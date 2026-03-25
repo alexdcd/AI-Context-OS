@@ -65,8 +65,10 @@ function AppContent() {
           data-tauri-drag-region
         />
 
-        {/* Sliding Toggle Button: Pushed left/right by the animated spacer */}
-        <div className="flex w-[40px] items-center justify-center shrink-0">
+        {/* Sliding Toggle Button: Pushed left/right by the animated spacer. 
+            mb-[3px] perfectly nudges it upwards to counter optical misalignment with macOS traffic lights 
+        */}
+        <div className="flex w-[40px] items-center justify-center shrink-0 mb-[3px]">
           <button
             onClick={toggleExplorer}
             className="flex h-6 w-6 items-center justify-center rounded-md text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
