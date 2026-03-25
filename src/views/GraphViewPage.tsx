@@ -173,6 +173,7 @@ export function GraphViewPage() {
     if (filteredData.nodes.length === 0) {
       setNodes([]);
       setEdges([]);
+      setLayouting(false);
       return;
     }
 

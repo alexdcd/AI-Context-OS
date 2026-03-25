@@ -146,7 +146,7 @@ export function ExplorerView() {
               </button>
             </div>
             <p className="text-[11px] text-[color:var(--text-2)]">
-              `Cmd/Ctrl + N` abre este formulario.
+              Cmd/Ctrl + N abre este formulario.
             </p>
           </div>
         )}

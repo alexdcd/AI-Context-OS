@@ -14,8 +14,8 @@ export function MemoryEditor() {
   const [l1, setL1] = useState("");
   const [l2, setL2] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<EditorMode>("both");
-  const [showInspector, setShowInspector] = useState(true);
+  const [mode, setMode] = useState<EditorMode>("l2");
+  const [showInspector, setShowInspector] = useState(false);
 
   useEffect(() => {
     if (activeMemory) {
