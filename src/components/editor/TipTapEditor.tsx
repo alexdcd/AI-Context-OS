@@ -1,21 +1,7 @@
 import { useEffect } from "react";
-import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import {
-  Bold,
-  Code,
-  Heading1,
-  Heading2,
-  Heading3,
-  Italic,
-  List,
-  ListOrdered,
-  Quote,
-  Redo2,
-  Strikethrough,
-  Undo2,
-} from "lucide-react";
 import { clsx } from "clsx";
 
 interface Props {
@@ -23,36 +9,22 @@ interface Props {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
-  toolbarLabel?: string;
-}
-
-interface ToolbarButton {
-  label: string;
-  icon: typeof Bold;
-  action: (editor: Editor) => void;
-  isActive?: (editor: Editor) => boolean;
-  isDisabled?: (editor: Editor) => boolean;
 }
 
 /**
- * Markdown-oriented TipTap editor with a compact toolbar inspired by block editors.
- * Content is serialized back to Markdown-compatible plain text.
+ * Minimal TipTap editor — no toolbar, markdown shortcuts only.
+ * Content is serialized to Markdown via TipTap's JSON API.
  */
 export function TipTapEditor({
   content,
   onChange,
   placeholder,
   className,
-  toolbarLabel,
 }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
-        codeBlock: {
-          HTMLAttributes: { class: "bg-zinc-800 rounded-lg p-3 font-mono text-sm" },
-        },
-        code: { HTMLAttributes: { class: "bg-zinc-800 rounded px-1 py-0.5 font-mono text-sm" } },
       }),
       Placeholder.configure({
         placeholder: placeholder ?? "Start writing...",
@@ -85,129 +57,15 @@ export function TipTapEditor({
 
   if (!editor) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]/60 p-3 text-sm text-[color:var(--text-2)]">
-        Cargando editor...
+      <div className="rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] p-3 text-sm text-[color:var(--text-2)]">
+        Loading...
       </div>
     );
   }
 
-  const toolbarButtons: ToolbarButton[] = [
-    {
-      label: "Undo",
-      icon: Undo2,
-      action: (ed) => ed.chain().focus().undo().run(),
-      isDisabled: (ed) => !ed.can().undo(),
-    },
-    {
-      label: "Redo",
-      icon: Redo2,
-      action: (ed) => ed.chain().focus().redo().run(),
-      isDisabled: (ed) => !ed.can().redo(),
-    },
-    {
-      label: "H1",
-      icon: Heading1,
-      action: (ed) => ed.chain().focus().toggleHeading({ level: 1 }).run(),
-      isActive: (ed) => ed.isActive("heading", { level: 1 }),
-    },
-    {
-      label: "H2",
-      icon: Heading2,
-      action: (ed) => ed.chain().focus().toggleHeading({ level: 2 }).run(),
-      isActive: (ed) => ed.isActive("heading", { level: 2 }),
-    },
-    {
-      label: "H3",
-      icon: Heading3,
-      action: (ed) => ed.chain().focus().toggleHeading({ level: 3 }).run(),
-      isActive: (ed) => ed.isActive("heading", { level: 3 }),
-    },
-    {
-      label: "Bold",
-      icon: Bold,
-      action: (ed) => ed.chain().focus().toggleBold().run(),
-      isActive: (ed) => ed.isActive("bold"),
-      isDisabled: (ed) => !ed.can().chain().focus().toggleBold().run(),
-    },
-    {
-      label: "Italic",
-      icon: Italic,
-      action: (ed) => ed.chain().focus().toggleItalic().run(),
-      isActive: (ed) => ed.isActive("italic"),
-      isDisabled: (ed) => !ed.can().chain().focus().toggleItalic().run(),
-    },
-    {
-      label: "Strike",
-      icon: Strikethrough,
-      action: (ed) => ed.chain().focus().toggleStrike().run(),
-      isActive: (ed) => ed.isActive("strike"),
-      isDisabled: (ed) => !ed.can().chain().focus().toggleStrike().run(),
-    },
-    {
-      label: "Inline code",
-      icon: Code,
-      action: (ed) => ed.chain().focus().toggleCode().run(),
-      isActive: (ed) => ed.isActive("code"),
-      isDisabled: (ed) => !ed.can().chain().focus().toggleCode().run(),
-    },
-    {
-      label: "Bullet list",
-      icon: List,
-      action: (ed) => ed.chain().focus().toggleBulletList().run(),
-      isActive: (ed) => ed.isActive("bulletList"),
-    },
-    {
-      label: "Ordered list",
-      icon: ListOrdered,
-      action: (ed) => ed.chain().focus().toggleOrderedList().run(),
-      isActive: (ed) => ed.isActive("orderedList"),
-    },
-    {
-      label: "Quote",
-      icon: Quote,
-      action: (ed) => ed.chain().focus().toggleBlockquote().run(),
-      isActive: (ed) => ed.isActive("blockquote"),
-    },
-  ];
-
-  return (
-    <div className="obs-editor-shell overflow-hidden">
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-[var(--border)] px-2 py-1">
-        {toolbarButtons.map((button) => {
-          const active = button.isActive?.(editor) ?? false;
-          const disabled = button.isDisabled?.(editor) ?? false;
-          return (
-            <button
-              key={button.label}
-              type="button"
-              onClick={() => button.action(editor)}
-              disabled={disabled}
-              className={clsx(
-                "inline-flex h-6 w-6 items-center justify-center rounded transition-colors",
-                active
-                  ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
-                  : "text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
-                disabled && "cursor-not-allowed opacity-30",
-              )}
-              title={button.label}
-            >
-              <button.icon className="h-3.5 w-3.5" />
-            </button>
-          );
-        })}
-        <span className="ml-auto text-[10px] text-[color:var(--text-2)]">
-          {toolbarLabel ?? ""}
-        </span>
-      </div>
-      <EditorContent editor={editor} />
-    </div>
-  );
+  return <EditorContent editor={editor} />;
 }
 
-/**
- * Extract markdown from the TipTap editor using its JSON document structure.
- * This avoids innerHTML/XSS concerns by using TipTap's typed API.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function editorToMarkdown(editor: any): string {
   const json = editor.getJSON();
@@ -279,10 +137,6 @@ function jsonToMarkdown(node: any): string {
   }
 }
 
-/**
- * Basic Markdown to HTML conversion for TipTap initialization.
- * Handles headings, bold, italic, strike, code blocks, inline code, lists, blockquotes, and paragraphs.
- */
 function markdownToHtml(md: string): string {
   if (!md.trim()) return "";
 

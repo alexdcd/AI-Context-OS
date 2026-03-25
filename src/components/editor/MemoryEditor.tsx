@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
-import { FileText, PanelRightClose, PanelRightOpen, Save, Trash2 } from "lucide-react";
+import { FileText, PanelRightClose, PanelRightOpen, Save, Trash2, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { useAppStore } from "../../lib/store";
 import { FrontmatterForm } from "./FrontmatterForm";
@@ -38,6 +38,7 @@ export function MemoryEditor() {
   const [dirty, setDirty] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("properties");
+  const [l1Open, setL1Open] = useState(false);
 
   useEffect(() => {
     if (activeMemory) {
@@ -176,66 +177,112 @@ export function MemoryEditor() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[color:var(--text-0)]">{meta.id}</p>
-          <p className="truncate text-[11px] text-[color:var(--text-2)]">{meta.l0 || "No L0 summary"}</p>
-        </div>
+      {/* Minimal top bar — actions only */}
+      <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-4 py-1.5">
+        <span className="flex-1 font-mono text-[11px] text-[color:var(--text-2)]">{meta.id}.md</span>
         <button
           type="button"
           onClick={() => setShowInspector((prev) => !prev)}
-          className="rounded p-1.5 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
+          className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
           title={showInspector ? "Hide inspector" : "Show inspector"}
         >
-          {showInspector ? (
-            <PanelRightClose className="h-4 w-4" />
-          ) : (
-            <PanelRightOpen className="h-4 w-4" />
-          )}
+          {showInspector ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
         </button>
         <button
           type="button"
           onClick={handleDelete}
           disabled={loading}
-          className="rounded p-1.5 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--danger)] disabled:opacity-50"
+          className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--danger)] disabled:opacity-50"
           title="Delete memory"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
           onClick={() => void handleSave()}
           disabled={!dirty || loading}
           className={clsx(
-            "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all",
+            "inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[11px] font-medium transition-all",
             dirty
               ? "bg-[color:var(--accent)] text-white hover:opacity-90"
               : "text-[color:var(--text-2)]",
           )}
         >
-          <Save className="h-3.5 w-3.5" />
+          <Save className="h-3 w-3" />
           {dirty ? "Save" : "Saved"}
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-y-auto p-3">
-          <TipTapEditor
-            content={l2}
-            onChange={(val) => {
-              setL2(val);
-              setDirty(true);
-            }}
-            className="min-h-[520px]"
-            placeholder="L2 · Contenido completo..."
-            toolbarLabel="L2 · Contenido completo · Cmd/Ctrl+S"
-          />
+        {/* Main editor area */}
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[780px] px-8 py-6">
+            {/* Editable title (L0) */}
+            <input
+              type="text"
+              value={meta.l0}
+              onChange={(e) => {
+                handleMetaChange({ ...meta, l0: e.target.value });
+              }}
+              placeholder="Untitled"
+              className="mb-1 w-full bg-transparent text-2xl font-semibold text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]/40 focus:outline-none"
+            />
+            <p className="mb-6 font-mono text-[11px] text-[color:var(--text-2)]">
+              {meta.memory_type}
+              {meta.importance >= 0.7 ? " · high" : meta.importance >= 0.4 ? "" : " · low"}
+              {meta.always_load && " · pinned"}
+              {meta.tags.length > 0 && ` · ${meta.tags.join(", ")}`}
+              {" · "}L2 content · v{meta.version}
+            </p>
+
+            {/* L2 — Main content */}
+            <TipTapEditor
+              content={l2}
+              onChange={(val) => {
+                setL2(val);
+                setDirty(true);
+              }}
+              className="min-h-[400px]"
+              placeholder="Write here..."
+            />
+
+            {/* L1 — Collapsible summary */}
+            <div className="mt-8 border-t border-[var(--border)] pt-3">
+              <button
+                type="button"
+                onClick={() => setL1Open((prev) => !prev)}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
+              >
+                <ChevronRight
+                  className={clsx(
+                    "h-3 w-3 transition-transform",
+                    l1Open && "rotate-90",
+                  )}
+                />
+                L1 · Expanded Summary
+              </button>
+              {l1Open && (
+                <div className="mt-2">
+                  <TipTapEditor
+                    content={l1}
+                    onChange={(val) => {
+                      setL1(val);
+                      setDirty(true);
+                    }}
+                    className="min-h-[120px]"
+                    placeholder="L1 summary (150-300 tokens)..."
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* Inspector sidebar */}
         <aside
           className={clsx(
             "obs-inspector min-h-0",
-            showInspector ? "w-[348px] opacity-100" : "pointer-events-none w-0 opacity-0",
+            showInspector ? "w-[320px] opacity-100" : "pointer-events-none w-0 opacity-0",
           )}
         >
           <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[color:var(--bg-0)]">
