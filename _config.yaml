@@ -1,0 +1,6 @@
+root_dir: /Users/alexdc/AI-Context-OS
+default_token_budget: 4000
+decay_threshold: 0.1
+scratch_ttl_days: 7
+active_tools:
+- claude

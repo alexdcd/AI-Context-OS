@@ -1,0 +1,61 @@
+# AI Context OS — Windsurf Rules
+# Auto-generated from claude.md. Do not edit manually.
+
+# RULES
+
+_No rules defined yet. Add rules in 08-rules/_
+
+# Reglas de Lectura y Escritura de Memorias
+
+## Lectura
+1. Lee SOLO los archivos que necesites para la tarea actual
+2. Empieza siempre por el nivel L1 (resumen)
+3. Carga L2 (completo) SOLO si L1 no tiene suficiente detalle
+4. NUNCA cargues más de 5 archivos L2 en una sola consulta
+5. Si la tarea es simple, 2-3 archivos L1 deberían ser suficientes
+6. Prioriza: rules > context > skills > projects > resources
+7. Memorias con always_load: true se cargan SIEMPRE como L1 para su tipo de tarea
+8. Si un output de herramienta supera 2000 tokens, escríbelo en 09-scratch/
+
+## Escritura
+- Usa el frontmatter YAML estándar (id, type, l0, importance, tags, related)
+- Separa contenido con <!-- L1 --> y <!-- L2 -->
+- Incrementa version: y actualiza modified: al editar
+- Archivos temporales van a 09-scratch/ con nombre descriptivo + timestamp
+
+# Estructura de Carpetas
+
+```
+/Users/alexdc/AI-Context-OS/
+├── claude.md                    ← ESTE ARCHIVO (enrutador maestro)
+├── _index.yaml                  ← catálogo L0 autogenerado
+├── _config.yaml                 ← configuración global
+├── 01-context/                  ← información estática del usuario
+├── 02-daily/                    ← registros diarios (JSONL)
+│   ├── daily-log.jsonl
+│   └── sessions/
+├── 03-intelligence/             ← investigación, mercado
+├── 04-projects/                 ← un subdirectorio por proyecto
+├── 05-resources/                ← plantillas, ejemplos
+├── 06-skills/                   ← habilidades/instrucciones IA
+├── 07-tasks/                    ← tareas (JSONL)
+│   └── backlog.jsonl
+├── 08-rules/                    ← restricciones y directrices
+└── 09-scratch/                  ← buffer temporal de la IA
+```
+
+# Regla de Compaction de Sesión
+
+Si llevas más de 15-20 intercambios en esta sesión:
+1. Escribe un resumen estructurado en 02-daily/sessions/YYYY-MM-DD-resumen.md
+2. Incluye: decisiones tomadas, hechos nuevos, tareas pendientes
+3. Appenda los hechos clave al daily-log.jsonl
+4. Sugiere al usuario iniciar nueva sesión para tareas no relacionadas
+
+Si generas un output largo (análisis, búsqueda, código):
+1. Escríbelo en 09-scratch/ con nombre descriptivo + timestamp
+2. Referencia la ruta en la conversación
+3. Lee selectivamente cuando necesites datos específicos
+
+# Índice de Memorias Disponibles
+
