@@ -247,13 +247,13 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
               Output Format
             </span>
             <input
-            type="text"
-            value={meta.output_format ?? ""}
-            onChange={(e) => update({ output_format: e.target.value.trim() || null })}
-            placeholder="markdown / json / text..."
-            className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-[color:var(--accent)] focus:outline-none"
-          />
-        </div>
+              type="text"
+              value={meta.output_format ?? ""}
+              onChange={(e) => update({ output_format: e.target.value.trim() || null })}
+              placeholder="markdown / json / text..."
+              className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-[color:var(--accent)] focus:outline-none"
+            />
+          </div>
           <ChipEditor
             label="Requires"
             values={meta.requires}
