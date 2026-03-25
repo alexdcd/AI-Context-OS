@@ -26,6 +26,7 @@ export function MemoryEditor() {
     activeMemory,
     activeRawFile,
     saveActiveMemory,
+    saveRawFile,
     deleteMemory,
     loading,
     memories,
@@ -160,7 +161,13 @@ export function MemoryEditor() {
 
   if (!activeMemory || !meta) {
     if (activeRawFile) {
-      return <RawFileViewer file={activeRawFile} />;
+      return (
+        <RawFileEditor
+          file={activeRawFile}
+          loading={loading}
+          onSave={saveRawFile}
+        />
+      );
     }
 
     return (
@@ -558,15 +565,48 @@ function formatTimestamp(value: string): string {
   return date.toLocaleString();
 }
 
-function RawFileViewer({ file }: { file: RawFileDocument }) {
+function RawFileEditor({
+  file,
+  loading,
+  onSave,
+}: {
+  file: RawFileDocument;
+  loading: boolean;
+  onSave: (path: string, content: string) => Promise<void>;
+}) {
   const fileName = getFileName(file.path);
-  const lineCount = file.content.length === 0 ? 0 : file.content.split(/\r?\n/).length;
+  const [content, setContent] = useState(file.content);
 
-  if (file.kind === "jsonl") {
-    return <JsonlViewer file={file} fileName={fileName} lineCount={lineCount} />;
-  }
+  useEffect(() => {
+    setContent(file.content);
+  }, [file.path, file.content]);
 
-  const language = file.kind === "yaml" ? "yaml" : "text";
+  const dirty = content !== file.content;
+  const lineCount = content.length === 0 ? 0 : content.split(/\r?\n/).length;
+  const language = file.kind === "yaml" ? "yaml" : file.kind;
+  const records = useMemo(
+    () => (file.kind === "jsonl" ? parseJsonl(content) : []),
+    [content, file.kind],
+  );
+  const parsedCount = records.filter((item) => !item.error).length;
+  const errorCount = records.length - parsedCount;
+
+  const handleSave = useCallback(async () => {
+    if (!dirty || loading) return;
+    await onSave(file.path, content);
+  }, [dirty, loading, onSave, file.path, content]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        void handleSave();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleSave]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
@@ -578,90 +618,82 @@ function RawFileViewer({ file }: { file: RawFileDocument }) {
           {language.toUpperCase()}
         </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="mb-2 text-xs text-[color:var(--text-2)]">
-          {lineCount} lines · read-only preview
-        </div>
-        <pre className="overflow-x-auto rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] p-3 text-xs leading-5 text-[color:var(--text-1)]">
-          <code>{file.content || " "}</code>
-        </pre>
-      </div>
-    </div>
-  );
-}
-
-function JsonlViewer({
-  file,
-  fileName,
-  lineCount,
-}: {
-  file: RawFileDocument;
-  fileName: string;
-  lineCount: number;
-}) {
-  const records = useMemo(() => parseJsonl(file.content), [file.content]);
-  const parsedCount = records.filter((item) => !item.error).length;
-  const errorCount = records.length - parsedCount;
-
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[color:var(--text-0)]">{fileName}</p>
-          <p className="truncate text-xs text-[color:var(--text-2)]">{file.path}</p>
-        </div>
-        <span className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-xs text-[color:var(--text-1)]">
-          JSONL
-        </span>
-      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--text-2)]">
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-2)]">
           <span>{lineCount} lines</span>
-          <span>·</span>
-          <span>{records.length} records</span>
-          <span>·</span>
-          <span>{parsedCount} parsed</span>
-          {errorCount > 0 && (
+          {file.kind === "jsonl" && (
             <>
               <span>·</span>
-              <span>{errorCount} errors</span>
+              <span>{records.length} records</span>
+              <span>·</span>
+              <span>{parsedCount} parsed</span>
+              {errorCount > 0 && (
+                <>
+                  <span>·</span>
+                  <span>{errorCount} errors</span>
+                </>
+              )}
             </>
           )}
+          <span>·</span>
+          <span>{dirty ? "unsaved" : "saved"}</span>
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={!dirty || loading}
+            className={clsx(
+              "ml-auto rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              dirty
+                ? "bg-[color:var(--accent)] text-white hover:brightness-110"
+                : "cursor-not-allowed bg-[color:var(--bg-3)] text-[color:var(--text-2)]",
+            )}
+          >
+            {loading ? "Saving..." : dirty ? "Save" : "Saved"}
+          </button>
         </div>
 
-        <div className="space-y-2">
-          {records.length === 0 && (
-            <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
-              Empty JSONL file.
-            </p>
-          )}
-          {records.map((record) => (
-            <div
-              key={`jsonl-${record.line}`}
-              className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)]"
-            >
-              <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1.5">
-                <p className="text-xs text-[color:var(--text-2)]">Line {record.line}</p>
-                <span className="text-[10px] text-[color:var(--text-2)]">
-                  {record.error ? "INVALID" : "OK"}
-                </span>
-              </div>
-              {record.error ? (
-                <div className="px-2.5 py-2">
-                  <p className="mb-1 text-xs text-[#e39ca3]">{record.error}</p>
-                  <pre className="overflow-x-auto text-xs text-[color:var(--text-1)]">
-                    <code>{record.raw}</code>
-                  </pre>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          spellCheck={false}
+          className="mb-3 min-h-[360px] w-full resize-y rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] p-3 font-mono text-xs leading-5 text-[color:var(--text-1)] focus:border-[color:var(--accent)] focus:outline-none"
+        />
+
+        {file.kind === "jsonl" && (
+          <div className="space-y-2">
+            {records.length === 0 && (
+              <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
+                Empty JSONL file.
+              </p>
+            )}
+            {records.map((record) => (
+              <div
+                key={`jsonl-${record.line}`}
+                className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)]"
+              >
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1.5">
+                  <p className="text-xs text-[color:var(--text-2)]">Line {record.line}</p>
+                  <span className="text-[10px] text-[color:var(--text-2)]">
+                    {record.error ? "INVALID" : "OK"}
+                  </span>
                 </div>
-              ) : (
-                <pre className="overflow-x-auto px-2.5 py-2 text-xs text-[color:var(--text-1)]">
-                  <code>{record.pretty}</code>
-                </pre>
-              )}
-            </div>
-          ))}
-        </div>
+                {record.error ? (
+                  <div className="px-2.5 py-2">
+                    <p className="mb-1 text-xs text-[#e39ca3]">{record.error}</p>
+                    <pre className="overflow-x-auto text-xs text-[color:var(--text-1)]">
+                      <code>{record.raw}</code>
+                    </pre>
+                  </div>
+                ) : (
+                  <pre className="overflow-x-auto px-2.5 py-2 text-xs text-[color:var(--text-1)]">
+                    <code>{record.pretty}</code>
+                  </pre>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
