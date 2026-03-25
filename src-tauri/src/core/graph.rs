@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use chrono::Utc;
 use petgraph::graph::{Graph, NodeIndex};
 use petgraph::Undirected;
 
+use crate::core::decay::decay_score;
 use crate::core::types::{GraphData, GraphEdge, GraphNode, Memory};
 
 /// Build an undirected graph from memory relationships.
@@ -60,12 +62,18 @@ pub fn to_graph_data(memories: &[Memory], _decay_threshold: f64) -> GraphData {
     for node_idx in graph.node_indices() {
         let id = &graph[node_idx];
         if let Some(memory) = id_map.get(id) {
+            let days_since_last_access =
+                (Utc::now() - memory.meta.last_access).num_hours() as f64 / 24.0;
             nodes.push(GraphNode {
                 id: id.clone(),
                 label: memory.meta.l0.clone(),
                 memory_type: memory.meta.memory_type.clone(),
                 importance: memory.meta.importance,
-                decay_score: 1.0, // Simplified — will be computed by caller if needed
+                decay_score: decay_score(
+                    memory.meta.decay_rate,
+                    memory.meta.access_count,
+                    days_since_last_access.max(0.0),
+                ),
             });
         }
     }

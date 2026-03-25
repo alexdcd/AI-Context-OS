@@ -31,7 +31,24 @@ pub fn simulate_context(
     }
 
     let now = Utc::now();
-    let selected_ids: Vec<String> = Vec::new();
+    let mut base_scored: Vec<(usize, crate::core::types::ScoreBreakdown)> = memories
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let score = compute_score(&query, m, &memories, &[], now);
+            (i, score)
+        })
+        .collect();
+    base_scored.sort_by(|a, b| {
+        b.1.final_score
+            .partial_cmp(&a.1.final_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let selected_ids: Vec<String> = base_scored
+        .iter()
+        .take(5)
+        .map(|(idx, _)| memories[*idx].meta.id.clone())
+        .collect();
 
     // Score all memories
     let mut scored: Vec<(usize, crate::core::types::ScoreBreakdown)> = memories
