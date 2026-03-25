@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { MemoryMeta, MemoryType } from "../../lib/types";
-import { MEMORY_TYPE_COLORS, MEMORY_TYPE_LABELS } from "../../lib/types";
+import { MEMORY_TYPE_LABELS } from "../../lib/types";
 
 interface FrontmatterFormProps {
   meta: MemoryMeta;
@@ -11,7 +11,6 @@ interface ChipEditorProps {
   label: string;
   values: string[];
   placeholder: string;
-  color?: string;
   onAdd: (value: string) => void;
   onRemove: (value: string) => void;
 }
@@ -20,7 +19,6 @@ function ChipEditor({
   label,
   values,
   placeholder,
-  color,
   onAdd,
   onRemove,
 }: ChipEditorProps) {
@@ -44,9 +42,9 @@ function ChipEditor({
             key={value}
             className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
             style={{
-              borderColor: color ?? "#3f3f46",
-              color: color ?? "#d4d4d8",
-              backgroundColor: `${color ?? "#27272a"}20`,
+              borderColor: "var(--border)",
+              color: "var(--text-1)",
+              backgroundColor: "var(--bg-3)",
             }}
           >
             {value}
@@ -96,7 +94,6 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
     return [...list, value];
   };
 
-  const typeColor = MEMORY_TYPE_COLORS[meta.memory_type];
   const isSkill = meta.memory_type === "skill";
 
   return (
@@ -108,7 +105,7 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             type="text"
             value={meta.id}
             onChange={(e) => update({ id: toMemoryRef(e.target.value) })}
-            className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] focus:border-sky-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] focus:border-[color:var(--accent)] focus:outline-none"
             placeholder="memory-id"
           />
         </div>
@@ -121,7 +118,7 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             value={meta.memory_type}
             onChange={(e) => update({ memory_type: e.target.value as MemoryType })}
             className="w-full rounded-lg border bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-1)]"
-            style={{ borderColor: typeColor }}
+            style={{ borderColor: "var(--border)" }}
           >
             {(Object.keys(MEMORY_TYPE_LABELS) as MemoryType[]).map((t) => (
               <option key={t} value={t}>
@@ -136,7 +133,7 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             type="checkbox"
             checked={meta.always_load}
             onChange={(e) => update({ always_load: e.target.checked })}
-            className="accent-sky-500"
+            className="accent-[color:var(--accent)]"
           />
           Always load
         </label>
@@ -154,7 +151,8 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             step="0.05"
             value={meta.importance}
             onChange={(e) => update({ importance: parseFloat(e.target.value) })}
-            className="w-full accent-sky-500"
+            className="w-full"
+            style={{ accentColor: "var(--accent)" }}
           />
         </div>
         <div className="space-y-1">
@@ -168,7 +166,8 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             step="0.05"
             value={meta.confidence}
             onChange={(e) => update({ confidence: parseFloat(e.target.value) })}
-            className="w-full accent-cyan-500"
+            className="w-full"
+            style={{ accentColor: "var(--accent)" }}
           />
         </div>
         <div className="space-y-1">
@@ -182,7 +181,8 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             step="0.0001"
             value={meta.decay_rate}
             onChange={(e) => update({ decay_rate: parseFloat(e.target.value) })}
-            className="w-full accent-emerald-500"
+            className="w-full"
+            style={{ accentColor: "var(--accent)" }}
           />
         </div>
       </section>
@@ -197,7 +197,7 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             value={meta.l0}
             onChange={(e) => update({ l0: e.target.value })}
             placeholder="Resumen de una línea..."
-            className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-sky-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-[color:var(--accent)] focus:outline-none"
           />
         </div>
 
@@ -205,7 +205,6 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
           label="Tags"
           values={meta.tags}
           placeholder="Añadir tag..."
-          color="#a78bfa"
           onAdd={(value) =>
             update({
               tags: addUnique(meta.tags, value, false),
@@ -217,7 +216,6 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
           label="Related"
           values={meta.related}
           placeholder="memory-id..."
-          color="#60a5fa"
           onAdd={(value) =>
             update({
               related: addUnique(meta.related, value),
@@ -235,7 +233,6 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             label="Triggers"
             values={meta.triggers}
             placeholder="frase de activación..."
-            color="#4ade80"
             onAdd={(value) =>
               update({
                 triggers: addUnique(meta.triggers, value, false),
@@ -250,18 +247,17 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
               Output Format
             </span>
             <input
-              type="text"
-              value={meta.output_format ?? ""}
-              onChange={(e) => update({ output_format: e.target.value.trim() || null })}
-              placeholder="markdown / json / text..."
-              className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-sky-500/50 focus:outline-none"
-            />
-          </div>
+            type="text"
+            value={meta.output_format ?? ""}
+            onChange={(e) => update({ output_format: e.target.value.trim() || null })}
+            placeholder="markdown / json / text..."
+            className="w-full rounded-lg border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-[color:var(--accent)] focus:outline-none"
+          />
+        </div>
           <ChipEditor
             label="Requires"
             values={meta.requires}
             placeholder="memory-id requerido..."
-            color="#22c55e"
             onAdd={(value) =>
               update({
                 requires: addUnique(meta.requires, value),
@@ -275,7 +271,6 @@ export function FrontmatterForm({ meta, onChange }: FrontmatterFormProps) {
             label="Optional"
             values={meta.optional}
             placeholder="memory-id opcional..."
-            color="#f59e0b"
             onAdd={(value) =>
               update({
                 optional: addUnique(meta.optional, value),
