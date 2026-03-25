@@ -17,6 +17,7 @@ pub fn scan_memories(root: &Path) -> Vec<(MemoryMeta, String)> {
         "06-skills",
         "07-tasks",
         "08-rules",
+        "09-scratch",
     ];
 
     for folder in &folders {
