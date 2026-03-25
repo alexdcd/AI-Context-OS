@@ -1,10 +1,11 @@
 use std::fs;
 
 use chrono::Utc;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::core::frontmatter::serialize_frontmatter;
 use crate::core::types::{MemoryMeta, MemoryType};
+use crate::core::watcher::start_watcher;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -21,13 +22,14 @@ pub struct OnboardingProfile {
 #[tauri::command]
 pub fn run_onboarding(
     profile: OnboardingProfile,
+    app: AppHandle,
     state: State<AppState>,
 ) -> Result<bool, String> {
     // Step 1: Set root directory if custom
     if let Some(ref custom_root) = profile.root_dir {
         let expanded = shellexpand(custom_root);
         let path = std::path::PathBuf::from(&expanded);
-        *state.root_dir.write().unwrap() = path;
+        state.set_root(path)?;
     }
 
     let root = state.get_root();
@@ -70,6 +72,10 @@ pub fn run_onboarding(
     for (meta, path) in all {
         index.insert(meta.id.clone(), (meta, path));
     }
+
+    // Persist selected root and ensure watcher points at this workspace.
+    state.set_root(root.clone())?;
+    start_watcher(root, app).ok();
 
     Ok(true)
 }
