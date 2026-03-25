@@ -13,6 +13,7 @@ import { useAppStore } from "./lib/store";
 import { isOnboarded } from "./lib/tauri";
 import { SettingsView } from "./views/SettingsView";
 import { useThemeEffect } from "./lib/settingsStore";
+import { PanelLeft } from "lucide-react";
 
 function AppContent() {
   useFileWatcher();
@@ -20,6 +21,7 @@ function AppContent() {
   const error = useAppStore((s) => s.error);
   const setError = useAppStore((s) => s.setError);
   const initialize = useAppStore((s) => s.initialize);
+  const toggleExplorer = useAppStore((s) => s.toggleExplorer);
 
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
 
@@ -49,8 +51,23 @@ function AppContent() {
   }
 
   return (
-    <div className="h-screen overflow-hidden">
-      <div className="obs-app-shell flex h-full overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--bg-0)]">
+      <div 
+        data-tauri-drag-region 
+        className="flex h-12 w-full shrink-0 flex-row items-center border-b border-[color:var(--border)] relative z-50"
+      >
+        <div data-tauri-drag-region className="w-[76px] shrink-0" /> {/* Spacer for macOS traffic lights */}
+        <button
+          onClick={toggleExplorer}
+          className="rounded-md p-1.5 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
+          title="Toggle Explorer"
+        >
+          <PanelLeft className="h-[18px] w-[18px]" pointerEvents="none" />
+        </button>
+        <div data-tauri-drag-region className="flex-1 h-full" />
+      </div>
+
+      <div className="obs-app-shell flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="relative flex-1 overflow-hidden">
           <div className="h-full overflow-hidden bg-[color:var(--bg-1)]">
