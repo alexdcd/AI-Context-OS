@@ -72,15 +72,17 @@ function TreeNode({
   toggleExpand,
   conflictIds,
 }: TreeNodeProps) {
-  const { selectedPath, selectFile, memories } = useAppStore();
+  const { selectedPath, selectFile, selectRawFile, memories } = useAppStore();
   const isExpanded = expanded.has(node.path);
   const isSelected = selectedPath === node.path;
   const color = getTypeColor(node);
 
-  const memoryId = node.name.replace(".md", "");
-  const memoryMeta = memories.find((m) => m.id === memoryId);
+  const isMarkdown = node.name.endsWith(".md");
+  const memoryId = isMarkdown ? node.name.replace(".md", "") : "";
+  const memoryMeta = isMarkdown ? memories.find((m) => m.id === memoryId) : null;
 
   const hasConflict = conflictIds.has(memoryId);
+  const isRawSupported = isRawViewerSupported(node.name);
 
   // Decay-based opacity for memory files
   const opacity = memoryMeta
@@ -90,8 +92,10 @@ function TreeNode({
   const handleClick = () => {
     if (node.is_dir) {
       toggleExpand(node.path);
-    } else if (node.name.endsWith(".md") && memoryMeta) {
+    } else if (isMarkdown && memoryMeta) {
       selectFile(memoryMeta.id);
+    } else if (isRawSupported) {
+      selectRawFile(node.path);
     }
   };
 
@@ -165,6 +169,15 @@ function TreeNode({
         </div>
       )}
     </>
+  );
+}
+
+function isRawViewerSupported(name: string): boolean {
+  const lowerName = name.toLowerCase();
+  return (
+    lowerName.endsWith(".jsonl") ||
+    lowerName.endsWith(".yaml") ||
+    lowerName.endsWith(".yml")
   );
 }
 

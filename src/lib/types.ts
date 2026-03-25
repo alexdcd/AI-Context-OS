@@ -38,6 +38,14 @@ export interface Memory {
   file_path: string;
 }
 
+export type RawFileKind = "jsonl" | "yaml" | "text";
+
+export interface RawFileDocument {
+  path: string;
+  content: string;
+  kind: RawFileKind;
+}
+
 export type LoadLevel = "l0" | "l1" | "l2";
 
 export interface ScoreBreakdown {

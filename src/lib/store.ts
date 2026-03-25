@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import type { FileNode, Memory, MemoryMeta, GraphData } from "./types";
+import type {
+  FileNode,
+  GraphData,
+  Memory,
+  MemoryMeta,
+  RawFileDocument,
+  RawFileKind,
+} from "./types";
 import * as api from "./tauri";
 
 interface AppStore {
@@ -8,6 +15,7 @@ interface AppStore {
   fileTree: FileNode[];
   memories: MemoryMeta[];
   activeMemory: Memory | null;
+  activeRawFile: RawFileDocument | null;
   selectedPath: string | null;
   graphData: GraphData | null;
   loading: boolean;
@@ -18,6 +26,7 @@ interface AppStore {
   loadFileTree: () => Promise<void>;
   loadMemories: () => Promise<void>;
   selectFile: (id: string) => Promise<void>;
+  selectRawFile: (path: string) => Promise<void>;
   clearSelection: () => void;
   saveActiveMemory: (l1: string, l2: string, meta: MemoryMeta) => Promise<void>;
   deleteMemory: (id: string) => Promise<void>;
@@ -31,6 +40,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   fileTree: [],
   memories: [],
   activeMemory: null,
+  activeRawFile: null,
   selectedPath: null,
   graphData: null,
   loading: false,
@@ -74,14 +84,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       set({ loading: true });
       const memory = await api.getMemory(id);
-      set({ activeMemory: memory, selectedPath: memory.file_path, loading: false });
+      set({
+        activeMemory: memory,
+        activeRawFile: null,
+        selectedPath: memory.file_path,
+        loading: false,
+      });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  selectRawFile: async (path: string) => {
+    try {
+      set({ loading: true });
+      const content = await api.readFile(path);
+      const kind = inferRawFileKind(path);
+      set({
+        activeMemory: null,
+        activeRawFile: { path, content, kind },
+        selectedPath: path,
+        loading: false,
+      });
     } catch (e) {
       set({ error: String(e), loading: false });
     }
   },
 
   clearSelection: () => {
-    set({ activeMemory: null, selectedPath: null });
+    set({ activeMemory: null, activeRawFile: null, selectedPath: null });
   },
 
   saveActiveMemory: async (l1, l2, meta) => {
@@ -93,7 +124,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         l1_content: l1,
         l2_content: l2,
       });
-      set({ activeMemory: saved, loading: false });
+      set({ activeMemory: saved, activeRawFile: null, loading: false });
       await get().loadMemories();
       await get().loadFileTree();
       await get().loadGraph();
@@ -108,7 +139,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       await api.deleteMemory(id);
       const active = get().activeMemory;
       if (active?.meta.id === id) {
-        set({ activeMemory: null, selectedPath: null, loading: false });
+        set({
+          activeMemory: null,
+          activeRawFile: null,
+          selectedPath: null,
+          loading: false,
+        });
       } else {
         set({ loading: false });
       }
@@ -142,3 +178,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setError: (error) => set({ error }),
 }));
+
+function inferRawFileKind(path: string): RawFileKind {
+  const lowerPath = path.toLowerCase();
+  if (lowerPath.endsWith(".jsonl")) return "jsonl";
+  if (lowerPath.endsWith(".yaml") || lowerPath.endsWith(".yml")) return "yaml";
+  return "text";
+}
