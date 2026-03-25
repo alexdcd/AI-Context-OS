@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 
 use chrono::Utc;
 use tauri::{AppHandle, Emitter, State};
@@ -119,8 +120,10 @@ pub fn create_memory(
         memory.meta.id.clone(),
         (memory.meta.clone(), file_path.to_string_lossy().to_string()),
     );
+    drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
+    crate::commands::router::regenerate_router_internal(&app, &state)?;
 
     Ok(memory)
 }
@@ -132,35 +135,62 @@ pub fn save_memory(
     app: AppHandle,
     state: State<AppState>,
 ) -> Result<Memory, String> {
+    let root = state.get_root();
     let index = state.memory_index.read().unwrap();
     let (_old_meta, path) = index
         .get(&input.id)
         .ok_or_else(|| format!("Memory not found: {}", input.id))?;
-    let file_path = std::path::PathBuf::from(path.clone());
+    let old_file_path = PathBuf::from(path.clone());
+
+    if input.meta.id.trim().is_empty() {
+        return Err("Memory id cannot be empty".to_string());
+    }
+    if input.meta.id != input.id && index.contains_key(&input.meta.id) {
+        return Err(format!("Memory already exists: {}", input.meta.id));
+    }
     drop(index);
 
     let mut meta = input.meta;
     meta.modified = Utc::now();
     meta.version += 1;
+    meta.id = meta.id.trim().to_string();
+
+    let target_file_path = memory_folder(&root, &meta.memory_type).join(format!("{}.md", meta.id));
+    if target_file_path.exists() && target_file_path != old_file_path {
+        return Err(format!(
+            "A memory file already exists at {}",
+            target_file_path.display()
+        ));
+    }
 
     let memory = Memory {
         meta,
         l1_content: input.l1_content,
         l2_content: input.l2_content,
         raw_content: String::new(),
-        file_path: file_path.to_string_lossy().to_string(),
+        file_path: target_file_path.to_string_lossy().to_string(),
     };
 
-    write_memory(&file_path, &memory)?;
+    write_memory(&target_file_path, &memory)?;
+    if target_file_path != old_file_path && old_file_path.exists() {
+        fs::remove_file(&old_file_path)
+            .map_err(|e| format!("Failed to move memory file {}: {}", old_file_path.display(), e))?;
+    }
 
     // Update index
     let mut index = state.memory_index.write().unwrap();
+    index.remove(&input.id);
     index.insert(
         memory.meta.id.clone(),
-        (memory.meta.clone(), file_path.to_string_lossy().to_string()),
+        (
+            memory.meta.clone(),
+            target_file_path.to_string_lossy().to_string(),
+        ),
     );
+    drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
+    crate::commands::router::regenerate_router_internal(&app, &state)?;
 
     Ok(memory)
 }
@@ -176,10 +206,12 @@ pub fn delete_memory(
     let (_meta, path) = index
         .remove(&id)
         .ok_or_else(|| format!("Memory not found: {}", id))?;
+    drop(index);
 
     fs::remove_file(&path).map_err(|e| format!("Failed to delete {}: {}", path, e))?;
 
     let _ = app.emit("file-deleted", &path);
+    crate::commands::router::regenerate_router_internal(&app, &state)?;
 
     Ok(())
 }
