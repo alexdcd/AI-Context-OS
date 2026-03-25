@@ -98,8 +98,7 @@ fn load_all_memories(root: &PathBuf) -> Vec<Memory> {
     scanned
         .iter()
         .filter_map(|(_meta, path)| {
-            let full_path = root.join(path);
-            read_memory(&full_path).ok()
+            read_memory(std::path::Path::new(path)).ok()
         })
         .collect()
 }
@@ -250,8 +249,7 @@ fn main() {
         Commands::Show { id } => {
             let scanned = scan_memories(&root);
             if let Some((_meta, path)) = scanned.iter().find(|(m, _)| m.id == id) {
-                let full_path = root.join(path);
-                match read_memory(&full_path) {
+                match read_memory(std::path::Path::new(path)) {
                     Ok(memory) => {
                         println!("ID: {}", memory.meta.id);
                         println!("Type: {:?}", memory.meta.memory_type);
