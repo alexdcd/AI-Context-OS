@@ -2,10 +2,10 @@
 @import "tailwindcss";
 
 :root, :root.light {
-  --bg-0: #ffffff;
-  --bg-1: #f8f9fa;
-  --bg-2: #f1f3f5;
-  --bg-3: #e9ecef;
+  --bg-0: #f1f3f5;
+  --bg-1: #ffffff;
+  --bg-2: #e2e6ea;
+  --bg-3: #d3d9df;
   --border: rgba(0, 0, 0, 0.08);
   --border-active: rgba(0, 0, 0, 0.16);
   --text-0: #1a1b1e;
