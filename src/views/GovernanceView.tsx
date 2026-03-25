@@ -53,17 +53,16 @@ export function GovernanceView() {
       : 0;
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-950 px-4 py-3">
-        <h1 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-          <Shield className="h-5 w-5 text-violet-400" />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-[var(--border)] px-4 py-3">
+        <h1 className="flex items-center gap-2 text-lg font-semibold text-[color:var(--text-0)]">
+          <Shield className="h-5 w-5 text-sky-300" />
           Governance Panel
         </h1>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 bg-zinc-950">
+      <div className="flex border-b border-[var(--border)] bg-[color:var(--bg-1)]/55">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -71,8 +70,8 @@ export function GovernanceView() {
             className={clsx(
               "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
               activeTab === tab.id
-                ? "border-violet-500 text-violet-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-300",
+                ? "border-sky-500 text-sky-200"
+                : "border-transparent text-[color:var(--text-2)] hover:text-[color:var(--text-0)]",
             )}
           >
             <tab.icon className="h-4 w-4" />
@@ -91,7 +90,7 @@ export function GovernanceView() {
               <StatCard label="Conflicts" value={conflicts.length.toString()} />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-zinc-400 mb-3">
+              <h3 className="mb-3 text-sm font-medium text-[color:var(--text-1)]">
                 Memories by Type
               </h3>
               <div className="space-y-2">
@@ -101,10 +100,10 @@ export function GovernanceView() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: MEMORY_TYPE_COLORS[type as keyof typeof MEMORY_TYPE_COLORS] }}
                     />
-                    <span className="text-sm text-zinc-400 w-24">
+                    <span className="w-24 text-sm text-[color:var(--text-1)]">
                       {MEMORY_TYPE_LABELS[type as keyof typeof MEMORY_TYPE_LABELS]}
                     </span>
-                    <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[color:var(--bg-3)]">
                       <div
                         className="h-full rounded-full"
                         style={{
@@ -113,7 +112,7 @@ export function GovernanceView() {
                         }}
                       />
                     </div>
-                    <span className="text-sm font-mono text-zinc-500 w-8 text-right">
+                    <span className="w-8 text-right text-sm font-mono text-[color:var(--text-2)]">
                       {count}
                     </span>
                   </div>
@@ -126,18 +125,18 @@ export function GovernanceView() {
         {activeTab === "conflicts" && (
           <div className="space-y-3">
             {conflicts.map((c, i) => (
-              <div key={i} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+              <div key={i} className="rounded-lg border border-amber-500/25 bg-amber-500/8 p-3">
                 <div className="flex items-center gap-2 mb-1">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <span className="text-sm font-medium text-amber-400">
+                  <span className="text-sm font-medium text-amber-300">
                     {c.memory_a} ↔ {c.memory_b}
                   </span>
                 </div>
-                <p className="text-sm text-zinc-400">{c.description}</p>
+                <p className="text-sm text-[color:var(--text-1)]">{c.description}</p>
               </div>
             ))}
             {conflicts.length === 0 && (
-              <p className="text-center text-sm text-zinc-600 py-8">
+              <p className="py-8 text-center text-sm text-[color:var(--text-2)]">
                 No conflicts detected
               </p>
             )}
@@ -147,17 +146,17 @@ export function GovernanceView() {
         {activeTab === "decay" && (
           <div className="space-y-2">
             {decayCandidates.map((m) => (
-              <div key={m.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 flex items-center gap-3">
-                <Clock className="h-4 w-4 text-zinc-600" />
-                <span className="text-sm text-zinc-300">{m.id}</span>
-                <span className="text-xs text-zinc-500">{m.l0}</span>
-                <span className="ml-auto text-xs text-zinc-600">
+              <div key={m.id} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[color:var(--bg-1)]/65 p-3">
+                <Clock className="h-4 w-4 text-[color:var(--text-2)]" />
+                <span className="text-sm text-[color:var(--text-1)]">{m.id}</span>
+                <span className="text-xs text-[color:var(--text-2)]">{m.l0}</span>
+                <span className="ml-auto text-xs text-[color:var(--text-2)]">
                   Last: {new Date(m.last_access).toLocaleDateString()}
                 </span>
               </div>
             ))}
             {decayCandidates.length === 0 && (
-              <p className="text-center text-sm text-zinc-600 py-8">
+              <p className="py-8 text-center text-sm text-[color:var(--text-2)]">
                 No decay candidates
               </p>
             )}
@@ -167,15 +166,15 @@ export function GovernanceView() {
         {activeTab === "consolidation" && (
           <div className="space-y-3">
             {consolidation.map((s, i) => (
-              <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-                <p className="text-sm text-zinc-300 mb-2">{s.summary}</p>
-                <span className="text-xs text-zinc-500">
+              <div key={i} className="rounded-lg border border-[var(--border)] bg-[color:var(--bg-1)]/65 p-3">
+                <p className="mb-2 text-sm text-[color:var(--text-1)]">{s.summary}</p>
+                <span className="text-xs text-[color:var(--text-2)]">
                   Suggested: {s.suggested_folder}
                 </span>
               </div>
             ))}
             {consolidation.length === 0 && (
-              <p className="text-center text-sm text-zinc-600 py-8">
+              <p className="py-8 text-center text-sm text-[color:var(--text-2)]">
                 No consolidation suggestions
               </p>
             )}
@@ -188,9 +187,9 @@ export function GovernanceView() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-      <p className="text-2xl font-semibold text-zinc-100">{value}</p>
-      <p className="text-xs text-zinc-500 mt-1">{label}</p>
+    <div className="rounded-lg border border-[var(--border)] bg-[color:var(--bg-1)]/70 p-4">
+      <p className="text-2xl font-semibold text-[color:var(--text-0)]">{value}</p>
+      <p className="mt-1 text-xs text-[color:var(--text-2)]">{label}</p>
     </div>
   );
 }

@@ -138,7 +138,9 @@ export function GraphViewPage() {
   const [typeFilter, setTypeFilter] = useState<MemoryType | "all">("all");
   const [selectedNode, setSelectedNode] = useState<GNode | null>(null);
   const [showInspector, setShowInspector] = useState(true);
-  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [flowInstance, setFlowInstance] = useState<
+    ReactFlowInstance<FlowNode, FlowEdge> | null
+  >(null);
 
   useEffect(() => {
     loadGraph();
