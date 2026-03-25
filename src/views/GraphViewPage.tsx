@@ -12,6 +12,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { Network } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../lib/store";
 import { MEMORY_TYPE_COLORS } from "../lib/types";
 import { saveMemory, getMemory } from "../lib/tauri";
@@ -86,7 +87,8 @@ async function layoutWithElk(
 }
 
 export function GraphViewPage() {
-  const { graphData, loadGraph } = useAppStore();
+  const navigate = useNavigate();
+  const { graphData, loadGraph, selectFile, setError } = useAppStore();
   const [nodes, setNodes, onNodesChange] = useNodesState<{
     id: string;
     position: { x: number; y: number };
@@ -99,6 +101,9 @@ export function GraphViewPage() {
     target: string;
   }>([]);
   const [layouting, setLayouting] = useState(false);
+  const [edgeMode, setEdgeMode] = useState<"related" | "requires" | "optional">(
+    "related",
+  );
 
   useEffect(() => {
     loadGraph();
@@ -160,34 +165,66 @@ export function GraphViewPage() {
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return;
 
+      const edgeColors: Record<string, string> = {
+        related: "#6366f1",
+        requires: "#22c55e",
+        optional: "#f59e0b",
+      };
+
       // Add edge visually
       const newEdge = {
         id: `e-new-${Date.now()}`,
         source: connection.source,
         target: connection.target,
-        label: "related",
-        style: { stroke: "#6366f1" },
+        label: edgeMode,
+        style: { stroke: edgeColors[edgeMode] ?? "#6366f1" },
         labelStyle: { fill: "#a1a1aa", fontSize: 10 },
       };
       setEdges((eds) => addEdge(newEdge, eds));
 
-      // Update the source memory's `related` field
+      // Update relationship fields in source memory
       try {
         const memory = await getMemory(connection.source);
-        if (!memory.meta.related.includes(connection.target)) {
-          memory.meta.related.push(connection.target);
-          await saveMemory({
-            id: memory.meta.id,
-            meta: memory.meta,
-            l1_content: memory.l1_content,
-            l2_content: memory.l2_content,
-          });
+        const ensureUniquePush = (arr: string[], value: string) => {
+          if (!arr.includes(value)) arr.push(value);
+        };
+
+        if (edgeMode === "related") {
+          ensureUniquePush(memory.meta.related, connection.target);
+        } else if (memory.meta.memory_type === "skill") {
+          if (edgeMode === "requires") {
+            ensureUniquePush(memory.meta.requires, connection.target);
+          } else {
+            ensureUniquePush(memory.meta.optional, connection.target);
+          }
+        } else {
+          // Non-skill memories fallback to "related" edges.
+          ensureUniquePush(memory.meta.related, connection.target);
         }
+
+        await saveMemory({
+          id: memory.meta.id,
+          meta: memory.meta,
+          l1_content: memory.l1_content,
+          l2_content: memory.l2_content,
+        });
       } catch (e) {
-        console.error("Failed to update relationship:", e);
+        setError(`Failed to update relationship: ${String(e)}`);
       }
     },
-    [setEdges],
+    [edgeMode, setEdges, setError],
+  );
+
+  const onNodeClick = useCallback(
+    async (_event: unknown, node: { id: string }) => {
+      try {
+        await selectFile(node.id);
+        navigate("/");
+      } catch (e) {
+        setError(`Failed to open memory ${node.id}: ${String(e)}`);
+      }
+    },
+    [navigate, selectFile, setError],
   );
 
   return (
@@ -199,6 +236,20 @@ export function GraphViewPage() {
           {graphData?.nodes.length ?? 0} nodes · {graphData?.edges.length ?? 0}{" "}
           edges
         </span>
+        <label className="ml-auto flex items-center gap-2 text-xs text-zinc-400">
+          New edge
+          <select
+            value={edgeMode}
+            onChange={(e) =>
+              setEdgeMode(e.target.value as "related" | "requires" | "optional")
+            }
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+          >
+            <option value="related">related</option>
+            <option value="requires">requires (skills)</option>
+            <option value="optional">optional (skills)</option>
+          </select>
+        </label>
         {layouting && (
           <span className="text-xs text-violet-400 ml-2">Layouting...</span>
         )}
@@ -211,6 +262,7 @@ export function GraphViewPage() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             fitView
             proOptions={{ hideAttribution: true }}

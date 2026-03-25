@@ -20,6 +20,7 @@ interface AppStore {
   selectFile: (id: string) => Promise<void>;
   clearSelection: () => void;
   saveActiveMemory: (l1: string, l2: string, meta: MemoryMeta) => Promise<void>;
+  deleteMemory: (id: string) => Promise<void>;
   loadGraph: () => Promise<void>;
   regenerateRouter: () => Promise<void>;
   setError: (error: string | null) => void;
@@ -44,6 +45,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       await get().loadFileTree();
       await get().loadMemories();
+      await get().loadGraph();
       set({ initialized: true, loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });
@@ -94,6 +96,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({ activeMemory: saved, loading: false });
       await get().loadMemories();
       await get().loadFileTree();
+      await get().loadGraph();
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  deleteMemory: async (id) => {
+    try {
+      set({ loading: true });
+      await api.deleteMemory(id);
+      const active = get().activeMemory;
+      if (active?.meta.id === id) {
+        set({ activeMemory: null, selectedPath: null, loading: false });
+      } else {
+        set({ loading: false });
+      }
+      await get().loadMemories();
+      await get().loadFileTree();
+      await get().loadGraph();
     } catch (e) {
       set({ error: String(e), loading: false });
     }
@@ -112,6 +133,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     try {
       await api.regenerateRouter();
       await get().loadMemories();
+      await get().loadFileTree();
+      await get().loadGraph();
     } catch (e) {
       set({ error: String(e) });
     }
