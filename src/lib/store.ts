@@ -204,6 +204,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setError: (error) => set({ error }),
   toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
+  setExplorerOpen: (open) => set({ explorerOpen: open }),
   toggleCreateMemory: () => set((s) => ({ isCreateMemoryOpen: !s.isCreateMemoryOpen })),
   setCreateMemoryOpen: (v) => set({ isCreateMemoryOpen: v }),
 }));
