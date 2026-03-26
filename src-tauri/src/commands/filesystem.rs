@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tauri::State;
 
@@ -86,4 +86,110 @@ pub fn write_file(path: String, content: String) -> Result<(), String> {
             .map_err(|e| format!("Failed to create directory: {}", e))?;
     }
     fs::write(&path, content).map_err(|e| format!("Failed to write {}: {}", path, e))
+}
+
+/// Create a directory and any missing parent directories.
+#[tauri::command]
+pub fn create_directory(path: String) -> Result<String, String> {
+    fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory {}: {}", path, e))?;
+    Ok(path)
+}
+
+/// Rename or move a file or directory.
+#[tauri::command]
+pub fn rename_path(old_path: String, new_path: String) -> Result<String, String> {
+    let old = PathBuf::from(&old_path);
+    let new = PathBuf::from(&new_path);
+
+    if !old.exists() {
+        return Err(format!("Path does not exist: {}", old_path));
+    }
+    if new.exists() && new != old {
+        return Err(format!("Target already exists: {}", new_path));
+    }
+    if let Some(parent) = new.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create target directory {}: {}", parent.display(), e))?;
+    }
+
+    fs::rename(&old, &new)
+        .map_err(|e| format!("Failed to rename {} to {}: {}", old_path, new_path, e))?;
+    Ok(new.to_string_lossy().to_string())
+}
+
+/// Delete a file or directory recursively.
+#[tauri::command]
+pub fn delete_path(path: String) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    if !target.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+
+    if target.is_dir() {
+        fs::remove_dir_all(&target)
+            .map_err(|e| format!("Failed to delete directory {}: {}", path, e))?;
+    } else {
+        fs::remove_file(&target).map_err(|e| format!("Failed to delete file {}: {}", path, e))?;
+    }
+
+    Ok(())
+}
+
+/// Duplicate a raw file alongside the original using a unique sibling name.
+#[tauri::command]
+pub fn duplicate_file(path: String) -> Result<String, String> {
+    let source = PathBuf::from(&path);
+    if !source.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+    if source.is_dir() {
+        return Err("Directory duplication is not supported".to_string());
+    }
+
+    let file_name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("Invalid file name for {}", path))?;
+    let parent = source
+        .parent()
+        .ok_or_else(|| format!("Failed to resolve parent directory for {}", path))?;
+
+    let duplicate = unique_duplicate_path(parent, file_name);
+    fs::copy(&source, &duplicate).map_err(|e| {
+        format!(
+            "Failed to duplicate {} to {}: {}",
+            path,
+            duplicate.display(),
+            e
+        )
+    })?;
+
+    Ok(duplicate.to_string_lossy().to_string())
+}
+
+fn unique_duplicate_path(parent: &Path, file_name: &str) -> PathBuf {
+    let original = Path::new(file_name);
+    let stem = original
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or(file_name);
+    let ext = original.extension().and_then(|value| value.to_str());
+
+    let mut counter = 0;
+    loop {
+        let suffix = if counter == 0 {
+            "-copy".to_string()
+        } else {
+            format!("-copy-{}", counter + 1)
+        };
+        let candidate_name = match ext {
+            Some(ext) => format!("{}{}.{}", stem, suffix, ext),
+            None => format!("{}{}", stem, suffix),
+        };
+        let candidate = parent.join(candidate_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
 }

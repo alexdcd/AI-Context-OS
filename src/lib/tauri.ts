@@ -31,10 +31,16 @@ export const getMemory = (id: string) =>
   invoke<Memory>("get_memory", { id });
 export const createMemory = (input: CreateMemoryInput) =>
   invoke<Memory>("create_memory", { input });
+export const createMemoryAtPath = (input: CreateMemoryInput, parentDir: string) =>
+  invoke<Memory>("create_memory_at_path", { input, parentDir });
 export const saveMemory = (input: SaveMemoryInput) =>
   invoke<Memory>("save_memory", { input });
 export const deleteMemory = (id: string) =>
   invoke<void>("delete_memory", { id });
+export const renameMemoryFile = (path: string, newId: string) =>
+  invoke<Memory>("rename_memory_file", { path, newId });
+export const duplicateMemoryFile = (path: string, newId: string) =>
+  invoke<Memory>("duplicate_memory_file", { path, newId });
 
 // Filesystem
 export const getFileTree = () => invoke<FileNode[]>("get_file_tree");
@@ -42,6 +48,14 @@ export const readFile = (path: string) =>
   invoke<string>("read_file", { path });
 export const writeFile = (path: string, content: string) =>
   invoke<void>("write_file", { path, content });
+export const createDirectory = (path: string) =>
+  invoke<string>("create_directory", { path });
+export const renamePath = (oldPath: string, newPath: string) =>
+  invoke<string>("rename_path", { oldPath, newPath });
+export const deletePath = (path: string) =>
+  invoke<void>("delete_path", { path });
+export const duplicateFile = (path: string) =>
+  invoke<string>("duplicate_file", { path });
 
 // Router
 export const regenerateRouter = () => invoke<string>("regenerate_router");
