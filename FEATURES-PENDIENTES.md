@@ -47,8 +47,6 @@
 
 ## Governance
 
-- ✅ **Scratch TTL visible** — Tab "Scratch TTL" en GovernanceView mostrando archivos expirados
-- ✅ **Scratch auto-cleanup** — Botones "Eliminar" individual y "Limpiar todos" en la tab Scratch
 - ⬚ **Acciones para decay candidates** — Botones para archivar memorias con decay alto
 - ⬚ **Consolidación ejecutable** — Aplicar sugerencias de consolidación con un click (merge entries → nueva memoria)
 - ⬚ **Historial de governance** — Log de acciones tomadas (archivados, promovidos, etc.)
@@ -63,7 +61,6 @@
 
 ## Simulation
 
-- ✅ **Export de contexto** — Botón "Copiar" en SimulationView que copia el contexto al clipboard
 - ⬚ **Perfiles de simulación guardados** — Guardar combinaciones de query + budget para reutilizar
 - ⬚ **Comparar simulaciones** — Vista side-by-side de dos simulaciones con diferente query/budget
 
@@ -78,8 +75,6 @@
 
 ## UX
 
-- ✅ **Keyboard shortcuts** — Cmd+G (graph), Cmd+J (journal), Cmd+B (toggle explorer), Cmd+S (save en editor)
-- ✅ **Toast notifications** — Error toast con auto-dismiss a 4s y animación de entrada/salida
 - ⬚ **Onboarding mejorado** — Tutorial interactivo post-setup que explique el flujo completo
 - ⬚ **Responsive sidebar** — Colapsar sidebar icon-only en pantallas pequeñas (ya parcial)
 - ⬚ **Temas adicionales** — Más allá de dark/light: variantes de color accent
