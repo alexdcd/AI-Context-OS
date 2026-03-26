@@ -28,6 +28,7 @@ export function HybridMarkdownEditor({
   const blocks = useMemo(() => splitIntoBlocks(content), [content]);
   const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
+  const skipNextBlurCommitRef = useRef(false);
 
   const commitAndUpdate = useCallback(
     (newBlocks: string[]) => {
@@ -58,6 +59,11 @@ export function HybridMarkdownEditor({
 
   const handleBlur = useCallback(
     (e: React.FocusEvent) => {
+      if (skipNextBlurCommitRef.current) {
+        skipNextBlurCommitRef.current = false;
+        return;
+      }
+
       // Don't blur if focus is moving to another block in this editor
       const related = e.relatedTarget as HTMLElement | null;
       if (related?.closest("[data-hybrid-editor]")) return;
@@ -73,6 +79,39 @@ export function HybridMarkdownEditor({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>, idx: number) => {
       const el = e.currentTarget;
+      const isMod = e.metaKey || e.ctrlKey;
+
+      if (isMod && !e.altKey) {
+        const key = e.key.toLowerCase();
+
+        if (key === "b") {
+          e.preventDefault();
+          e.stopPropagation();
+          applyInlineMarker(el, editValue, setEditValue, "**");
+          return;
+        }
+
+        if (key === "i") {
+          e.preventDefault();
+          e.stopPropagation();
+          applyInlineMarker(el, editValue, setEditValue, "*");
+          return;
+        }
+
+        if (key === "e") {
+          e.preventDefault();
+          e.stopPropagation();
+          applyInlineMarker(el, editValue, setEditValue, "`");
+          return;
+        }
+
+        if (key === "x" && e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          applyInlineMarker(el, editValue, setEditValue, "~~");
+          return;
+        }
+      }
 
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -85,6 +124,7 @@ export function HybridMarkdownEditor({
         const newBlocks = [...blocks];
         newBlocks[idx] = before;
         newBlocks.splice(idx + 1, 0, after);
+        skipNextBlurCommitRef.current = true;
         commitAndUpdate(newBlocks);
         setFocusedIdx(idx + 1);
         setEditValue(after);
@@ -99,6 +139,7 @@ export function HybridMarkdownEditor({
           const merged = prevText + editValue;
           const newBlocks = blocks.filter((_, i) => i !== idx);
           newBlocks[idx - 1] = merged;
+          skipNextBlurCommitRef.current = true;
           commitAndUpdate(newBlocks);
           setFocusedIdx(idx - 1);
           setEditValue(merged);
@@ -116,6 +157,7 @@ export function HybridMarkdownEditor({
         const cursorPos = getCaretOffset(el);
         if (cursorPos === 0) {
           e.preventDefault();
+          skipNextBlurCommitRef.current = true;
           commitEdit(idx, editValue);
           const prevIdx = idx - 1;
           setFocusedIdx(prevIdx);
@@ -127,6 +169,7 @@ export function HybridMarkdownEditor({
         const cursorPos = getCaretOffset(el);
         if (cursorPos >= editValue.length) {
           e.preventDefault();
+          skipNextBlurCommitRef.current = true;
           commitEdit(idx, editValue);
           const nextIdx = idx + 1;
           setFocusedIdx(nextIdx);
@@ -266,7 +309,7 @@ function EditableBlock({
       onKeyDown={onKeyDown}
       onPaste={handlePaste}
       spellCheck={false}
-      className="rounded-sm bg-[color:var(--bg-1)]/60 px-1 py-0.5 font-mono text-sm leading-relaxed text-[color:var(--text-2)] outline-none"
+      className="px-1 py-0.5 text-sm leading-relaxed whitespace-pre-wrap break-words text-[color:var(--text-1)] outline-none"
     />
   );
 }
@@ -295,7 +338,7 @@ function RenderedBlock({
 
   return (
     <div
-      className="cursor-text rounded-sm px-1 py-0.5 transition-colors hover:bg-[color:var(--bg-1)]/40"
+      className="cursor-text px-1 py-0.5"
       onClick={onClick}
     >
       <BlockContent markdown={trimmed} />
@@ -407,7 +450,7 @@ function BlockContent({ markdown }: { markdown: string }) {
 
   // Paragraph
   return (
-    <p className="text-sm leading-relaxed text-[color:var(--text-1)]">
+    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-[color:var(--text-1)]">
       {renderInline(markdown)}
     </p>
   );
@@ -481,6 +524,13 @@ function splitIntoBlocks(content: string): string[] {
   const blocks: string[] = [];
   let buffer = "";
 
+  const flushBuffer = () => {
+    if (buffer.length > 0) {
+      blocks.push(buffer);
+      buffer = "";
+    }
+  };
+
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -495,18 +545,17 @@ function splitIntoBlocks(content: string): string[] {
       trimmed === "***";
 
     if (isBlockStart) {
-      if (buffer.trim()) blocks.push(buffer.trim());
+      flushBuffer();
       blocks.push(line);
-      buffer = "";
     } else if (trimmed === "") {
-      if (buffer.trim()) blocks.push(buffer.trim());
-      buffer = "";
+      flushBuffer();
+      blocks.push("");
     } else {
       buffer += (buffer ? "\n" : "") + line;
     }
   }
 
-  if (buffer.trim()) blocks.push(buffer.trim());
+  flushBuffer();
   if (blocks.length === 0) return [""];
   return blocks;
 }
@@ -522,14 +571,97 @@ function getCaretOffset(el: HTMLElement): number {
   return range.toString().length;
 }
 
+function getSelectionOffsets(el: HTMLElement): { start: number; end: number } {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return { start: 0, end: 0 };
+
+  const range = sel.getRangeAt(0);
+  const startRange = range.cloneRange();
+  startRange.selectNodeContents(el);
+  startRange.setEnd(range.startContainer, range.startOffset);
+
+  const endRange = range.cloneRange();
+  endRange.selectNodeContents(el);
+  endRange.setEnd(range.endContainer, range.endOffset);
+
+  const start = startRange.toString().length;
+  const end = endRange.toString().length;
+
+  return {
+    start: Math.min(start, end),
+    end: Math.max(start, end),
+  };
+}
+
+function applyInlineMarker(
+  el: HTMLElement,
+  currentValue: string,
+  setValue: (next: string) => void,
+  marker: string,
+) {
+  const { start, end } = getSelectionOffsets(el);
+  const before = currentValue.slice(0, start);
+  const selected = currentValue.slice(start, end);
+  const after = currentValue.slice(end);
+  const wrapped = `${before}${marker}${selected}${marker}${after}`;
+  const nextSelectionStart = start + marker.length;
+  const nextSelectionEnd = nextSelectionStart + selected.length;
+
+  setValue(wrapped);
+  el.textContent = wrapped;
+
+  requestAnimationFrame(() => {
+    setSelectionOffsets(el, nextSelectionStart, nextSelectionEnd);
+  });
+}
+
 function setCaretOffset(el: HTMLElement, offset: number) {
-  const textNode = el.firstChild;
-  if (!textNode) return;
+  setSelectionOffsets(el, offset, offset);
+}
+
+function setSelectionOffsets(el: HTMLElement, start: number, end: number) {
   const range = document.createRange();
   const sel = window.getSelection();
-  const pos = Math.min(offset, (textNode.textContent ?? "").length);
-  range.setStart(textNode, pos);
-  range.collapse(true);
-  sel?.removeAllRanges();
-  sel?.addRange(range);
+  if (!sel) return;
+
+  const startPoint = resolveTextNodeOffset(el, start);
+  const endPoint = resolveTextNodeOffset(el, end);
+  if (!startPoint || !endPoint) return;
+
+  range.setStart(startPoint.node, startPoint.offset);
+  range.setEnd(endPoint.node, endPoint.offset);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function resolveTextNodeOffset(
+  root: HTMLElement,
+  targetOffset: number,
+): { node: Text; offset: number } | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode() as Text | null;
+  let consumed = 0;
+
+  while (node) {
+    const length = node.textContent?.length ?? 0;
+    if (consumed + length >= targetOffset) {
+      return { node, offset: targetOffset - consumed };
+    }
+    consumed += length;
+    node = walker.nextNode() as Text | null;
+  }
+
+  const fallback = root.lastChild;
+  if (fallback && fallback.nodeType === Node.TEXT_NODE) {
+    const textNode = fallback as Text;
+    return { node: textNode, offset: textNode.textContent?.length ?? 0 };
+  }
+
+  if (!root.firstChild) {
+    const textNode = document.createTextNode("");
+    root.appendChild(textNode);
+    return { node: textNode, offset: 0 };
+  }
+
+  return null;
 }

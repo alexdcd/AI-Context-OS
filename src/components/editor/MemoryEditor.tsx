@@ -3,7 +3,7 @@ import { FileText, PanelRightClose, PanelRightOpen, Save, Trash2, ChevronRight }
 import { clsx } from "clsx";
 import { useAppStore } from "../../lib/store";
 import { FrontmatterForm } from "./FrontmatterForm";
-import { HybridMarkdownEditor } from "./HybridMarkdownEditor";
+import { TipTapEditor } from "./TipTapEditor";
 import type { MemoryMeta, MemoryType, RawFileDocument } from "../../lib/types";
 
 type InspectorTab = "properties" | "links" | "history";
@@ -236,7 +236,7 @@ export function MemoryEditor() {
             </p>
 
             {/* L2 — Main content */}
-            <HybridMarkdownEditor
+            <TipTapEditor
               content={l2}
               onChange={(val) => {
                 setL2(val);
@@ -263,7 +263,7 @@ export function MemoryEditor() {
               </button>
               {l1Open && (
                 <div className="mt-2">
-                  <HybridMarkdownEditor
+                  <TipTapEditor
                     content={l1}
                     onChange={(val) => {
                       setL1(val);

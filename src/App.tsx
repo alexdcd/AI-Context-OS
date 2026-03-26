@@ -16,6 +16,19 @@ import { useThemeEffect } from "./lib/settingsStore";
 import { PanelLeft } from "lucide-react";
 import { SearchModal } from "./components/layout/SearchModal";
 
+function isEditableElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  if (target.isContentEditable) return true;
+
+  const tagName = target.tagName.toLowerCase();
+  if (tagName === "input" || tagName === "textarea" || tagName === "select") {
+    return true;
+  }
+
+  return Boolean(target.closest("[contenteditable='true']"));
+}
+
 function AppContent() {
   useFileWatcher();
   useThemeEffect();
@@ -33,7 +46,8 @@ function AppContent() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
-      switch (e.key) {
+      if (isEditableElement(e.target)) return;
+      switch (e.key.toLowerCase()) {
         case "k":
           e.preventDefault();
           setSearchOpen((v) => !v);

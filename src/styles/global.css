@@ -118,7 +118,7 @@ textarea {
   outline: none;
   font-family: "Inter", -apple-system, system-ui, sans-serif;
   color: var(--text-0);
-  line-height: 1.72;
+  line-height: 1.55;
   font-size: 0.9375rem;
 }
 
@@ -154,13 +154,13 @@ textarea {
 }
 
 .tiptap p {
-  margin: 0.4rem 0;
+  margin: 0;
 }
 
 .tiptap ul,
 .tiptap ol {
   padding-left: 1.5rem;
-  margin: 0.3rem 0;
+  margin: 0.1rem 0;
 }
 
 .tiptap ul {
@@ -172,7 +172,7 @@ textarea {
 }
 
 .tiptap li {
-  margin: 0.15rem 0;
+  margin: 0;
 }
 
 .tiptap pre {
