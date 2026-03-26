@@ -14,6 +14,7 @@ import { isOnboarded } from "./lib/tauri";
 import { SettingsView } from "./views/SettingsView";
 import { useThemeEffect } from "./lib/settingsStore";
 import { PanelLeft } from "lucide-react";
+import { SearchModal } from "./components/layout/SearchModal";
 
 function AppContent() {
   useFileWatcher();
