@@ -132,6 +132,7 @@ export function GraphViewPage() {
     "related",
   );
   const [typeFilter, setTypeFilter] = useState<MemoryType | "all">("all");
+  const [minImportance, setMinImportance] = useState(0);
   const [selectedNode, setSelectedNode] = useState<GNode | null>(null);
   const [showInspector, setShowInspector] = useState(true);
   const [flowInstance, setFlowInstance] = useState<
@@ -146,16 +147,19 @@ export function GraphViewPage() {
     if (!graphData) {
       return { nodes: [] as GNode[], edges: [] as GraphEdge[] };
     }
-    const nodesByType =
-      typeFilter === "all"
-        ? graphData.nodes
-        : graphData.nodes.filter((node) => node.memory_type === typeFilter);
-    const nodeIds = new Set(nodesByType.map((node) => node.id));
-    const edgesByType = graphData.edges.filter(
+    let filtered = graphData.nodes;
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((node) => node.memory_type === typeFilter);
+    }
+    if (minImportance > 0) {
+      filtered = filtered.filter((node) => node.importance >= minImportance);
+    }
+    const nodeIds = new Set(filtered.map((node) => node.id));
+    const edgesFiltered = graphData.edges.filter(
       (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target),
     );
-    return { nodes: nodesByType, edges: edgesByType };
-  }, [graphData, typeFilter]);
+    return { nodes: filtered, edges: edgesFiltered };
+  }, [graphData, typeFilter, minImportance]);
 
   useEffect(() => {
     if (!graphData) return;
@@ -301,6 +305,22 @@ export function GraphViewPage() {
               </option>
             ))}
           </select>
+
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-[color:var(--text-2)]">Imp ≥</label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={minImportance}
+              onChange={(e) => setMinImportance(parseFloat(e.target.value))}
+              className="h-1 w-16 accent-[color:var(--accent)]"
+            />
+            <span className="w-5 text-right font-mono text-[10px] text-[color:var(--text-2)]">
+              {minImportance.toFixed(1)}
+            </span>
+          </div>
 
           <select
             value={edgeMode}
