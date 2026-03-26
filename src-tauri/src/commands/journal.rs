@@ -4,6 +4,7 @@ use tauri::State;
 
 use crate::core::journal;
 use crate::core::jsonl::append_jsonl;
+use crate::core::memory;
 use crate::core::tasks;
 use crate::core::types::{DailyEntry, JournalDateInfo, JournalPage, TaskItem, TaskState};
 use crate::state::AppState;
@@ -82,6 +83,61 @@ pub fn save_journal_page(
                     source: format!("journal:{}", date),
                 };
                 let _ = append_jsonl(&daily_path, &entry);
+            }
+        }
+    }
+
+    // Extract #tags from content and propagate to matching memories
+    let hashtag_re = Regex::new(r"#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap();
+    let mut found_tags: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for line in content.lines() {
+        for caps in hashtag_re.captures_iter(line) {
+            let tag = caps[1].to_lowercase();
+            // Skip the typed bullet tags already handled above
+            if !matches!(
+                tag.as_str(),
+                "decision" | "idea" | "meeting" | "goal" | "blocker" | "insight" | "question"
+            ) {
+                found_tags.insert(tag);
+            }
+        }
+    }
+
+    if !found_tags.is_empty() {
+        let index = state.memory_index.read().unwrap();
+        for (mem_id, (meta, file_path)) in index.iter() {
+            let id_lower = mem_id.to_lowercase();
+            let l0_lower = meta.l0.to_lowercase();
+            let existing_tags: Vec<String> =
+                meta.tags.iter().map(|t| t.to_lowercase()).collect();
+
+            // Check if any extracted #tag matches this memory's id, l0, or existing tags
+            let matching: Vec<&String> = found_tags
+                .iter()
+                .filter(|tag| {
+                    id_lower.contains(tag.as_str())
+                        || l0_lower.contains(tag.as_str())
+                        || existing_tags.iter().any(|t| t == tag.as_str())
+                })
+                .collect();
+
+            if !matching.is_empty() {
+                // Add the journal date as a tag to this memory if not already present
+                let date_tag = date.clone();
+                if !meta.tags.contains(&date_tag) {
+                    if let Ok(mut mem) =
+                        memory::read_memory(std::path::Path::new(file_path))
+                    {
+                        if !mem.meta.tags.contains(&date_tag) {
+                            mem.meta.tags.push(date_tag);
+                            mem.meta.modified = now;
+                            let _ = memory::write_memory(
+                                std::path::Path::new(file_path),
+                                &mem,
+                            );
+                        }
+                    }
+                }
             }
         }
     }
