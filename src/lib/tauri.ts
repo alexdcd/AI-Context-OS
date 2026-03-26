@@ -94,6 +94,12 @@ export const toggleTaskState = (id: string) =>
   invoke<TaskItem>("toggle_task_state", { id });
 export const generateTaskId = () => invoke<string>("generate_task_id");
 
+// Backup
+export const backupWorkspace = (destination: string) =>
+  invoke<string>("backup_workspace", { destination });
+export const restoreWorkspace = (source: string) =>
+  invoke<boolean>("restore_workspace", { source });
+
 // Onboarding
 export interface OnboardingProfile {
   name: string;

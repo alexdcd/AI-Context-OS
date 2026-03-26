@@ -9,3 +9,4 @@ pub mod daily;
 pub mod onboarding;
 pub mod journal;
 pub mod tasks;
+pub mod backup;

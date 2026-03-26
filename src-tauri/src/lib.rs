@@ -60,6 +60,9 @@ pub fn run() {
             // Onboarding
             commands::onboarding::run_onboarding,
             commands::onboarding::is_onboarded,
+            // Backup
+            commands::backup::backup_workspace,
+            commands::backup::restore_workspace,
         ])
         .setup(|app| {
             let state = app.state::<AppState>();

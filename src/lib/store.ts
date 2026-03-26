@@ -37,6 +37,7 @@ interface AppStore {
   regenerateRouter: () => Promise<void>;
   setError: (error: string | null) => void;
   toggleExplorer: () => void;
+  setExplorerOpen: (open: boolean) => void;
   toggleCreateMemory: () => void;
   setCreateMemoryOpen: (v: boolean) => void;
 }

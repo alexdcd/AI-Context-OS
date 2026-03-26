@@ -37,10 +37,22 @@ function AppContent() {
   const initialize = useAppStore((s) => s.initialize);
   const toggleExplorer = useAppStore((s) => s.toggleExplorer);
   const explorerOpen = useAppStore((s) => s.explorerOpen);
+  const setExplorerOpen = useAppStore((s) => s.setExplorerOpen);
 
   const navigate = useNavigate();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Responsive: auto-close explorer on narrow windows
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) setExplorerOpen(false);
+    };
+    handler(mq); // initial check
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [setExplorerOpen]);
 
   // Global keyboard shortcuts
   useEffect(() => {
