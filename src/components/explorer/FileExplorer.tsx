@@ -70,6 +70,13 @@ interface DragPreviewState {
   y: number;
 }
 
+interface SelectionLockStyles {
+  bodyUserSelect: string;
+  bodyWebkitUserSelect: string;
+  htmlUserSelect: string;
+  htmlWebkitUserSelect: string;
+}
+
 interface UndoMoveAction {
   kind: "memory" | "raw";
   currentPath: string;
@@ -355,7 +362,12 @@ function TreeNode({
         title={canDrag ? "Arrastra para mover a otra carpeta" : undefined}
         onClick={handleClick}
         onContextMenu={(event) => onContextMenu(event, node)}
-        onPointerDown={(event) => onPointerDragStart(event, node)}
+        onPointerDown={(event) => {
+          if (canDrag && event.button === 0) {
+            event.preventDefault();
+          }
+          onPointerDragStart(event, node);
+        }}
       >
         {node.is_dir ? (
           <>
@@ -529,6 +541,7 @@ export function FileExplorer() {
   const draggedItemRef = useRef<DraggedItem | null>(null);
   const pointerDragRef = useRef<PointerDragSession | null>(null);
   const undoMoveStackRef = useRef<UndoMoveAction[]>([]);
+  const selectionLockRef = useRef<SelectionLockStyles | null>(null);
   const suppressClickRef = useRef(false);
   const suppressClickTimeoutRef = useRef<number | null>(null);
   const isDragging = dragSourcePath !== null;
@@ -562,6 +575,7 @@ export function FileExplorer() {
       if (suppressClickTimeoutRef.current !== null) {
         window.clearTimeout(suppressClickTimeoutRef.current);
       }
+      restoreTextSelection();
     };
   }, []);
 
@@ -650,6 +664,35 @@ export function FileExplorer() {
     setDropTargetPath(null);
     setDragSourcePath(null);
     setDragPreview(null);
+    restoreTextSelection();
+  };
+
+  const disableTextSelection = () => {
+    if (selectionLockRef.current) return;
+
+    selectionLockRef.current = {
+      bodyUserSelect: document.body.style.userSelect,
+      bodyWebkitUserSelect: document.body.style.webkitUserSelect,
+      htmlUserSelect: document.documentElement.style.userSelect,
+      htmlWebkitUserSelect: document.documentElement.style.webkitUserSelect,
+    };
+
+    document.body.style.userSelect = "none";
+    document.body.style.webkitUserSelect = "none";
+    document.documentElement.style.userSelect = "none";
+    document.documentElement.style.webkitUserSelect = "none";
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const restoreTextSelection = () => {
+    const styles = selectionLockRef.current;
+    if (!styles) return;
+
+    document.body.style.userSelect = styles.bodyUserSelect;
+    document.body.style.webkitUserSelect = styles.bodyWebkitUserSelect;
+    document.documentElement.style.userSelect = styles.htmlUserSelect;
+    document.documentElement.style.webkitUserSelect = styles.htmlWebkitUserSelect;
+    selectionLockRef.current = null;
   };
 
   const removePointerDragListeners = () => {
@@ -988,6 +1031,7 @@ export function FileExplorer() {
           }
 
           activeSession.hasDragged = true;
+          disableTextSelection();
           suppressClickRef.current = true;
           draggedItemRef.current = toDraggedItem(sourceNode);
           setDragSourcePath(sourceNode.path);
