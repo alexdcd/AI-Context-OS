@@ -403,6 +403,7 @@ function TreeNode({
               conflictIds={conflictIds}
               onContextMenu={onContextMenu}
               dropTargetPath={dropTargetPath}
+              dragSourcePath={dragSourcePath}
               getDraggedItem={getDraggedItem}
               canDropPathOnDirectory={canDropPathOnDirectory}
               onPointerDragStart={onPointerDragStart}
@@ -1056,6 +1057,12 @@ export function FileExplorer() {
 
   return (
     <div className="px-1 py-1">
+      {fileTree.length > 0 && !dragPreview && (
+        <p className="px-3 pb-2 pt-1 text-[10px] uppercase tracking-wide text-[color:var(--text-2)]">
+          Arrastra archivos a carpetas para moverlos
+        </p>
+      )}
+
       {fileTree.map((node) => (
         <TreeNode
           key={node.path}
@@ -1066,6 +1073,7 @@ export function FileExplorer() {
           conflictIds={conflictIds}
           onContextMenu={handleContextMenu}
           dropTargetPath={dropTargetPath}
+          dragSourcePath={dragSourcePath}
           getDraggedItem={getDraggedItem}
           canDropPathOnDirectory={canDropPathOnDirectory}
           onPointerDragStart={handlePointerDragStart}
@@ -1096,6 +1104,25 @@ export function FileExplorer() {
           groups={menuGroups}
           onClose={closeContextMenu}
         />
+      )}
+
+      {dragPreview && (
+        <div
+          className="pointer-events-none fixed z-50 flex items-center gap-2 rounded-xl border border-[color:var(--accent)]/40 bg-[color:var(--bg-1)]/95 px-3 py-2 shadow-2xl backdrop-blur"
+          style={{
+            left: dragPreview.x,
+            top: dragPreview.y,
+            transform: "translate(14px, 14px)",
+          }}
+        >
+          <GripVertical className="h-3.5 w-3.5 text-[color:var(--accent)]" />
+          <span className="max-w-[220px] truncate text-[12px] font-medium text-[color:var(--text-0)]">
+            {dragPreview.name}
+          </span>
+          <span className="rounded-full bg-[color:var(--accent)]/12 px-1.5 py-[1px] text-[10px] uppercase tracking-wide text-[color:var(--accent)]">
+            mover
+          </span>
+        </div>
       )}
     </div>
   );
