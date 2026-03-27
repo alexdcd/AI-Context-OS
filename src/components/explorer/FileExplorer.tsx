@@ -192,9 +192,9 @@ interface TreeNodeProps {
   toggleExpand: (path: string) => void;
   conflictIds: Set<string>;
   onContextMenu: (event: React.MouseEvent, node: FileNode) => void;
-  draggedItem: DraggedItem | null;
   dropTargetPath: string | null;
-  suppressClick: boolean;
+  getDraggedItem: () => DraggedItem | null;
+  isClickSuppressed: () => boolean;
   onDragStart: (node: FileNode) => void;
   onDragEnd: () => void;
   onDragHoverDirectory: (targetPath: string | null) => void;
@@ -213,9 +213,9 @@ function TreeNode({
   toggleExpand,
   conflictIds,
   onContextMenu,
-  draggedItem,
   dropTargetPath,
-  suppressClick,
+  getDraggedItem,
+  isClickSuppressed,
   onDragStart,
   onDragEnd,
   onDragHoverDirectory,
@@ -239,11 +239,10 @@ function TreeNode({
   const opacity = memoryMeta ? computeDecayOpacity(memoryMeta) : 1;
   const isProtected = isProtectedNode(node);
   const canDrag = !node.is_dir && !isProtected;
-  const canAcceptDrop = node.is_dir && canDropOnDirectory(draggedItem, node);
-  const isDropTarget = dropTargetPath === node.path && canAcceptDrop;
+  const isDropTarget = dropTargetPath === node.path;
 
   const handleClick = () => {
-    if (draggedItem || suppressClick) return;
+    if (isClickSuppressed()) return;
 
     if (node.is_dir) {
       toggleExpand(node.path);
@@ -261,7 +260,7 @@ function TreeNode({
   };
 
   const handleDirectoryDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!canAcceptDrop) return;
+    if (!canDropOnDirectory(getDraggedItem(), node)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
@@ -269,7 +268,7 @@ function TreeNode({
   };
 
   const handleDirectoryDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!canAcceptDrop) return;
+    if (!canDropOnDirectory(getDraggedItem(), node)) return;
     event.preventDefault();
     event.stopPropagation();
     const sourcePath =
@@ -282,9 +281,13 @@ function TreeNode({
   return (
     <div
       onDragEnter={node.is_dir ? () => {
-        if (canAcceptDrop) onDragHoverDirectory(node.path);
+        if (canDropOnDirectory(getDraggedItem(), node)) onDragHoverDirectory(node.path);
       } : undefined}
       onDragOver={node.is_dir ? handleDirectoryDragOver : undefined}
+      onDragLeave={node.is_dir ? (event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        if (dropTargetPath === node.path) onDragHoverDirectory(null);
+      } : undefined}
       onDrop={node.is_dir ? handleDirectoryDrop : undefined}
     >
       <div
@@ -369,9 +372,9 @@ function TreeNode({
               toggleExpand={toggleExpand}
               conflictIds={conflictIds}
               onContextMenu={onContextMenu}
-              draggedItem={draggedItem}
               dropTargetPath={dropTargetPath}
-              suppressClick={suppressClick}
+              getDraggedItem={getDraggedItem}
+              isClickSuppressed={isClickSuppressed}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
               onDragHoverDirectory={onDragHoverDirectory}
@@ -464,9 +467,9 @@ export function FileExplorer() {
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
   const [renamingTarget, setRenamingTarget] = useState<RenameTarget | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
-  const [suppressClick, setSuppressClick] = useState(false);
+  const draggedItemRef = useRef<DraggedItem | null>(null);
+  const suppressClickRef = useRef(false);
   const suppressClickTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -539,7 +542,7 @@ export function FileExplorer() {
   const closeContextMenu = () => setCtxMenu(null);
 
   const clearDragState = () => {
-    setDraggedItem(null);
+    draggedItemRef.current = null;
     setDropTargetPath(null);
   };
 
@@ -548,10 +551,13 @@ export function FileExplorer() {
       window.clearTimeout(suppressClickTimeoutRef.current);
     }
     suppressClickTimeoutRef.current = window.setTimeout(() => {
-      setSuppressClick(false);
+      suppressClickRef.current = false;
       suppressClickTimeoutRef.current = null;
     }, delay);
   };
+
+  const getDraggedItem = () => draggedItemRef.current;
+  const isClickSuppressed = () => suppressClickRef.current || draggedItemRef.current !== null;
 
   const startRename = (node: FileNode) => {
     setRenamingTarget({
@@ -754,7 +760,7 @@ export function FileExplorer() {
   };
 
   const handleDropOnDirectory = async (target: FileNode, sourcePath: string | null) => {
-    const effectiveSourcePath = sourcePath ?? draggedItem?.path ?? null;
+    const effectiveSourcePath = sourcePath ?? draggedItemRef.current?.path ?? null;
     if (!effectiveSourcePath) return;
     const sourceNode = findNodeByPath(fileTree, effectiveSourcePath);
     if (!sourceNode || !canDropOnDirectory(toDraggedItem(sourceNode), target)) {
@@ -763,7 +769,7 @@ export function FileExplorer() {
       return;
     }
 
-    setSuppressClick(true);
+    suppressClickRef.current = true;
     clearDragState();
 
     try {
@@ -886,17 +892,17 @@ export function FileExplorer() {
           toggleExpand={toggleExpand}
           conflictIds={conflictIds}
           onContextMenu={handleContextMenu}
-          draggedItem={draggedItem}
           dropTargetPath={dropTargetPath}
-          suppressClick={suppressClick}
+          getDraggedItem={getDraggedItem}
+          isClickSuppressed={isClickSuppressed}
           onDragStart={(node) => {
-            setSuppressClick(true);
-            setDraggedItem({
+            suppressClickRef.current = true;
+            draggedItemRef.current = {
               path: node.path,
               name: node.name,
               isMarkdown: isMarkdownFile(node.name),
               isProtected: isProtectedNode(node),
-            });
+            };
           }}
           onDragEnd={() => {
             clearDragState();
