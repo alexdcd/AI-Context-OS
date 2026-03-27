@@ -120,6 +120,7 @@ pub fn save_memory(
         .get(&input.id)
         .ok_or_else(|| format!("Memory not found: {}", input.id))?;
     let old_file_path = PathBuf::from(path.clone());
+    let old_memory_type = old_meta.memory_type.clone();
 
     if input.meta.id.trim().is_empty() {
         return Err("Memory id cannot be empty".to_string());
@@ -134,7 +135,7 @@ pub fn save_memory(
     meta.version += 1;
     meta.id = meta.id.trim().to_string();
 
-    let target_parent = if meta.memory_type == old_meta.memory_type {
+    let target_parent = if meta.memory_type == old_memory_type {
         old_file_path
             .parent()
             .map(PathBuf::from)
