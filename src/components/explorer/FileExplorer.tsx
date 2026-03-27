@@ -10,6 +10,7 @@ import {
   Folder,
   FolderPlus,
   FolderSearch,
+  GripVertical,
   MoveRight,
   Pencil,
   Trash2,
@@ -49,6 +50,24 @@ interface DraggedItem {
   name: string;
   isMarkdown: boolean;
   isProtected: boolean;
+}
+
+interface PointerDragSession {
+  pointerId: number;
+  sourcePath: string;
+  startX: number;
+  startY: number;
+  hasDragged: boolean;
+  moveHandler: (event: PointerEvent) => void;
+  upHandler: (event: PointerEvent) => void;
+  cancelHandler: (event: PointerEvent) => void;
+  blurHandler: () => void;
+}
+
+interface DragPreviewState {
+  name: string;
+  x: number;
+  y: number;
 }
 
 interface MenuAction {
@@ -193,10 +212,11 @@ interface TreeNodeProps {
   conflictIds: Set<string>;
   onContextMenu: (event: React.MouseEvent, node: FileNode) => void;
   dropTargetPath: string | null;
+  dragSourcePath: string | null;
   getDraggedItem: () => DraggedItem | null;
+  canDropPathOnDirectory: (target: FileNode, sourcePath: string | null) => boolean;
+  onPointerDragStart: (event: React.PointerEvent<HTMLDivElement>, node: FileNode) => void;
   isClickSuppressed: () => boolean;
-  onDragStart: (node: FileNode) => void;
-  onDragEnd: () => void;
   onDragHoverDirectory: (targetPath: string | null) => void;
   onDropOnDirectory: (target: FileNode, sourcePath: string | null) => void;
   renamingPath: string | null;
@@ -214,10 +234,11 @@ function TreeNode({
   conflictIds,
   onContextMenu,
   dropTargetPath,
+  dragSourcePath,
   getDraggedItem,
+  canDropPathOnDirectory,
+  onPointerDragStart,
   isClickSuppressed,
-  onDragStart,
-  onDragEnd,
   onDragHoverDirectory,
   onDropOnDirectory,
   renamingPath,
@@ -240,6 +261,7 @@ function TreeNode({
   const isProtected = isProtectedNode(node);
   const canDrag = !node.is_dir && !isProtected;
   const isDropTarget = dropTargetPath === node.path;
+  const isDragSource = dragSourcePath === node.path;
 
   const handleClick = () => {
     if (isClickSuppressed()) return;
@@ -260,7 +282,8 @@ function TreeNode({
   };
 
   const handleDirectoryDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!canDropOnDirectory(getDraggedItem(), node)) return;
+    const sourcePath = getDraggedPathFromEvent(event, getDraggedItem);
+    if (!canDropPathOnDirectory(node, sourcePath)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
@@ -279,8 +302,9 @@ function TreeNode({
 
   return (
     <div
-      onDragEnter={node.is_dir ? () => {
-        if (canDropOnDirectory(getDraggedItem(), node)) onDragHoverDirectory(node.path);
+      onDragEnter={node.is_dir ? (event) => {
+        const sourcePath = getDraggedPathFromEvent(event, getDraggedItem);
+        if (canDropPathOnDirectory(node, sourcePath)) onDragHoverDirectory(node.path);
       } : undefined}
       onDragOver={node.is_dir ? handleDirectoryDragOver : undefined}
       onDragLeave={node.is_dir ? (event) => {
@@ -291,28 +315,24 @@ function TreeNode({
     >
       <div
         className={clsx(
-          "flex cursor-pointer items-center gap-1.5 rounded px-2 py-[5px] text-[13px] transition-colors",
+          "group flex items-center gap-1.5 rounded px-2 py-[5px] text-[13px] transition-colors",
+          canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
           isSelected
             ? "bg-[color:var(--accent-muted)] text-[color:var(--text-0)]"
             : "text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
           isDropTarget && "bg-[color:var(--accent-muted)] ring-1 ring-[color:var(--accent)]",
+          isDragSource && "bg-[color:var(--bg-2)] ring-1 ring-[color:var(--accent)]/60",
         )}
         style={{
           paddingLeft: `${depth * 12 + 8}px`,
-          opacity: node.is_dir ? 1 : opacity,
+          opacity: isDragSource ? 0.55 : node.is_dir ? 1 : opacity,
         }}
-        draggable={canDrag}
+        data-explorer-dir-path={node.is_dir ? node.path : undefined}
+        draggable={false}
+        title={canDrag ? "Arrastra para mover a otra carpeta" : undefined}
         onClick={handleClick}
         onContextMenu={(event) => onContextMenu(event, node)}
-        onDragStart={(event) => {
-          if (!canDrag) return;
-          event.stopPropagation();
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("application/x-ai-context-path", node.path);
-          event.dataTransfer.setData("text/plain", node.path);
-          onDragStart(node);
-        }}
-        onDragEnd={() => onDragEnd()}
+        onPointerDown={(event) => onPointerDragStart(event, node)}
       >
         {node.is_dir ? (
           <>
@@ -325,7 +345,11 @@ function TreeNode({
           </>
         ) : (
           <>
-            <span className="w-3" />
+            <span className="flex w-3 items-center justify-center">
+              {canDrag ? (
+                <GripVertical className="h-3 w-3 text-[color:var(--text-2)] opacity-70 transition-opacity group-hover:opacity-100" />
+              ) : null}
+            </span>
             <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: color ?? "var(--text-2)" }} />
           </>
         )}
@@ -342,9 +366,16 @@ function TreeNode({
             }}
             onBlur={onRenameCancel}
             onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
           />
         ) : (
           <span className="truncate">{node.name}</span>
+        )}
+
+        {isDropTarget && (
+          <span className="rounded-full bg-[color:var(--accent)]/14 px-1.5 py-[1px] text-[10px] font-medium text-[color:var(--accent)]">
+            Soltar para mover
+          </span>
         )}
 
         {hasConflict && (
@@ -373,9 +404,9 @@ function TreeNode({
               onContextMenu={onContextMenu}
               dropTargetPath={dropTargetPath}
               getDraggedItem={getDraggedItem}
+              canDropPathOnDirectory={canDropPathOnDirectory}
+              onPointerDragStart={onPointerDragStart}
               isClickSuppressed={isClickSuppressed}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
               onDragHoverDirectory={onDragHoverDirectory}
               onDropOnDirectory={onDropOnDirectory}
               renamingPath={renamingPath}
@@ -468,7 +499,10 @@ export function FileExplorer() {
   const [renamingTarget, setRenamingTarget] = useState<RenameTarget | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const [dragSourcePath, setDragSourcePath] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<DragPreviewState | null>(null);
   const draggedItemRef = useRef<DraggedItem | null>(null);
+  const pointerDragRef = useRef<PointerDragSession | null>(null);
   const suppressClickRef = useRef(false);
   const suppressClickTimeoutRef = useRef<number | null>(null);
 
@@ -544,12 +578,30 @@ export function FileExplorer() {
   const clearDragState = () => {
     draggedItemRef.current = null;
     setDropTargetPath(null);
+    setDragSourcePath(null);
+    setDragPreview(null);
+  };
+
+  const removePointerDragListeners = () => {
+    const session = pointerDragRef.current;
+    if (!session) return;
+
+    window.removeEventListener("pointermove", session.moveHandler);
+    window.removeEventListener("pointerup", session.upHandler);
+    window.removeEventListener("pointercancel", session.cancelHandler);
+    window.removeEventListener("blur", session.blurHandler);
+    pointerDragRef.current = null;
+  };
+
+  const clearSuppressionTimer = () => {
+    if (suppressClickTimeoutRef.current !== null) {
+      window.clearTimeout(suppressClickTimeoutRef.current);
+      suppressClickTimeoutRef.current = null;
+    }
   };
 
   const releaseSuppressedClick = (delay = 0) => {
-    if (suppressClickTimeoutRef.current !== null) {
-      window.clearTimeout(suppressClickTimeoutRef.current);
-    }
+    clearSuppressionTimer();
     suppressClickTimeoutRef.current = window.setTimeout(() => {
       suppressClickRef.current = false;
       suppressClickTimeoutRef.current = null;
@@ -759,6 +811,25 @@ export function FileExplorer() {
     }
   };
 
+  const canDropPathOnDirectory = (target: FileNode, sourcePath: string | null) => {
+    if (!sourcePath) return false;
+    const sourceNode = findNodeByPath(fileTree, sourcePath);
+    if (!sourceNode) return false;
+    return canDropOnDirectory(toDraggedItem(sourceNode), target);
+  };
+
+  const resolveDropTargetAtPoint = (clientX: number, clientY: number, sourcePath: string) => {
+    const targetPath = getDirectoryPathFromPoint(clientX, clientY);
+    if (!targetPath) return null;
+
+    const targetNode = findNodeByPath(fileTree, targetPath);
+    if (!targetNode || !canDropPathOnDirectory(targetNode, sourcePath)) {
+      return null;
+    }
+
+    return targetNode;
+  };
+
   const handleDropOnDirectory = async (target: FileNode, sourcePath: string | null) => {
     const effectiveSourcePath = sourcePath ?? draggedItemRef.current?.path ?? null;
     suppressClickRef.current = true;
@@ -784,8 +855,11 @@ export function FileExplorer() {
         await selectFile(moved.meta.id);
       } else {
         const nextPath = `${target.path}/${sourceNode.name}`;
-        await renamePath(sourceNode.path, nextPath);
+        const movedPath = await renamePath(sourceNode.path, nextPath);
         await refreshTreeAndMemories();
+        if (isRawViewerSupported(movedPath)) {
+          await selectRawFile(movedPath);
+        }
       }
     } catch (error) {
       setError(String(error));
@@ -793,6 +867,103 @@ export function FileExplorer() {
       releaseSuppressedClick(50);
     }
   };
+
+  const handlePointerDragStart = (event: React.PointerEvent<HTMLDivElement>, node: FileNode) => {
+    if (event.button !== 0 || node.is_dir || isProtectedNode(node)) return;
+
+    removePointerDragListeners();
+    clearSuppressionTimer();
+
+    const sourcePath = node.path;
+    const session: PointerDragSession = {
+      pointerId: event.pointerId,
+      sourcePath,
+      startX: event.clientX,
+      startY: event.clientY,
+      hasDragged: false,
+      moveHandler: (moveEvent) => {
+        const activeSession = pointerDragRef.current;
+        if (!activeSession || moveEvent.pointerId !== activeSession.pointerId) return;
+
+        if (!activeSession.hasDragged) {
+          const distance = Math.hypot(
+            moveEvent.clientX - activeSession.startX,
+            moveEvent.clientY - activeSession.startY,
+          );
+          if (distance < 5) return;
+
+          const sourceNode = findNodeByPath(fileTree, activeSession.sourcePath);
+          if (!sourceNode) {
+            removePointerDragListeners();
+            clearDragState();
+            releaseSuppressedClick();
+            return;
+          }
+
+          activeSession.hasDragged = true;
+          suppressClickRef.current = true;
+          draggedItemRef.current = toDraggedItem(sourceNode);
+          setDragSourcePath(sourceNode.path);
+        }
+
+        moveEvent.preventDefault();
+        const targetNode = resolveDropTargetAtPoint(
+          moveEvent.clientX,
+          moveEvent.clientY,
+          activeSession.sourcePath,
+        );
+        setDropTargetPath(targetNode?.path ?? null);
+        setDragPreview({
+          name: draggedItemRef.current?.name ?? node.name,
+          x: moveEvent.clientX,
+          y: moveEvent.clientY,
+        });
+      },
+      upHandler: (upEvent) => {
+        const activeSession = pointerDragRef.current;
+        if (!activeSession || upEvent.pointerId !== activeSession.pointerId) return;
+
+        const sourcePath = activeSession.sourcePath;
+        const wasDragging = activeSession.hasDragged;
+        removePointerDragListeners();
+
+        if (!wasDragging) return;
+
+        upEvent.preventDefault();
+        const targetNode = resolveDropTargetAtPoint(upEvent.clientX, upEvent.clientY, sourcePath);
+        if (!targetNode) {
+          clearDragState();
+          releaseSuppressedClick(50);
+          return;
+        }
+
+        void handleDropOnDirectory(targetNode, sourcePath);
+      },
+      cancelHandler: (cancelEvent) => {
+        const activeSession = pointerDragRef.current;
+        if (!activeSession || cancelEvent.pointerId !== activeSession.pointerId) return;
+        removePointerDragListeners();
+        clearDragState();
+        releaseSuppressedClick(50);
+      },
+      blurHandler: () => {
+        removePointerDragListeners();
+        clearDragState();
+        releaseSuppressedClick(50);
+      },
+    };
+
+    pointerDragRef.current = session;
+    window.addEventListener("pointermove", session.moveHandler);
+    window.addEventListener("pointerup", session.upHandler);
+    window.addEventListener("pointercancel", session.cancelHandler);
+    window.addEventListener("blur", session.blurHandler);
+  };
+
+  useEffect(() => () => {
+    removePointerDragListeners();
+    clearSuppressionTimer();
+  }, []);
 
   const menuGroups: MenuAction[][] = currentNode
     ? currentNode.is_dir
@@ -896,20 +1067,9 @@ export function FileExplorer() {
           onContextMenu={handleContextMenu}
           dropTargetPath={dropTargetPath}
           getDraggedItem={getDraggedItem}
+          canDropPathOnDirectory={canDropPathOnDirectory}
+          onPointerDragStart={handlePointerDragStart}
           isClickSuppressed={isClickSuppressed}
-          onDragStart={(node) => {
-            suppressClickRef.current = true;
-            draggedItemRef.current = {
-              path: node.path,
-              name: node.name,
-              isMarkdown: isMarkdownFile(node.name),
-              isProtected: isProtectedNode(node),
-            };
-          }}
-          onDragEnd={() => {
-            clearDragState();
-            releaseSuppressedClick(50);
-          }}
           onDragHoverDirectory={setDropTargetPath}
           onDropOnDirectory={(target, sourcePath) => {
             void handleDropOnDirectory(target, sourcePath);
@@ -973,4 +1133,22 @@ function toDraggedItem(node: FileNode): DraggedItem {
     isMarkdown: isMarkdownFile(node.name),
     isProtected: isProtectedNode(node),
   };
+}
+
+function getDraggedPathFromEvent(
+  event: Pick<React.DragEvent, "dataTransfer">,
+  getDraggedItem: () => DraggedItem | null,
+): string | null {
+  return (
+    event.dataTransfer.getData("application/x-ai-context-path") ||
+    event.dataTransfer.getData("text/plain") ||
+    getDraggedItem()?.path ||
+    null
+  );
+}
+
+function getDirectoryPathFromPoint(clientX: number, clientY: number): string | null {
+  const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+  const directory = target?.closest<HTMLElement>("[data-explorer-dir-path]");
+  return directory?.dataset.explorerDirPath ?? null;
 }
