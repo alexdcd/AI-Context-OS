@@ -380,7 +380,10 @@ function TreeNode({
           </>
         ) : (
           <>
-            <span className="flex w-3 items-center justify-center">
+            <span className={clsx(
+              "flex w-3 items-center justify-center",
+              canDrag && "cursor-grab active:cursor-grabbing",
+            )}>
               {canDrag ? (
                 <GripVertical className="h-3 w-3 text-[color:var(--text-2)] opacity-70 transition-opacity group-hover:opacity-100" />
               ) : null}
@@ -1187,12 +1190,6 @@ export function FileExplorer() {
 
   return (
     <div className="px-1 py-1">
-      {fileTree.length > 0 && !dragPreview && (
-        <p className="px-3 pb-2 pt-1 text-[10px] uppercase tracking-wide text-[color:var(--text-2)]">
-          Arrastra archivos a carpetas para moverlos. Cmd+Z deshace el ultimo movimiento
-        </p>
-      )}
-
       {fileTree.map((node) => (
         <TreeNode
           key={node.path}
