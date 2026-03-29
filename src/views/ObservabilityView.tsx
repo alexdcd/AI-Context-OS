@@ -3,10 +3,8 @@ import {
   Activity,
   BarChart3,
   Zap,
-  Plug,
   Check,
   X,
-  Copy,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -18,7 +16,6 @@ import {
   applyOptimization,
   dismissOptimization,
   runOptimizationAnalysis,
-  getMcpConnectionInfo,
 } from "../lib/tauri";
 import type {
   ContextRequestRecord,
@@ -26,12 +23,11 @@ import type {
   TopMemoryRecord,
   UnusedMemoryRecord,
   OptimizationRecord,
-  McpConnectionInfo,
 } from "../lib/types";
 // Store not used in this view currently (live events not yet wired)
 // import { useObservabilityStore } from "../lib/observabilityStore";
 
-type Tab = "live" | "intelligence" | "optimizations" | "connect";
+type Tab = "live" | "intelligence" | "optimizations";
 
 export function ObservabilityView() {
   const [activeTab, setActiveTab] = useState<Tab>("live");
@@ -40,7 +36,6 @@ export function ObservabilityView() {
     { id: "live", icon: Activity, label: "En Vivo" },
     { id: "intelligence", icon: BarChart3, label: "Inteligencia" },
     { id: "optimizations", icon: Zap, label: "Optimizaciones" },
-    { id: "connect", icon: Plug, label: "Conectar IA" },
   ];
 
   return (
@@ -82,7 +77,6 @@ export function ObservabilityView() {
       {activeTab === "live" && <LiveTab />}
       {activeTab === "intelligence" && <IntelligenceTab />}
       {activeTab === "optimizations" && <OptimizationsTab />}
-      {activeTab === "connect" && <ConnectTab />}
     </div>
   );
 }

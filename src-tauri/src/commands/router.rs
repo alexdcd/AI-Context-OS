@@ -3,9 +3,9 @@ use std::path::Path;
 
 use tauri::{AppHandle, Emitter, State};
 
-use crate::core::compat::{generate_cursorrules, generate_windsurfrules};
+use crate::core::compat::{render_claude_adapter, render_cursor_adapter, render_windsurf_adapter};
 use crate::core::index::scan_memories;
-use crate::core::router::{generate_claude_md, generate_index_yaml};
+use crate::core::router::{generate_router_content, generate_index_yaml};
 use crate::core::types::{Config, MemoryMeta};
 use crate::state::AppState;
 
@@ -16,23 +16,26 @@ fn regenerate_router_files(
     let all = scan_memories(root);
     let metas: Vec<_> = all.iter().map(|(m, _)| m.clone()).collect();
 
-    // Generate claude.md
-    let claude_md = generate_claude_md(&metas, config);
+    // Generate neutral router content (source of truth)
+    let neutral = generate_router_content(&metas, config);
+
+    // Write adapter artifacts from neutral content
+    let claude_md = render_claude_adapter(&neutral);
     fs::write(root.join("claude.md"), &claude_md)
         .map_err(|e| format!("Failed to write claude.md: {}", e))?;
 
-    // Generate _index.yaml
+    let cursorrules = render_cursor_adapter(&neutral);
+    fs::write(root.join(".cursorrules"), &cursorrules)
+        .map_err(|e| format!("Failed to write .cursorrules: {}", e))?;
+
+    let windsurfrules = render_windsurf_adapter(&neutral);
+    fs::write(root.join(".windsurfrules"), &windsurfrules)
+        .map_err(|e| format!("Failed to write .windsurfrules: {}", e))?;
+
+    // Generate _index.yaml (independent of adapters)
     let index_yaml = generate_index_yaml(&metas);
     fs::write(root.join("_index.yaml"), &index_yaml)
         .map_err(|e| format!("Failed to write _index.yaml: {}", e))?;
-
-    // Generate compatibility files
-    let cursorrules = generate_cursorrules(&claude_md);
-    fs::write(root.join(".cursorrules"), &cursorrules)
-        .map_err(|e| format!("Failed to write .cursorrules: {}", e))?;
-    let windsurfrules = generate_windsurfrules(&claude_md);
-    fs::write(root.join(".windsurfrules"), &windsurfrules)
-        .map_err(|e| format!("Failed to write .windsurfrules: {}", e))?;
 
     Ok((claude_md, all))
 }

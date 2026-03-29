@@ -6,7 +6,7 @@ use chrono::Utc;
 use crate::core::index::scan_memories;
 use crate::core::levels::estimate_tokens;
 use crate::core::memory::read_memory;
-use crate::core::router::generate_claude_md;
+use crate::core::router::generate_router_content;
 use crate::core::scoring::compute_score;
 use crate::core::types::{Config, LoadLevel, Memory, MemoryType, ScoreBreakdown, ScoredMemory};
 
@@ -68,7 +68,7 @@ pub fn execute_context_query(
 
     if memories.is_empty() {
         // Generate rules even with no memories
-        let rules_content = generate_claude_md(&[], config);
+        let rules_content = generate_router_content(&[], config);
         return Ok(ContextResult {
             scored_memories: Vec::new(),
             loaded: Vec::new(),
@@ -231,7 +231,7 @@ pub fn execute_context_query(
 
     // Generate rules content
     let all_metas: Vec<_> = memories.iter().map(|m| m.meta.clone()).collect();
-    let rules_content = generate_claude_md(&all_metas, config);
+    let rules_content = generate_router_content(&all_metas, config);
 
     let tokens_used = token_budget - remaining_budget;
 

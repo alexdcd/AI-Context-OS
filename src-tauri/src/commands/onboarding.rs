@@ -52,7 +52,8 @@ pub fn run_onboarding(
     let config = state.config.read().unwrap().clone();
     let all = crate::core::index::scan_memories(&root);
     let metas: Vec<_> = all.iter().map(|(m, _)| m.clone()).collect();
-    let claude_md = crate::core::router::generate_claude_md(&metas, &config);
+    let neutral = crate::core::router::generate_router_content(&metas, &config);
+    let claude_md = crate::core::compat::render_claude_adapter(&neutral);
     fs::write(root.join("claude.md"), &claude_md)
         .map_err(|e| format!("Failed to write claude.md: {}", e))?;
 
@@ -60,9 +61,9 @@ pub fn run_onboarding(
     fs::write(root.join("_index.yaml"), &index_yaml)
         .map_err(|e| format!("Failed to write _index.yaml: {}", e))?;
 
-    let cursorrules = crate::core::compat::generate_cursorrules(&claude_md);
+    let cursorrules = crate::core::compat::render_cursor_adapter(&neutral);
     fs::write(root.join(".cursorrules"), &cursorrules).ok();
-    let windsurfrules = crate::core::compat::generate_windsurfrules(&claude_md);
+    let windsurfrules = crate::core::compat::render_windsurf_adapter(&neutral);
     fs::write(root.join(".windsurfrules"), &windsurfrules).ok();
 
     // Persist selected root and refresh runtime bindings for this workspace.
