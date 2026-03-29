@@ -62,7 +62,7 @@ clap = { version = "4", features = ["derive"] }
 schemars = "0.8"
 
 # MCP protocol
-rmcp = { version = "1.3", features = ["server", "transport-io", "server-side-http", "tower"] }
+rmcp = { version = "1.3", features = ["server", "transport-io", "transport-streamable-http-server", "tower"] }
 
 # SQLite (observability database)
 rusqlite = { version = "0.39", features = ["bundled"] }

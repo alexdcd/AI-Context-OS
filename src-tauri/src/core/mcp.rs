@@ -124,7 +124,7 @@ impl AiContextMcpServer {
         name = "get_context",
         description = "Load relevant AI context for a task. Returns rules, scored memories at appropriate detail levels, and a list of available but unloaded memories. Use this at the start of every task."
     )]
-    async fn get_context(&self, #[tool(params)] params: GetContextParams) -> String {
+    async fn get_context(&self, Parameters(params): Parameters<GetContextParams>) -> String {
         let root = self.state.root_dir.read().unwrap().clone();
         let config = self.state.config.read().unwrap().clone();
 
@@ -190,7 +190,7 @@ impl AiContextMcpServer {
         name = "save_memory",
         description = "Create or update a memory in the AI Context OS workspace. Memories persist knowledge for future AI sessions."
     )]
-    async fn save_memory(&self, #[tool(params)] params: SaveMemoryParams) -> String {
+    async fn save_memory(&self, Parameters(params): Parameters<SaveMemoryParams>) -> String {
         let root = self.state.root_dir.read().unwrap().clone();
 
         let memory_type = match params.memory_type.to_lowercase().as_str() {
@@ -253,7 +253,7 @@ impl AiContextMcpServer {
         name = "get_skill",
         description = "Load a skill memory and its full dependency chain (requires + optional). Returns the skill content plus all dependent memories assembled."
     )]
-    async fn get_skill(&self, #[tool(params)] params: GetSkillParams) -> String {
+    async fn get_skill(&self, Parameters(params): Parameters<GetSkillParams>) -> String {
         let root = self.state.root_dir.read().unwrap().clone();
 
         let all_entries = scan_memories(&root);
@@ -335,7 +335,7 @@ impl AiContextMcpServer {
         name = "log_session",
         description = "Log a structured session event to the daily JSONL log. Use for tracking milestones, errors, or session boundaries."
     )]
-    async fn log_session(&self, #[tool(params)] params: LogSessionParams) -> String {
+    async fn log_session(&self, Parameters(params): Parameters<LogSessionParams>) -> String {
         let root = self.state.root_dir.read().unwrap().clone();
         let today = Utc::now().format("%Y-%m-%d").to_string();
         let log_path = root.join("02-daily").join("sessions").join(format!("{}.jsonl", today));
