@@ -11,7 +11,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import ELK from "elkjs/lib/elk.bundled.js";
+import ELK from "elkjs/lib/elk-api.js";
 import {
   ExternalLink,
   Network,
@@ -31,7 +31,8 @@ import {
   type MemoryType,
 } from "../lib/types";
 
-const elk = new ELK();
+const elkWorkerUrl = new URL("elkjs/lib/elk-worker.min.js", import.meta.url).toString();
+const elk = new ELK({ workerUrl: elkWorkerUrl });
 
 interface FlowNode {
   id: string;

@@ -144,14 +144,14 @@ function AppContent() {
     <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--bg-0)]">
       <div 
         className="flex h-[38px] w-full shrink-0 flex-row items-center border-b border-[color:var(--border)] relative z-50 bg-[color:var(--bg-0)]"
+        data-tauri-drag-region
       >
-        <div data-tauri-drag-region className="w-[72px] h-full shrink-0" /> {/* Spacer for macOS traffic lights */}
+        <div className="w-[72px] h-full shrink-0" /> {/* Spacer for macOS traffic lights */}
 
         {/* Animated spacer linking Toggle Button to the right edge of Explorer */}
         <div 
           className="flex h-full items-center justify-start overflow-hidden transition-[width] duration-300 ease-in-out"
           style={{ width: explorerOpen ? "196px" : "0px" }}
-          data-tauri-drag-region
         />
 
         {/* Sliding Toggle Button: Pushed left/right by the animated spacer. 
@@ -173,7 +173,7 @@ function AppContent() {
         </div>
 
         {/* Remaining top window drag region */}
-        <div data-tauri-drag-region className="flex-1 h-full" />
+        <div className="flex-1 h-full" />
       </div>
 
       <div className="obs-app-shell flex flex-1 overflow-hidden">

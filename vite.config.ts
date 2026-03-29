@@ -13,10 +13,6 @@ export default defineConfig(async () => ({
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
 
-          if (id.includes("elkjs")) {
-            return "elk-vendor";
-          }
-
           if (id.includes("@xyflow/react")) {
             return "xyflow-vendor";
           }
@@ -39,11 +35,7 @@ export default defineConfig(async () => ({
             return "react-vendor";
           }
 
-          if (id.includes("lucide-react") || id.includes("clsx")) {
-            return "ui-vendor";
-          }
-
-          return "vendor";
+          return undefined;
         },
       },
     },
