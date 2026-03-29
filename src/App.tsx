@@ -165,6 +165,7 @@ function AppContent() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--bg-0)]">
       <div 
+        data-tauri-drag-region
         className="flex h-[38px] w-full shrink-0 flex-row items-center border-b border-[color:var(--border)] relative z-50 bg-[color:var(--bg-0)]"
         onMouseDownCapture={handleTitlebarMouseDownCapture}
       >
@@ -195,7 +196,7 @@ function AppContent() {
         </div>
 
         {/* Remaining top window drag region */}
-        <div className="flex-1 h-full" />
+        <div data-tauri-drag-region className="flex-1 h-full" />
       </div>
 
       <div className="obs-app-shell flex flex-1 overflow-hidden">
