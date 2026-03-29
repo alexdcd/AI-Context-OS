@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
+use crate::core::observability::ObservabilityDb;
 use crate::core::types::{Config, MemoryMeta};
 use crate::core::watcher::MemoryIndex;
 
@@ -13,6 +14,7 @@ pub struct AppState {
     pub root_dir: RwLock<PathBuf>,
     pub memory_index: MemoryIndex, // Arc<RwLock<HashMap<id, (meta, file_path)>>>
     pub config: RwLock<Config>,
+    pub observability: Arc<Mutex<Option<ObservabilityDb>>>,
 }
 
 impl AppState {
