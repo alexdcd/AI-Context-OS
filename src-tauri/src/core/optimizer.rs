@@ -128,8 +128,10 @@ pub fn run_optimizations(db: &ObservabilityDb, root: &Path) -> Result<Vec<Optimi
     }
 
     // Detector 5: Remove decayed memories
+    let now = chrono::Utc::now();
     for mem in &memories {
-        let decay_score = mem.meta.importance * mem.meta.decay_rate.powf(mem.meta.access_count as f64);
+        let days_since = (now - mem.meta.last_access).num_days().max(0) as f64;
+        let decay_score = mem.meta.importance * mem.meta.decay_rate.powf(days_since);
         if decay_score < 0.05 && mem.meta.importance < 0.3 {
             suggestions.push(OptimizationRecord {
                 id: 0,

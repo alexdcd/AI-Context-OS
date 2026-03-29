@@ -124,11 +124,11 @@ pub fn run() {
                 }
             }
 
-            // Spawn MCP HTTP server
+            // Spawn MCP HTTP server (shares AppState locks to stay in sync)
             {
                 let shared_state = Arc::new(crate::core::mcp::McpSharedState {
-                    root_dir: std::sync::RwLock::new(root.clone()),
-                    config: std::sync::RwLock::new(state.config.read().unwrap().clone()),
+                    root_dir: state.root_dir.clone(),
+                    config: state.config.clone(),
                     observability: state.observability.clone(),
                 });
                 tauri::async_runtime::spawn(async move {

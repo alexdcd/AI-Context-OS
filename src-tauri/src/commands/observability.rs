@@ -33,18 +33,19 @@ pub fn get_recent_context_requests(
 
 #[tauri::command]
 pub fn get_observability_stats(days: u32, state: State<AppState>) -> Result<ObservabilityStats, String> {
-    let obs = state.observability.lock().unwrap();
-    match obs.as_ref() {
-        Some(db) => {
-            let mut stats = db.get_stats(days)?;
-            // Fill total_memories from memory_index
-            if let Ok(index) = state.memory_index.read() {
-                stats.total_memories = index.len() as u32;
-            }
-            Ok(stats)
+    // Acquire and release Mutex before touching RwLock to prevent deadlock
+    let mut stats = {
+        let obs = state.observability.lock().unwrap();
+        match obs.as_ref() {
+            Some(db) => db.get_stats(days)?,
+            None => return Ok(ObservabilityStats::default()),
         }
-        None => Ok(ObservabilityStats::default()),
+    };
+    // Mutex dropped — safe to acquire RwLock
+    if let Ok(index) = state.memory_index.read() {
+        stats.total_memories = index.len() as u32;
     }
+    Ok(stats)
 }
 
 #[tauri::command]

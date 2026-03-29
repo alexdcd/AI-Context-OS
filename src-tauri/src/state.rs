@@ -11,9 +11,9 @@ use crate::core::watcher::MemoryIndex;
 const ROOT_HINT_FILE: &str = ".ai-context-os-root";
 
 pub struct AppState {
-    pub root_dir: RwLock<PathBuf>,
+    pub root_dir: Arc<RwLock<PathBuf>>,
     pub memory_index: MemoryIndex, // Arc<RwLock<HashMap<id, (meta, file_path)>>>
-    pub config: RwLock<Config>,
+    pub config: Arc<RwLock<Config>>,
     pub observability: Arc<Mutex<Option<ObservabilityDb>>>,
 }
 
@@ -24,15 +24,15 @@ impl AppState {
         let root = Self::load_persisted_root(&home).unwrap_or(default_root);
 
         Self {
-            root_dir: RwLock::new(root.clone()),
+            root_dir: Arc::new(RwLock::new(root.clone())),
             memory_index: Arc::new(RwLock::new(HashMap::new())),
-            config: RwLock::new(Config {
+            config: Arc::new(RwLock::new(Config {
                 root_dir: root.to_string_lossy().to_string(),
                 default_token_budget: 4000,
                 decay_threshold: 0.1,
                 scratch_ttl_days: 7,
                 active_tools: vec!["claude".to_string()],
-            }),
+            })),
             observability: Arc::new(Mutex::new(None)),
         }
     }

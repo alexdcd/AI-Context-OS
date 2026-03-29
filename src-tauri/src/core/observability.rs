@@ -412,7 +412,9 @@ impl ObservabilityDb {
         let mut stmt = conn
             .prepare(
                 "SELECT ms.memory_id, COUNT(*) as times_served,
-                        ms.load_level as typical_level,
+                        (SELECT load_level FROM memories_served
+                         WHERE memory_id = ms.memory_id
+                         GROUP BY load_level ORDER BY COUNT(*) DESC LIMIT 1) as typical_level,
                         SUM(ms.token_estimate) as total_tokens,
                         ROUND(COUNT(*) * 100.0 / NULLIF((
                             SELECT COUNT(*) FROM context_requests

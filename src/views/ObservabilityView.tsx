@@ -28,7 +28,8 @@ import type {
   OptimizationRecord,
   McpConnectionInfo,
 } from "../lib/types";
-import { useObservabilityStore } from "../lib/observabilityStore";
+// Store not used in this view currently (live events not yet wired)
+// import { useObservabilityStore } from "../lib/observabilityStore";
 
 type Tab = "live" | "intelligence" | "optimizations" | "connect";
 
@@ -87,10 +88,16 @@ export function ObservabilityView() {
 
 function LiveTab() {
   const [requests, setRequests] = useState<ContextRequestRecord[]>([]);
-  const liveEvents = useObservabilityStore((s) => s.liveEvents);
+
+  const loadRequests = () => {
+    getRecentContextRequests(20).then(setRequests).catch(console.error);
+  };
 
   useEffect(() => {
-    getRecentContextRequests(20).then(setRequests).catch(console.error);
+    loadRequests();
+    // Poll every 5 seconds for new requests
+    const interval = setInterval(loadRequests, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const last = requests[0];
@@ -128,25 +135,6 @@ function LiveTab() {
       ) : (
         <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
           Sin peticiones de contexto aun. Conecta una herramienta de IA para comenzar.
-        </div>
-      )}
-
-      {/* Live events */}
-      {liveEvents.length > 0 && (
-        <div>
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)", marginBottom: 8 }}>
-            Eventos en tiempo real
-          </h3>
-          {liveEvents.slice(0, 5).map((ev, i) => (
-            <div key={i} className="card" style={{ padding: 10, marginBottom: 6, fontSize: 12 }}>
-              <span style={{ color: "var(--accent)", fontWeight: 600 }}>{ev.event_type}</span>
-              {" — "}
-              <span style={{ color: "var(--text-1)" }}>{ev.query}</span>
-              <span style={{ color: "var(--text-2)", marginLeft: 8 }}>
-                {ev.tokens_used}t / {ev.memories_loaded}m
-              </span>
-            </div>
-          ))}
         </div>
       )}
 
@@ -389,7 +377,7 @@ function OptimizationsTab() {
                         gap: 3,
                       }}
                     >
-                      <Check size={12} /> Aplicar
+                      <Check size={12} /> Hecho
                     </button>
                     <button
                       onClick={() => handleDismiss(opt.id)}

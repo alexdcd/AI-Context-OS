@@ -288,8 +288,8 @@ fn main() {
             };
 
             let shared_state = Arc::new(core::mcp::McpSharedState {
-                root_dir: std::sync::RwLock::new(root),
-                config: std::sync::RwLock::new(config),
+                root_dir: Arc::new(std::sync::RwLock::new(root)),
+                config: Arc::new(std::sync::RwLock::new(config)),
                 observability: obs,
             });
 

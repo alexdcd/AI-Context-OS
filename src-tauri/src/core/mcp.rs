@@ -19,8 +19,8 @@ use crate::core::types::{Config, LoadLevel, MemoryMeta, MemoryType};
 
 /// Shared state accessible by the MCP server tools.
 pub struct McpSharedState {
-    pub root_dir: RwLock<PathBuf>,
-    pub config: RwLock<Config>,
+    pub root_dir: Arc<RwLock<PathBuf>>,
+    pub config: Arc<RwLock<Config>>,
     pub observability: Arc<Mutex<Option<ObservabilityDb>>>,
 }
 
