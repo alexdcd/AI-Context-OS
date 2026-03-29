@@ -33,6 +33,7 @@ impl AppState {
                 scratch_ttl_days: 7,
                 active_tools: vec!["claude".to_string()],
             }),
+            observability: Arc::new(Mutex::new(None)),
         }
     }
 
