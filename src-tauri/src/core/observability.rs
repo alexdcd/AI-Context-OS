@@ -5,6 +5,8 @@ use chrono::Utc;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
+use crate::core::index::scan_memories;
+
 /// SQLite-backed observability database for tracking context requests.
 /// Lives at {workspace}/.cache/observability.db
 pub struct ObservabilityDb {
@@ -377,8 +379,8 @@ impl ObservabilityDb {
             .query_row(
                 "SELECT COUNT(DISTINCT memory_id) FROM memories_served ms
                  JOIN context_requests cr ON ms.request_id = cr.id
-                 WHERE cr.timestamp > datetime('now', '-30 days')",
-                [],
+                 WHERE cr.timestamp > datetime('now', ?1)",
+                params![format!("-{} days", days)],
                 |row| row.get(0),
             )
             .map_err(|e| format!("Stats query error: {}", e))?;
@@ -446,32 +448,56 @@ impl ObservabilityDb {
     }
 
     /// Get memories that haven't been served in N+ days.
-    pub fn get_unused_memories(&self, days: u32) -> Result<Vec<UnusedMemoryRecord>, String> {
+    pub fn get_unused_memories(&self, root: &Path, days: u32) -> Result<Vec<UnusedMemoryRecord>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn
             .prepare(
-                "SELECT memory_id, MAX(cr.timestamp) as last_served,
-                        CAST(julianday('now') - julianday(MAX(cr.timestamp)) AS INTEGER) as days_since
+                "SELECT memory_id, MAX(cr.timestamp) as last_served
                  FROM memories_served ms
                  JOIN context_requests cr ON ms.request_id = cr.id
-                 GROUP BY memory_id
-                 HAVING days_since > ?1
-                 ORDER BY days_since DESC",
+                 GROUP BY memory_id",
             )
             .map_err(|e| format!("Query error: {}", e))?;
 
         let rows = stmt
-            .query_map(params![days], |row| {
-                Ok(UnusedMemoryRecord {
-                    memory_id: row.get(0)?,
-                    last_served: row.get(1)?,
-                    days_since_use: row.get(2)?,
-                })
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                ))
             })
             .map_err(|e| format!("Query error: {}", e))?;
 
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Row error: {}", e))
+        let served = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Row error: {}", e))?;
+
+        let now = Utc::now();
+        let served_map: std::collections::HashMap<_, _> = served.into_iter().collect();
+        let mut unused = Vec::new();
+
+        for (meta, _) in scan_memories(root) {
+            let (last_served, days_since_use) = match served_map.get(&meta.id) {
+                Some(Some(timestamp)) => {
+                    let last = chrono::DateTime::parse_from_rfc3339(timestamp)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .unwrap_or(meta.last_access);
+                    (Some(timestamp.clone()), (now - last).num_days().max(0) as u32)
+                }
+                Some(None) | None => (None, (now - meta.last_access).num_days().max(0) as u32),
+            };
+
+            if days_since_use > days {
+                unused.push(UnusedMemoryRecord {
+                    memory_id: meta.id,
+                    last_served,
+                    days_since_use,
+                });
+            }
+        }
+
+        unused.sort_by(|a, b| b.days_since_use.cmp(&a.days_since_use));
+        Ok(unused)
     }
 
     /// Insert or update today's health score.

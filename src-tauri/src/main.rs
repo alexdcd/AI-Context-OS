@@ -2,5 +2,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    ai_context_os::run()
+    match ai_context_os::try_run_embedded_mcp_server() {
+        Ok(true) => {}
+        Ok(false) => ai_context_os::run(),
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1);
+        }
+    }
 }

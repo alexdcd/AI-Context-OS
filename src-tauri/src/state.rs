@@ -4,9 +4,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 
+use crate::core::index::scan_memories;
 use crate::core::observability::ObservabilityDb;
-use crate::core::types::{Config, MemoryMeta};
-use crate::core::watcher::MemoryIndex;
+use crate::core::types::Config;
+use crate::core::watcher::{MemoryIndex, WatcherHandle};
 
 const ROOT_HINT_FILE: &str = ".ai-context-os-root";
 
@@ -15,6 +16,7 @@ pub struct AppState {
     pub memory_index: MemoryIndex, // Arc<RwLock<HashMap<id, (meta, file_path)>>>
     pub config: Arc<RwLock<Config>>,
     pub observability: Arc<Mutex<Option<ObservabilityDb>>>,
+    pub watcher_handle: Arc<Mutex<Option<WatcherHandle>>>,
 }
 
 impl AppState {
@@ -34,6 +36,7 @@ impl AppState {
                 active_tools: vec!["claude".to_string()],
             })),
             observability: Arc::new(Mutex::new(None)),
+            watcher_handle: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -53,6 +56,35 @@ impl AppState {
         }
 
         Self::persist_root_hint(&root)
+    }
+
+    pub fn refresh_memory_index(&self) {
+        let root = self.get_root();
+        let all = scan_memories(&root);
+        let mut index = self.memory_index.write().unwrap();
+        index.clear();
+        for (meta, path) in all {
+            index.insert(meta.id.clone(), (meta, path));
+        }
+    }
+
+    pub fn rebind_observability(&self) -> Result<(), String> {
+        let root = self.get_root();
+        let db = ObservabilityDb::new(&root)?;
+        *self.observability.lock().unwrap() = Some(db);
+        Ok(())
+    }
+
+    pub fn clear_observability(&self) {
+        *self.observability.lock().unwrap() = None;
+    }
+
+    pub fn replace_watcher(&self, watcher: Option<WatcherHandle>) {
+        let mut guard = self.watcher_handle.lock().unwrap();
+        if let Some(existing) = guard.take() {
+            existing.stop();
+        }
+        *guard = watcher;
     }
 
     fn root_hint_path(home: &Path) -> PathBuf {

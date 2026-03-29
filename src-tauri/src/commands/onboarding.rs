@@ -5,7 +5,6 @@ use tauri::{AppHandle, State};
 
 use crate::core::frontmatter::serialize_frontmatter;
 use crate::core::types::{MemoryMeta, MemoryType};
-use crate::core::watcher::start_watcher;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -66,16 +65,9 @@ pub fn run_onboarding(
     let windsurfrules = crate::core::compat::generate_windsurfrules(&claude_md);
     fs::write(root.join(".windsurfrules"), &windsurfrules).ok();
 
-    // Update memory index
-    let mut index = state.memory_index.write().unwrap();
-    index.clear();
-    for (meta, path) in all {
-        index.insert(meta.id.clone(), (meta, path));
-    }
-
-    // Persist selected root and ensure watcher points at this workspace.
+    // Persist selected root and refresh runtime bindings for this workspace.
     state.set_root(root.clone())?;
-    start_watcher(root, app, Some(state.memory_index.clone())).ok();
+    crate::commands::config::sync_workspace_runtime(state.inner(), Some(&app))?;
 
     Ok(true)
 }

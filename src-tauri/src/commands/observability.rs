@@ -63,9 +63,10 @@ pub fn get_top_memories_stats(
 
 #[tauri::command]
 pub fn get_unused_memories_stats(days: u32, state: State<AppState>) -> Result<Vec<UnusedMemoryRecord>, String> {
+    let root = state.get_root();
     let obs = state.observability.lock().unwrap();
     match obs.as_ref() {
-        Some(db) => db.get_unused_memories(days),
+        Some(db) => db.get_unused_memories(&root, days),
         None => Ok(vec![]),
     }
 }

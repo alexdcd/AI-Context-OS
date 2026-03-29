@@ -120,20 +120,22 @@ pub fn execute_context_query(
     // Collect skill dependency IDs
     let mut force_load_ids: HashSet<String> = HashSet::new();
     let mut boost_ids: HashSet<String> = HashSet::new();
-    for (idx, _score) in &scored {
+    for (idx, score) in scored.iter().take(5) {
         let mem = &memories[*idx];
-        if mem.meta.memory_type == MemoryType::Skill {
-            for req_id in &mem.meta.requires {
-                force_load_ids.insert(req_id.clone());
-            }
-            for opt_id in &mem.meta.optional {
-                boost_ids.insert(opt_id.clone());
-            }
+        if mem.meta.memory_type != MemoryType::Skill || score.final_score <= 0.15 {
+            continue;
+        }
+
+        for req_id in &mem.meta.requires {
+            force_load_ids.insert(req_id.clone());
+        }
+        for opt_id in &mem.meta.optional {
+            boost_ids.insert(opt_id.clone());
         }
     }
 
     // Apply optional boost
-    let scored: Vec<(usize, ScoreBreakdown)> = scored
+    let mut scored: Vec<(usize, ScoreBreakdown)> = scored
         .into_iter()
         .map(|(idx, mut s)| {
             if boost_ids.contains(&memories[idx].meta.id) {
@@ -142,6 +144,11 @@ pub fn execute_context_query(
             (idx, s)
         })
         .collect();
+    scored.sort_by(|a, b| {
+        b.1.final_score
+            .partial_cmp(&a.1.final_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Greedy allocation within token budget
     let mut remaining_budget = token_budget;

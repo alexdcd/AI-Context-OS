@@ -146,6 +146,32 @@ fn expand_home(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
+pub fn sync_workspace_runtime(state: &crate::state::AppState, app: Option<&AppHandle>) -> Result<(), String> {
+    state.refresh_memory_index();
+
+    if let Err(e) = state.rebind_observability() {
+        state.clear_observability();
+        log::warn!("Failed to initialize observability DB for {}: {}", state.get_root().display(), e);
+    }
+
+    if let Some(app) = app {
+        let root = state.get_root();
+        if root.exists() {
+            match start_watcher(root.clone(), app.clone(), Some(state.memory_index.clone())) {
+                Ok(handle) => state.replace_watcher(Some(handle)),
+                Err(e) => {
+                    state.replace_watcher(None);
+                    log::warn!("Failed to start watcher on {}: {}", root.display(), e);
+                }
+            }
+        } else {
+            state.replace_watcher(None);
+        }
+    }
+
+    Ok(())
+}
+
 /// Initialize the workspace directory structure.
 #[tauri::command]
 pub fn init_workspace(app: AppHandle, state: State<AppState>) -> Result<bool, String> {
@@ -158,7 +184,7 @@ pub fn init_workspace(app: AppHandle, state: State<AppState>) -> Result<bool, St
     let config = create_workspace_structure(&root, &[])?;
     state.set_root(root.clone())?;
     *state.config.write().unwrap() = config;
-    start_watcher(root, app, Some(state.memory_index.clone())).ok();
+    sync_workspace_runtime(state.inner(), Some(&app))?;
 
     Ok(true)
 }
@@ -177,7 +203,7 @@ pub fn get_config(state: State<AppState>) -> Result<Config, String> {
 
 /// Save configuration.
 #[tauri::command]
-pub fn save_config(config: Config, state: State<AppState>) -> Result<(), String> {
+pub fn save_config(config: Config, app: AppHandle, state: State<AppState>) -> Result<(), String> {
     let root = if config.root_dir.trim().is_empty() {
         state.get_root()
     } else {
@@ -192,5 +218,6 @@ pub fn save_config(config: Config, state: State<AppState>) -> Result<(), String>
         .map_err(|e| format!("Failed to write config: {}", e))?;
     state.set_root(root)?;
     *state.config.write().unwrap() = config;
+    sync_workspace_runtime(state.inner(), Some(&app))?;
     Ok(())
 }

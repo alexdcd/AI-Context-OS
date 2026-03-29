@@ -22,7 +22,7 @@ pub fn run_optimizations(db: &ObservabilityDb, root: &Path) -> Result<Vec<Optimi
 
     // Get usage stats from DB
     let top_memories = db.get_top_memories(100, 30).unwrap_or_default();
-    let unused = db.get_unused_memories(30).unwrap_or_default();
+    let unused = db.get_unused_memories(root, 30).unwrap_or_default();
 
     // Detector 1: Compress large L1 content
     for mem in &memories {
@@ -231,4 +231,3 @@ pub fn run_optimizations(db: &ObservabilityDb, root: &Path) -> Result<Vec<Optimi
 
     Ok(suggestions)
 }
-
