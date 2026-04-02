@@ -9,6 +9,25 @@ use crate::core::memory::{read_memory, write_memory};
 use crate::core::types::{CreateMemoryInput, Memory, MemoryFilter, MemoryMeta, MemoryType, SaveMemoryInput};
 use crate::state::AppState;
 
+fn should_regenerate_router(
+    old_meta: &MemoryMeta,
+    new_meta: &MemoryMeta,
+    old_file_path: &PathBuf,
+    new_file_path: &PathBuf,
+) -> bool {
+    old_file_path != new_file_path
+        || old_meta.id != new_meta.id
+        || old_meta.memory_type != new_meta.memory_type
+        || old_meta.l0 != new_meta.l0
+        || old_meta.importance != new_meta.importance
+        || old_meta.always_load != new_meta.always_load
+        || old_meta.tags != new_meta.tags
+        || old_meta.triggers != new_meta.triggers
+        || old_meta.related != new_meta.related
+        || old_meta.requires != new_meta.requires
+        || old_meta.optional != new_meta.optional
+}
+
 /// List all memory metadata (L0 level).
 #[tauri::command]
 pub fn list_memories(
@@ -72,6 +91,7 @@ pub fn get_memory(id: String, state: State<AppState>) -> Result<Memory, String> 
 
     // Persist updated counters to disk
     write_memory(std::path::Path::new(path), &memory)?;
+    state.mark_recent_write(std::path::Path::new(path));
 
     // Update in-memory index
     drop(index);
@@ -119,6 +139,7 @@ pub fn save_memory(
     let (old_meta, path) = index
         .get(&input.id)
         .ok_or_else(|| format!("Memory not found: {}", input.id))?;
+    let old_meta = old_meta.clone();
     let old_file_path = PathBuf::from(path.clone());
     let old_memory_type = old_meta.memory_type.clone();
 
@@ -160,6 +181,7 @@ pub fn save_memory(
     };
 
     write_memory(&target_file_path, &memory)?;
+    state.mark_recent_write(&target_file_path);
     if target_file_path != old_file_path && old_file_path.exists() {
         fs::remove_file(&old_file_path)
             .map_err(|e| format!("Failed to move memory file {}: {}", old_file_path.display(), e))?;
@@ -178,7 +200,9 @@ pub fn save_memory(
     drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
-    crate::commands::router::regenerate_router_internal(&app, &state)?;
+    if should_regenerate_router(&old_meta, &memory.meta, &old_file_path, &target_file_path) {
+        crate::commands::router::regenerate_router_internal(&app, &state)?;
+    }
 
     Ok(memory)
 }
@@ -243,6 +267,7 @@ pub fn rename_memory_file(
     memory.file_path = new_path.to_string_lossy().to_string();
 
     write_memory(&new_path, &memory)?;
+    state.mark_recent_write(&new_path);
     if new_path != old_path {
         fs::remove_file(&old_path).map_err(|e| {
             format!(
@@ -327,6 +352,7 @@ pub fn duplicate_memory_file(
     };
 
     write_memory(&target_path, &memory)?;
+    state.mark_recent_write(&target_path);
 
     let mut index = state.memory_index.write().unwrap();
     index.insert(
@@ -381,6 +407,7 @@ pub fn move_memory_file(
     memory.file_path = target_path.to_string_lossy().to_string();
 
     write_memory(&target_path, &memory)?;
+    state.mark_recent_write(&target_path);
     fs::remove_file(&source_path).map_err(|e| {
         format!(
             "Failed to move memory file {} to {}: {}",
@@ -456,6 +483,7 @@ fn create_memory_internal(
     };
 
     write_memory(&file_path, &memory)?;
+    state.mark_recent_write(&file_path);
 
     let mut index = state.memory_index.write().unwrap();
     index.insert(

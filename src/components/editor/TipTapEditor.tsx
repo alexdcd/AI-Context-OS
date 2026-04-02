@@ -5,8 +5,10 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { clsx } from "clsx";
 
 interface Props {
+  documentKey?: string;
   content: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   className?: string;
 }
@@ -16,8 +18,10 @@ interface Props {
  * Content is serialized to Markdown via TipTap's JSON API.
  */
 export function TipTapEditor({
+  documentKey,
   content,
   onChange,
+  onBlur,
   placeholder,
   className,
 }: Props) {
@@ -45,6 +49,9 @@ export function TipTapEditor({
       const text = editorToMarkdown(nextEditor);
       onChange(text);
     },
+    onBlur: () => {
+      onBlur?.();
+    },
   });
 
   useEffect(() => {
@@ -55,12 +62,12 @@ export function TipTapEditor({
         editor.commands.setContent(markdownToHtml(normalizedIncoming), false);
       }
     }
-  }, [content, editor]);
+  }, [content, editor, documentKey]);
 
   if (!editor) {
     return (
       <div className="rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] p-3 text-sm text-[color:var(--text-2)]">
-        Loading...
+        Cargando...
       </div>
     );
   }

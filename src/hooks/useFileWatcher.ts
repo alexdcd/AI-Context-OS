@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useAppStore } from "../lib/store";
+import { useAppStore, wasRecentlyWrittenLocally } from "../lib/store";
 
 /** Listen to Tauri events from the Rust file watcher and refresh state. */
 export function useFileWatcher() {
@@ -14,12 +14,15 @@ export function useFileWatcher() {
         const payload = event.payload ?? "";
         const looksLikePath = payload.includes("/") || payload.includes("\\");
         if (looksLikePath) {
+          if (wasRecentlyWrittenLocally(payload)) {
+            return;
+          }
           // External filesystem edit: keep router/index in sync with frontmatter changes.
           await regenerateRouter();
+          await loadMemories();
+          await loadFileTree();
+          await loadGraph();
         }
-        await loadMemories();
-        await loadFileTree();
-        await loadGraph();
       });
       unlisteners.push(unlisten1);
 
@@ -44,5 +47,5 @@ export function useFileWatcher() {
     return () => {
       unlisteners.forEach((fn) => fn());
     };
-  }, [loadFileTree, loadMemories, regenerateRouter]);
+  }, [loadFileTree, loadGraph, loadMemories, regenerateRouter]);
 }

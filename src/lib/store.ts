@@ -31,7 +31,13 @@ interface AppStore {
   selectRawFile: (path: string) => Promise<void>;
   saveRawFile: (path: string, content: string) => Promise<void>;
   clearSelection: () => void;
-  saveActiveMemory: (l1: string, l2: string, meta: MemoryMeta) => Promise<void>;
+  saveActiveMemory: (
+    sourceId: string,
+    l1: string,
+    l2: string,
+    meta: MemoryMeta,
+    refreshDerivedState?: boolean,
+  ) => Promise<Memory>;
   deleteMemory: (id: string) => Promise<void>;
   loadGraph: () => Promise<void>;
   regenerateRouter: () => Promise<void>;
@@ -122,18 +128,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   saveRawFile: async (path: string, content: string) => {
     try {
-      set({ loading: true });
       await api.writeFile(path, content);
+      markRecentLocalWrite(path);
       set((state) => ({
         activeRawFile:
           state.activeRawFile?.path === path
             ? { ...state.activeRawFile, content }
             : state.activeRawFile,
-        loading: false,
       }));
-      await get().loadFileTree();
     } catch (e) {
-      set({ error: String(e), loading: false });
+      const message = String(e);
+      set({ error: message });
+      throw new Error(message);
     }
   },
 
@@ -141,32 +147,38 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ activeMemory: null, activeRawFile: null, selectedPath: null });
   },
 
-  saveActiveMemory: async (l1, l2, meta) => {
+  saveActiveMemory: async (sourceId, l1, l2, meta, refreshDerivedState = false) => {
     try {
-      const activeMemory = get().activeMemory;
-      if (!activeMemory) {
-        set({ error: "No active memory to save", loading: false });
-        return;
-      }
-
-      set({ loading: true });
       const saved = await api.saveMemory({
-        id: activeMemory.meta.id,
+        id: sourceId,
         meta,
         l1_content: l1,
         l2_content: l2,
       });
-      set({
-        activeMemory: saved,
-        activeRawFile: null,
-        selectedPath: saved.file_path,
-        loading: false,
+      markRecentLocalWrite(saved.file_path);
+      set((state) => {
+        const isStillActive =
+          state.activeMemory?.meta.id === sourceId ||
+          state.activeMemory?.meta.id === saved.meta.id;
+
+        return isStillActive
+          ? {
+              activeMemory: saved,
+              activeRawFile: null,
+              selectedPath: saved.file_path,
+            }
+          : {};
       });
-      await get().loadMemories();
-      await get().loadFileTree();
-      await get().loadGraph();
+      if (refreshDerivedState) {
+        await get().loadMemories();
+        await get().loadFileTree();
+        await get().loadGraph();
+      }
+      return saved;
     } catch (e) {
-      set({ error: String(e), loading: false });
+      const message = String(e);
+      set({ error: message });
+      throw new Error(message);
     }
   },
 
@@ -219,6 +231,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
   toggleCreateMemory: () => set((s) => ({ isCreateMemoryOpen: !s.isCreateMemoryOpen })),
   setCreateMemoryOpen: (v) => set({ isCreateMemoryOpen: v }),
 }));
+
+const RECENT_LOCAL_WRITE_WINDOW_MS = 2_000;
+const recentLocalWrites = new Map<string, number>();
+
+function markRecentLocalWrite(path: string) {
+  const now = Date.now();
+  pruneRecentLocalWrites(now);
+  recentLocalWrites.set(path, now);
+}
+
+export function wasRecentlyWrittenLocally(path: string) {
+  const now = Date.now();
+  pruneRecentLocalWrites(now);
+  const writtenAt = recentLocalWrites.get(path);
+  return writtenAt !== undefined && now - writtenAt < RECENT_LOCAL_WRITE_WINDOW_MS;
+}
+
+function pruneRecentLocalWrites(now: number) {
+  for (const [path, writtenAt] of recentLocalWrites.entries()) {
+    if (now - writtenAt >= RECENT_LOCAL_WRITE_WINDOW_MS) {
+      recentLocalWrites.delete(path);
+    }
+  }
+}
 
 function inferRawFileKind(path: string): RawFileKind {
   const lowerPath = path.toLowerCase();

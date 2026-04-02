@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
 
 use crate::core::index::scan_memories;
 use crate::core::observability::ObservabilityDb;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub config: Arc<RwLock<Config>>,
     pub observability: Arc<Mutex<Option<ObservabilityDb>>>,
     pub watcher_handle: Arc<Mutex<Option<WatcherHandle>>>,
+    pub recent_writes: Arc<Mutex<HashMap<String, Instant>>>,
 }
 
 impl AppState {
@@ -37,6 +39,7 @@ impl AppState {
             })),
             observability: Arc::new(Mutex::new(None)),
             watcher_handle: Arc::new(Mutex::new(None)),
+            recent_writes: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -85,6 +88,13 @@ impl AppState {
             existing.stop();
         }
         *guard = watcher;
+    }
+
+    pub fn mark_recent_write(&self, path: &Path) {
+        let mut recent_writes = self.recent_writes.lock().unwrap();
+        let now = Instant::now();
+        recent_writes.retain(|_, written_at| now.duration_since(*written_at) < Duration::from_secs(2));
+        recent_writes.insert(path.to_string_lossy().to_string(), now);
     }
 
     fn root_hint_path(home: &Path) -> PathBuf {

@@ -157,7 +157,23 @@ pub fn sync_workspace_runtime(state: &crate::state::AppState, app: Option<&AppHa
     if let Some(app) = app {
         let root = state.get_root();
         if root.exists() {
-            match start_watcher(root.clone(), app.clone(), Some(state.memory_index.clone())) {
+            let recent_write_checker = {
+                let recent_writes = state.recent_writes.clone();
+                std::sync::Arc::new(move |path: &str| {
+                    let mut recent_writes = recent_writes.lock().unwrap();
+                    let now = std::time::Instant::now();
+                    recent_writes.retain(|_, written_at| {
+                        now.duration_since(*written_at) < std::time::Duration::from_secs(2)
+                    });
+                    recent_writes.contains_key(path)
+                })
+            };
+            match start_watcher(
+                root.clone(),
+                app.clone(),
+                Some(state.memory_index.clone()),
+                recent_write_checker,
+            ) {
                 Ok(handle) => state.replace_watcher(Some(handle)),
                 Err(e) => {
                     state.replace_watcher(None);

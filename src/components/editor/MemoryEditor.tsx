@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { FileText, PanelRightClose, PanelRightOpen, Save, Trash2, ChevronRight } from "lucide-react";
+import { FileText, PanelRightClose, PanelRightOpen, Trash2, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { useAppStore } from "../../lib/store";
 import { FrontmatterForm } from "./FrontmatterForm";
 import { TipTapEditor } from "./TipTapEditor";
-import type { MemoryMeta, MemoryType, RawFileDocument } from "../../lib/types";
+import type { Memory, MemoryMeta, MemoryType, RawFileDocument } from "../../lib/types";
 
 type InspectorTab = "properties" | "links" | "history";
+type SaveStatus = "saved" | "dirty" | "saving" | "error";
+
+const AUTO_SAVE_DELAY_MS = 300;
 
 interface OutgoingLink {
   id: string;
@@ -18,6 +21,19 @@ interface IncomingLink {
   l0: string;
   memoryType: MemoryType;
   kinds: string[];
+}
+
+interface MemoryDraft {
+  sourceId: string;
+  l1: string;
+  l2: string;
+  meta: MemoryMeta;
+  refreshDerivedState: boolean;
+}
+
+interface RawFileDraft {
+  path: string;
+  content: string;
 }
 
 export function MemoryEditor() {
@@ -36,9 +52,14 @@ export function MemoryEditor() {
   const [l1, setL1] = useState("");
   const [l2, setL2] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [showInspector, setShowInspector] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("properties");
   const [l1Open, setL1Open] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDraftRef = useRef<MemoryDraft | null>(null);
+  const queuedDraftRef = useRef<MemoryDraft | null>(null);
+  const isSavingRef = useRef(false);
 
   useEffect(() => {
     if (activeMemory) {
@@ -46,34 +67,121 @@ export function MemoryEditor() {
       setL1(activeMemory.l1_content);
       setL2(activeMemory.l2_content);
       setDirty(false);
+      setSaveStatus("saved");
       setInspectorTab("properties");
     }
   }, [activeMemory]);
 
   const handleMetaChange = useCallback((updated: MemoryMeta) => {
-    const previousType = meta?.memory_type;
-
     setMeta(updated);
     setDirty(true);
+    setSaveStatus("dirty");
+  }, []);
 
-    if (previousType && previousType !== updated.memory_type) {
-      void (async () => {
-        try {
-          await saveActiveMemory(l1, l2, updated);
-          setDirty(false);
-        } catch {
-          setDirty(true);
-        }
-      })();
+  useEffect(() => {
+    if (!activeMemory || !meta || !dirty) {
+      latestDraftRef.current = null;
+      return;
     }
-  }, [l1, l2, meta, saveActiveMemory]);
+
+    latestDraftRef.current = {
+      sourceId: activeMemory.meta.id,
+      l1,
+      l2,
+      meta,
+      refreshDerivedState: hasDerivedMemoryChanges(activeMemory, meta),
+    };
+  }, [activeMemory, meta, l1, l2, dirty]);
+
+  const flushQueuedSave = useCallback(async () => {
+    if (isSavingRef.current || !queuedDraftRef.current) return;
+
+    isSavingRef.current = true;
+
+    while (queuedDraftRef.current) {
+      const draft = queuedDraftRef.current;
+      queuedDraftRef.current = null;
+      setSaveStatus("saving");
+
+      try {
+        await saveActiveMemory(
+          draft.sourceId,
+          draft.l1,
+          draft.l2,
+          draft.meta,
+          draft.refreshDerivedState,
+        );
+
+        const currentActiveId = useAppStore.getState().activeMemory?.meta.id;
+        if (currentActiveId === draft.sourceId || currentActiveId === draft.meta.id) {
+          setDirty(false);
+          setSaveStatus("saved");
+        }
+      } catch {
+        setSaveStatus("error");
+        isSavingRef.current = false;
+        return;
+      }
+    }
+
+    isSavingRef.current = false;
+  }, [saveActiveMemory]);
+
+  const queueSave = useCallback((draft: MemoryDraft) => {
+    queuedDraftRef.current = draft;
+    void flushQueuedSave();
+  }, [flushQueuedSave]);
 
   const handleSave = useCallback(async () => {
-    if (meta && dirty) {
-      await saveActiveMemory(l1, l2, meta);
-      setDirty(false);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
-  }, [meta, l1, l2, dirty, saveActiveMemory]);
+
+    const draft = latestDraftRef.current;
+    if (!draft) return;
+
+    queueSave(draft);
+    await flushQueuedSave();
+  }, [flushQueuedSave, queueSave]);
+
+  useEffect(() => {
+    if (!latestDraftRef.current) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      const draft = latestDraftRef.current;
+      if (draft) {
+        queueSave(draft);
+      }
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [activeMemory?.meta.id, l1, l2, meta, dirty, queueSave]);
+
+  useEffect(() => {
+    const documentId = activeMemory?.meta.id;
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+
+      const draft = latestDraftRef.current;
+      if (documentId && draft?.sourceId === documentId) {
+        queueSave(draft);
+      }
+    };
+  }, [activeMemory?.meta.id, queueSave]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -93,7 +201,7 @@ export function MemoryEditor() {
   const handleDelete = useCallback(async () => {
     if (!meta) return;
     const ok = window.confirm(
-      `Delete memory "${meta.id}"?\n\nThis will permanently remove the file.`,
+      `Eliminar memoria "${meta.id}"?\n\nEsto borrara el archivo de forma permanente.`,
     );
     if (!ok) return;
     await deleteMemory(meta.id);
@@ -147,11 +255,11 @@ export function MemoryEditor() {
   const historyEntries = useMemo(() => {
     if (!meta) return [] as Array<{ label: string; value: string }>;
     return [
-      { label: "Created", value: formatTimestamp(meta.created) },
-      { label: "Modified", value: formatTimestamp(meta.modified) },
-      { label: "Last access", value: formatTimestamp(meta.last_access) },
+      { label: "Creado", value: formatTimestamp(meta.created) },
+      { label: "Modificado", value: formatTimestamp(meta.modified) },
+      { label: "Ultimo acceso", value: formatTimestamp(meta.last_access) },
       { label: "Version", value: `v${meta.version}` },
-      { label: "Access count", value: String(meta.access_count) },
+      { label: "Accesos", value: String(meta.access_count) },
     ];
   }, [meta]);
 
@@ -170,8 +278,8 @@ export function MemoryEditor() {
     if (activeRawFile) {
       return (
         <RawFileEditor
+          key={activeRawFile.path}
           file={activeRawFile}
-          loading={loading}
           onSave={saveRawFile}
         />
       );
@@ -180,9 +288,9 @@ export function MemoryEditor() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-[color:var(--text-2)]">
         <FileText className="h-8 w-8 text-[color:var(--text-2)]" />
-        <p className="text-sm text-[color:var(--text-1)]">Select a memory to edit</p>
+        <p className="text-sm text-[color:var(--text-1)]">Selecciona un archivo para editar</p>
         <p className="max-w-sm text-xs">
-          Use the sidebar to open a note.
+          Usa el explorador lateral para abrir una nota o archivo.
         </p>
       </div>
     );
@@ -193,11 +301,12 @@ export function MemoryEditor() {
       {/* Minimal top bar — actions only */}
       <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-4 py-1.5">
         <span className="flex-1 font-mono text-[11px] text-[color:var(--text-2)]">{meta.id}.md</span>
+        <SaveStateBadge status={saveStatus} />
         <button
           type="button"
           onClick={() => setShowInspector((prev) => !prev)}
           className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
-          title={showInspector ? "Hide inspector" : "Show inspector"}
+          title={showInspector ? "Ocultar inspector" : "Mostrar inspector"}
         >
           {showInspector ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
         </button>
@@ -206,23 +315,9 @@ export function MemoryEditor() {
           onClick={handleDelete}
           disabled={loading}
           className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--danger)] disabled:opacity-50"
-          title="Delete memory"
+          title="Eliminar memoria"
         >
           <Trash2 className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={!dirty || loading}
-          className={clsx(
-            "inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[11px] font-medium transition-all",
-            dirty
-              ? "bg-[color:var(--accent)] text-white hover:opacity-90"
-              : "text-[color:var(--text-2)]",
-          )}
-        >
-          <Save className="h-3 w-3" />
-          {dirty ? "Save" : "Saved"}
         </button>
       </div>
 
@@ -237,26 +332,30 @@ export function MemoryEditor() {
               onChange={(e) => {
                 handleMetaChange({ ...meta, l0: e.target.value });
               }}
-              placeholder="Untitled"
+              placeholder="Sin titulo"
               className="mb-1 w-full bg-transparent text-2xl font-semibold text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]/40 focus:outline-none"
             />
             <p className="mb-6 font-mono text-[11px] text-[color:var(--text-2)]">
               {meta.memory_type}
-              {meta.importance >= 0.7 ? " · high" : meta.importance >= 0.4 ? "" : " · low"}
-              {meta.always_load && " · pinned"}
+              {meta.importance >= 0.7 ? " · alta" : meta.importance >= 0.4 ? "" : " · baja"}
+              {meta.always_load && " · fijada"}
               {meta.tags.length > 0 && ` · ${meta.tags.join(", ")}`}
-              {" · "}L2 content · v{meta.version}
+              {" · "}contenido L2 · v{meta.version}
             </p>
 
             {/* L2 — Main content */}
             <TipTapEditor
+              key={`${activeMemory.meta.id}-l2`}
+              documentKey={`${activeMemory.meta.id}-l2`}
               content={l2}
               onChange={(val) => {
                 setL2(val);
                 setDirty(true);
+                setSaveStatus("dirty");
               }}
+              onBlur={() => void handleSave()}
               className="min-h-[400px]"
-              placeholder="Write here..."
+              placeholder="Escribe aqui..."
             />
 
             {/* L1 — Collapsible summary */}
@@ -272,18 +371,22 @@ export function MemoryEditor() {
                     l1Open && "rotate-90",
                   )}
                 />
-                L1 · Expanded Summary
+                L1 · Resumen ampliado
               </button>
               {l1Open && (
                 <div className="mt-2">
                   <TipTapEditor
+                    key={`${activeMemory.meta.id}-l1`}
+                    documentKey={`${activeMemory.meta.id}-l1`}
                     content={l1}
                     onChange={(val) => {
                       setL1(val);
                       setDirty(true);
+                      setSaveStatus("dirty");
                     }}
+                    onBlur={() => void handleSave()}
                     className="min-h-[120px]"
-                    placeholder="L1 summary (150-300 tokens)..."
+                    placeholder="Resumen L1 (150-300 tokens)..."
                   />
                 </div>
               )}
@@ -302,17 +405,17 @@ export function MemoryEditor() {
             <div className="flex items-center gap-1 border-b border-[var(--border)] px-2 py-1.5">
               <InspectorTabButton
                 active={inspectorTab === "properties"}
-                label="Properties"
+                label="Propiedades"
                 onClick={() => setInspectorTab("properties")}
               />
               <InspectorTabButton
                 active={inspectorTab === "links"}
-                label="Links"
+                label="Enlaces"
                 onClick={() => setInspectorTab("links")}
               />
               <InspectorTabButton
                 active={inspectorTab === "history"}
-                label="History"
+                label="Historial"
                 onClick={() => setInspectorTab("history")}
               />
             </div>
@@ -375,14 +478,14 @@ function LinksPanel({
 }) {
   return (
     <div className="space-y-3 p-3">
-      <LinkGroup title="Outgoing" links={outgoing} onOpenMemory={onOpenMemory} />
+      <LinkGroup title="Salientes" links={outgoing} onOpenMemory={onOpenMemory} />
       <div className="space-y-2">
         <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
-          Incoming
+          Entrantes
         </p>
         {incoming.length === 0 && (
           <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
-            No backlinks.
+            Sin backlinks.
           </p>
         )}
         {incoming.map((item) => (
@@ -428,7 +531,7 @@ function LinkGroup({
       <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">{title}</p>
       {links.length === 0 && (
         <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
-          No links.
+          Sin enlaces.
         </p>
       )}
       {links.map((item) => (
@@ -466,7 +569,7 @@ function HistoryPanel({
     <div className="space-y-2 p-3">
       {dirty && (
         <div className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-1)]">
-          Unsaved changes in current memory.
+          Hay cambios pendientes de sincronizar.
         </div>
       )}
       {history.map((entry) => (
@@ -486,24 +589,54 @@ function HistoryPanel({
 
 function formatTimestamp(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "N/A";
+  if (Number.isNaN(date.getTime())) return "No disponible";
   return date.toLocaleString();
+}
+
+function SaveStateBadge({ status }: { status: SaveStatus }) {
+  const label =
+    status === "saving"
+      ? "Guardando..."
+      : status === "error"
+        ? "Error al guardar"
+        : status === "dirty"
+          ? "Pendiente"
+          : "Guardado";
+
+  return (
+    <span
+      className={clsx(
+        "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        status === "error"
+          ? "border-[color:var(--danger)]/40 text-[color:var(--danger)]"
+          : status === "saving" || status === "dirty"
+            ? "border-[color:var(--accent)]/30 text-[color:var(--accent)]"
+            : "border-[var(--border)] text-[color:var(--text-2)]",
+      )}
+    >
+      {label}
+    </span>
+  );
 }
 
 function RawFileEditor({
   file,
-  loading,
   onSave,
 }: {
   file: RawFileDocument;
-  loading: boolean;
   onSave: (path: string, content: string) => Promise<void>;
 }) {
   const fileName = getFileName(file.path);
   const [content, setContent] = useState(file.content);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDraftRef = useRef<RawFileDraft | null>(null);
+  const queuedDraftRef = useRef<RawFileDraft | null>(null);
+  const isSavingRef = useRef(false);
 
   useEffect(() => {
     setContent(file.content);
+    setSaveStatus("saved");
   }, [file.path, file.content]);
 
   const dirty = content !== file.content;
@@ -516,10 +649,90 @@ function RawFileEditor({
   const parsedCount = records.filter((item) => !item.error).length;
   const errorCount = records.length - parsedCount;
 
+  useEffect(() => {
+    latestDraftRef.current = dirty ? { path: file.path, content } : null;
+  }, [content, dirty, file.path]);
+
+  const flushQueuedSave = useCallback(async () => {
+    if (isSavingRef.current || !queuedDraftRef.current) return;
+
+    isSavingRef.current = true;
+
+    while (queuedDraftRef.current) {
+      const draft = queuedDraftRef.current;
+      queuedDraftRef.current = null;
+      setSaveStatus("saving");
+
+      try {
+        await onSave(draft.path, draft.content);
+        if (draft.path === file.path) {
+          setSaveStatus("saved");
+        }
+      } catch {
+        setSaveStatus("error");
+        isSavingRef.current = false;
+        return;
+      }
+    }
+
+    isSavingRef.current = false;
+  }, [file.path, onSave]);
+
+  const queueSave = useCallback((draft: RawFileDraft) => {
+    queuedDraftRef.current = draft;
+    void flushQueuedSave();
+  }, [flushQueuedSave]);
+
   const handleSave = useCallback(async () => {
-    if (!dirty || loading) return;
-    await onSave(file.path, content);
-  }, [dirty, loading, onSave, file.path, content]);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    const draft = latestDraftRef.current;
+    if (!draft) return;
+
+    queueSave(draft);
+    await flushQueuedSave();
+  }, [flushQueuedSave, queueSave]);
+
+  useEffect(() => {
+    if (!latestDraftRef.current) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      const draft = latestDraftRef.current;
+      if (draft) {
+        queueSave(draft);
+      }
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [content, dirty, file.path, queueSave]);
+
+  useEffect(() => {
+    const filePath = file.path;
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+
+      const draft = latestDraftRef.current;
+      if (draft?.path === filePath) {
+        queueSave(draft);
+      }
+    };
+  }, [file.path, queueSave]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -539,6 +752,7 @@ function RawFileEditor({
           <p className="truncate text-sm font-semibold text-[color:var(--text-0)]">{fileName}</p>
           <p className="truncate text-xs text-[color:var(--text-2)]">{file.path}</p>
         </div>
+        <SaveStateBadge status={saveStatus} />
         <span className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-xs text-[color:var(--text-1)]">
           {language.toUpperCase()}
         </span>
@@ -546,48 +760,39 @@ function RawFileEditor({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-2)]">
-          <span>{lineCount} lines</span>
+          <span>{lineCount} lineas</span>
           {file.kind === "jsonl" && (
             <>
               <span>·</span>
-              <span>{records.length} records</span>
+              <span>{records.length} registros</span>
               <span>·</span>
-              <span>{parsedCount} parsed</span>
+              <span>{parsedCount} validos</span>
               {errorCount > 0 && (
                 <>
                   <span>·</span>
-                  <span>{errorCount} errors</span>
+                  <span>{errorCount} errores</span>
                 </>
               )}
             </>
           )}
           <span>·</span>
-          <span>{dirty ? "unsaved" : "saved"}</span>
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={!dirty || loading}
-            className={clsx(
-              "ml-auto rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-              dirty
-                ? "bg-[color:var(--accent)] text-white hover:brightness-110"
-                : "cursor-not-allowed bg-[color:var(--bg-3)] text-[color:var(--text-2)]",
-            )}
-          >
-            {loading ? "Saving..." : dirty ? "Save" : "Saved"}
-          </button>
+          <span>{dirty ? "pendiente" : "sincronizado"}</span>
         </div>
 
         <RawSyntaxEditor
           value={content}
-          onChange={setContent}
+          onChange={(value) => {
+            setContent(value);
+            setSaveStatus("dirty");
+          }}
+          onBlur={() => void handleSave()}
         />
 
         {file.kind === "jsonl" && (
           <div className="space-y-2">
             {records.length === 0 && (
               <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
-                Empty JSONL file.
+                Archivo JSONL vacio.
               </p>
             )}
             {records.map((record) => (
@@ -596,9 +801,9 @@ function RawFileEditor({
                 className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)]"
               >
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-2.5 py-1.5">
-                  <p className="text-xs text-[color:var(--text-2)]">Line {record.line}</p>
+                  <p className="text-xs text-[color:var(--text-2)]">Linea {record.line}</p>
                   <span className="text-[10px] text-[color:var(--text-2)]">
-                    {record.error ? "INVALID" : "OK"}
+                    {record.error ? "INVALIDO" : "OK"}
                   </span>
                 </div>
                 {record.error ? (
@@ -646,7 +851,7 @@ function parseJsonl(content: string): Array<{
         line: index + 1,
         raw: line,
         pretty: line,
-        error: `JSON parse error: ${String(e)}`,
+        error: `Error al parsear JSON: ${String(e)}`,
       });
     }
   });
@@ -659,12 +864,36 @@ function getFileName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+function hasDerivedMemoryChanges(previous: Memory, next: MemoryMeta) {
+  return JSON.stringify(toComparableMemoryMeta(previous.meta)) !== JSON.stringify(toComparableMemoryMeta(next));
+}
+
+function toComparableMemoryMeta(meta: MemoryMeta) {
+  return {
+    id: meta.id,
+    memory_type: meta.memory_type,
+    l0: meta.l0,
+    importance: meta.importance,
+    always_load: meta.always_load,
+    decay_rate: meta.decay_rate,
+    confidence: meta.confidence,
+    tags: meta.tags,
+    related: meta.related,
+    triggers: meta.triggers,
+    requires: meta.requires,
+    optional: meta.optional,
+    output_format: meta.output_format,
+  };
+}
+
 function RawSyntaxEditor({
   value,
   onChange,
+  onBlur,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -689,6 +918,7 @@ function RawSyntaxEditor({
         ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         onKeyDown={handleKeyDown}
         spellCheck={false}
         wrap="off"

@@ -35,6 +35,7 @@ pub fn start_watcher(
     root: PathBuf,
     app_handle: AppHandle,
     memory_index: Option<MemoryIndex>,
+    is_recent_write: Arc<dyn Fn(&str) -> bool + Send + Sync>,
 ) -> Result<WatcherHandle, String> {
     if !root.exists() {
         return Err(format!("Cannot watch missing directory: {}", root.display()));
@@ -88,6 +89,10 @@ pub fn start_watcher(
                                 || path_str.ends_with(".yaml")
                                 || path_str.ends_with(".jsonl")
                             {
+                                if is_recent_write(&path_str) {
+                                    continue;
+                                }
+
                                 // Track external access: update last_access in memory index
                                 if path_str.ends_with(".md") {
                                     if let Some(ref index) = memory_index {

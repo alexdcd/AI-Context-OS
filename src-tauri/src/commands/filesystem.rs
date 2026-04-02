@@ -80,13 +80,15 @@ pub fn read_file(path: String) -> Result<String, String> {
 
 /// Write raw content to a file.
 #[tauri::command]
-pub fn write_file(path: String, content: String) -> Result<(), String> {
+pub fn write_file(path: String, content: String, state: State<AppState>) -> Result<(), String> {
     // Ensure parent directory exists
     if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create directory: {}", e))?;
     }
-    fs::write(&path, content).map_err(|e| format!("Failed to write {}: {}", path, e))
+    fs::write(&path, content).map_err(|e| format!("Failed to write {}: {}", path, e))?;
+    state.mark_recent_write(Path::new(&path));
+    Ok(())
 }
 
 /// Create a directory and any missing parent directories.
