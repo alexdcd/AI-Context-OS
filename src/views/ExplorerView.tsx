@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Plus, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
 import { FileExplorer } from "../components/explorer/FileExplorer";
 import { useAppStore } from "../lib/store";
 import { createMemory } from "../lib/tauri";
 import type { MemoryType } from "../lib/types";
+import { useSettingsStore } from "../lib/settingsStore";
 
 const MemoryEditor = lazy(() =>
   import("../components/editor/MemoryEditor").then((module) => ({
@@ -24,6 +25,8 @@ export function ExplorerView() {
     isCreateMemoryOpen,
     setCreateMemoryOpen,
   } = useAppStore();
+  const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
+  const toggleShowSystemFiles = useSettingsStore((s) => s.toggleShowSystemFiles);
   const [newId, setNewId] = useState("");
   const [newType, setNewType] = useState<MemoryType>("context");
   const [newL0, setNewL0] = useState("");
@@ -96,21 +99,33 @@ export function ExplorerView() {
         <aside className="flex w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[color:var(--bg-0)] transition-all duration-300">
         <div className="flex shrink-0 h-[38px] items-center justify-between px-3 border-b border-[var(--border)]">
           <span className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
-            Memories
+            Memorias
             <span className="ml-1.5 font-normal tabular-nums">{memories.length}</span>
           </span>
           <div className="flex gap-0.5">
             <button
+              onClick={toggleShowSystemFiles}
+              className={clsx(
+                "rounded p-1 transition-colors",
+                showSystemFiles
+                  ? "text-[color:var(--accent)] hover:bg-[color:var(--accent-muted)]"
+                  : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
+              )}
+              title={showSystemFiles ? "Ocultar archivos del sistema" : "Mostrar archivos del sistema"}
+            >
+              {showSystemFiles ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            </button>
+            <button
               onClick={() => setCreateMemoryOpen(!isCreateMemoryOpen)}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="New memory (Cmd+N)"
+              title="Nueva memoria (Cmd+N)"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleRegenerate}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="Regenerate router"
+              title="Regenerar router"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
@@ -133,7 +148,7 @@ export function ExplorerView() {
               type="text"
               value={newL0}
               onChange={(e) => setNewL0(e.target.value)}
-              placeholder="Summary (L0)"
+              placeholder="Resumen (L0)"
               className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]"
             />
             <select
@@ -141,14 +156,14 @@ export function ExplorerView() {
               onChange={(e) => setNewType(e.target.value as MemoryType)}
               className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1.5 text-xs text-[color:var(--text-1)]"
             >
-              <option value="context">Context</option>
-              <option value="intelligence">Intelligence</option>
-              <option value="project">Project</option>
-              <option value="resource">Resource</option>
+              <option value="context">Contexto</option>
+              <option value="intelligence">Inteligencia</option>
+              <option value="project">Proyecto</option>
+              <option value="resource">Recurso</option>
               <option value="skill">Skill</option>
-              <option value="daily">Daily</option>
-              <option value="task">Task</option>
-              <option value="rule">Rule</option>
+              <option value="daily">Diario</option>
+              <option value="task">Tarea</option>
+              <option value="rule">Regla</option>
               <option value="scratch">Scratch</option>
             </select>
             <div className="flex gap-2">
@@ -156,7 +171,7 @@ export function ExplorerView() {
                 onClick={() => setCreateMemoryOpen(false)}
                 className="flex-1 rounded-md border border-[var(--border)] py-1.5 text-xs text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 onClick={handleCreate}
@@ -168,7 +183,7 @@ export function ExplorerView() {
                     : "bg-[color:var(--bg-3)] text-[color:var(--text-2)] opacity-50",
                 )}
               >
-                Create
+                Crear
               </button>
             </div>
           </div>

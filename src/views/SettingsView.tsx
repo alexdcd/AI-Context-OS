@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useSettingsStore, Theme } from "../lib/settingsStore";
-import { Monitor, Moon, Sun, Download, Upload, Check, Loader2 } from "lucide-react";
+import { Monitor, Moon, Sun, Download, Upload, Check, Loader2, Eye, EyeOff } from "lucide-react";
 import { clsx } from "clsx";
 import { backupWorkspace, restoreWorkspace } from "../lib/tauri";
 import { save, open } from "@tauri-apps/plugin-dialog";
@@ -8,7 +8,9 @@ import { useAppStore } from "../lib/store";
 
 export function SettingsView() {
   const theme = useSettingsStore((s) => s.theme);
+  const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
   const setTheme = useSettingsStore((s) => s.setTheme);
+  const setShowSystemFiles = useSettingsStore((s) => s.setShowSystemFiles);
   const initialize = useAppStore((s) => s.initialize);
 
   const [backupStatus, setBackupStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -108,6 +110,51 @@ export function SettingsView() {
               );
             })}
           </div>
+        </section>
+
+        <section className="obs-panel border border-[color:var(--border)] p-6">
+          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">Explorador</h2>
+          <p className="mb-4 text-sm text-[color:var(--text-2)]">
+            Decide si el árbol lateral prioriza memorias o también muestra archivos internos del sistema.
+          </p>
+
+          <button
+            onClick={() => setShowSystemFiles(!showSystemFiles)}
+            className={clsx(
+              "flex w-full items-start gap-3 rounded-md border p-4 text-left transition-colors",
+              showSystemFiles
+                ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]"
+                : "border-[color:var(--border)] bg-[color:var(--bg-0)] hover:border-[color:var(--border-active)]"
+            )}
+          >
+            <div className="mt-0.5">
+              {showSystemFiles ? (
+                <Eye className="h-5 w-5 text-[color:var(--accent)]" />
+              ) : (
+                <EyeOff className="h-5 w-5 text-[color:var(--text-2)]" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-[color:var(--text-0)]">Mostrar archivos del sistema</span>
+                <span
+                  className={clsx(
+                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                    showSystemFiles
+                      ? "bg-[color:var(--accent)] text-white"
+                      : "bg-[color:var(--bg-2)] text-[color:var(--text-2)]"
+                  )}
+                >
+                  {showSystemFiles ? "Modo avanzado" : "Solo memorias"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-[color:var(--text-2)]">
+                {showSystemFiles
+                  ? "Verás YAML, JSONL, claude.md y otros artefactos avanzados junto a las memorias."
+                  : "El explorador se centrará en archivos .md editables para reducir ruido visual."}
+              </p>
+            </div>
+          </button>
         </section>
 
         {/* Backup / Restore */}

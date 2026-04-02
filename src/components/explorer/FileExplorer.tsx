@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAppStore } from "../../lib/store";
+import { useSettingsStore } from "../../lib/settingsStore";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   createDirectory,
@@ -520,6 +521,54 @@ function pathMatchesTarget(targetPath: string | null, candidatePath: string): bo
   return targetPath === candidatePath || targetPath.startsWith(`${candidatePath}/`);
 }
 
+function isAdvancedOnlyFile(node: FileNode): boolean {
+  if (node.is_dir) return false;
+  if (PROTECTED_FILE_NAMES.has(node.name)) return true;
+  if (!isMarkdownFile(node.name)) return true;
+  if (node.name.startsWith("_")) return true;
+  return inferFolderTypeFromPath(node.path) === null;
+}
+
+function filterExplorerTree(
+  nodes: FileNode[],
+  showSystemFiles: boolean,
+): { nodes: FileNode[]; hiddenCount: number } {
+  if (showSystemFiles) {
+    return { nodes, hiddenCount: 0 };
+  }
+
+  const result: FileNode[] = [];
+  let hiddenCount = 0;
+
+  for (const node of nodes) {
+    if (node.is_dir) {
+      const filteredChildren = filterExplorerTree(node.children, showSystemFiles);
+      const shouldShowDirectory = node.memory_type !== null || filteredChildren.nodes.length > 0;
+
+      hiddenCount += filteredChildren.hiddenCount;
+
+      if (shouldShowDirectory) {
+        result.push({
+          ...node,
+          children: filteredChildren.nodes,
+        });
+      } else {
+        hiddenCount += 1;
+      }
+      continue;
+    }
+
+    if (isAdvancedOnlyFile(node)) {
+      hiddenCount += 1;
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  return { nodes: result, hiddenCount };
+}
+
 export function FileExplorer() {
   const {
     fileTree,
@@ -533,6 +582,7 @@ export function FileExplorer() {
     selectRawFile,
     setError,
   } = useAppStore();
+  const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [conflictIds, setConflictIds] = useState<Set<string>>(new Set());
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
@@ -548,6 +598,10 @@ export function FileExplorer() {
   const suppressClickRef = useRef(false);
   const suppressClickTimeoutRef = useRef<number | null>(null);
   const isDragging = dragSourcePath !== null;
+  const { nodes: visibleTree, hiddenCount } = useMemo(
+    () => filterExplorerTree(fileTree, showSystemFiles),
+    [fileTree, showSystemFiles],
+  );
 
   useEffect(() => {
     void loadFileTree();
@@ -567,11 +621,11 @@ export function FileExplorer() {
   }, [fileTree]);
 
   useEffect(() => {
-    if (fileTree.length > 0 && expanded.size === 0) {
-      const topLevel = new Set(fileTree.filter((node) => node.is_dir).map((node) => node.path));
+    if (visibleTree.length > 0 && expanded.size === 0) {
+      const topLevel = new Set(visibleTree.filter((node) => node.is_dir).map((node) => node.path));
       setExpanded(topLevel);
     }
-  }, [fileTree, expanded.size]);
+  }, [visibleTree, expanded.size]);
 
   useEffect(() => {
     return () => {
@@ -1190,7 +1244,24 @@ export function FileExplorer() {
 
   return (
     <div className="px-1 py-1">
-      {fileTree.map((node) => (
+      {!showSystemFiles && hiddenCount > 0 && (
+        <div className="mx-2 mb-2 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-1)] px-2.5 py-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
+            Vista enfocada
+          </p>
+          <p className="mt-1 text-xs text-[color:var(--text-2)]">
+            {hiddenCount} {hiddenCount === 1 ? "elemento avanzado oculto" : "elementos avanzados ocultos"}.
+          </p>
+        </div>
+      )}
+
+      {showSystemFiles && (
+        <div className="mx-2 mb-2 rounded-md border border-[color:var(--accent)]/25 bg-[color:var(--accent)]/8 px-2.5 py-2 text-xs text-[color:var(--text-2)]">
+          Modo avanzado activo. Se muestran archivos del sistema junto a las memorias.
+        </div>
+      )}
+
+      {visibleTree.map((node) => (
         <TreeNode
           key={node.path}
           node={node}
@@ -1220,9 +1291,9 @@ export function FileExplorer() {
         />
       ))}
 
-      {fileTree.length === 0 && (
+      {visibleTree.length === 0 && (
         <p className="px-3 py-8 text-center text-xs text-[color:var(--text-2)]">
-          No files yet.
+          {showSystemFiles ? "No hay archivos todavía." : "No hay memorias visibles en esta vista."}
         </p>
       )}
 

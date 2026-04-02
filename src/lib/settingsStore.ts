@@ -6,14 +6,21 @@ export type Theme = "dark" | "light" | "system";
 
 export interface SettingsStore {
   theme: Theme;
+  showSystemFiles: boolean;
   setTheme: (theme: Theme) => void;
+  setShowSystemFiles: (show: boolean) => void;
+  toggleShowSystemFiles: () => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       theme: "system",
+      showSystemFiles: false,
       setTheme: (theme) => set({ theme }),
+      setShowSystemFiles: (showSystemFiles) => set({ showSystemFiles }),
+      toggleShowSystemFiles: () =>
+        set((state) => ({ showSystemFiles: !state.showSystemFiles })),
     }),
     {
       name: "obs-settings",
