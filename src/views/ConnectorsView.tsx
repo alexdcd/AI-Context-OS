@@ -337,18 +337,18 @@ export function ConnectorsView() {
 
               {active.id === "claude-code" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {/* Option 1: Cowork */}
+                  {/* Option 1: Terminal / Cowork */}
                   <div>
-                    <SectionLabel>Opción 1 — Cowork (recomendado)</SectionLabel>
+                    <SectionLabel>Opción 1 — Uso nativo (recomendado)</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Abre una sesión colaborativa directamente en la carpeta raíz.
-                      Claude Code lee <code style={{ color: "var(--accent)" }}>claude.md</code> automáticamente
-                      y tiene acceso completo a los archivos del workspace.
+                      Es la forma óptima y más fácil de usar nuestro sistema. Solo se requiere abrir 
+                      el proyecto con la app desktop de Claude y usar la pestaña de <b>cowork</b>.
+                      Para usar el terminal de Claude de forma equivalente con la carpeta:
                     </p>
                     <SnippetCard
-                      snippet={`claude cowork "${info.workspace_root}"`}
-                      onCopy={() => copyWithFeedback(`claude cowork "${info.workspace_root}"`, "cowork")}
-                      copied={copied === "cowork"}
+                      snippet={`claude "${info.workspace_root}"`}
+                      onCopy={() => copyWithFeedback(`claude "${info.workspace_root}"`, "terminal")}
+                      copied={copied === "terminal"}
                     />
                   </div>
 
