@@ -48,6 +48,10 @@
 - ⬚ **Perfiles de simulación guardados** — Guardar combinaciones de query + budget para reutilizar
 - ⬚ **Comparar simulaciones** — Vista side-by-side de dos simulaciones con diferente query/budget
 
+## Workflows / Agentes
+
+- ⬚ **Marketplace de Agentes (Premium)** — Funcionalidad Freemium para importar plantillas de agentes especializados (ej. SM Agent). [Ver plan detallado](./feature_agente.md)
+
 ## Infraestructura
 
 - ⬚ **Tests** — Unit tests para scoring, decay, frontmatter parsing, router generation
