@@ -584,6 +584,7 @@ export function FileExplorer() {
     selectRawFile,
     setError,
   } = useAppStore();
+  const expertModeEnabled = useSettingsStore((s) => s.expertModeEnabled);
   const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
   const toggleShowSystemFiles = useSettingsStore((s) => s.toggleShowSystemFiles);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -1287,7 +1288,7 @@ export function FileExplorer() {
         </p>
       )}
 
-      {advancedItemCount > 0 && (
+      {expertModeEnabled && advancedItemCount > 0 && (
         <button
           type="button"
           onClick={toggleShowSystemFiles}

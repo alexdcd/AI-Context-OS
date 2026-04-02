@@ -25,6 +25,7 @@ export function ExplorerView() {
     isCreateMemoryOpen,
     setCreateMemoryOpen,
   } = useAppStore();
+  const expertModeEnabled = useSettingsStore((s) => s.expertModeEnabled);
   const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
   const toggleShowSystemFiles = useSettingsStore((s) => s.toggleShowSystemFiles);
   const [newId, setNewId] = useState("");
@@ -103,18 +104,20 @@ export function ExplorerView() {
             <span className="ml-1.5 font-normal tabular-nums">{memories.length}</span>
           </span>
           <div className="flex gap-0.5">
-            <button
-              onClick={toggleShowSystemFiles}
-              className={clsx(
-                "rounded p-1 transition-colors",
-                showSystemFiles
-                  ? "text-[color:var(--accent)] hover:bg-[color:var(--accent-muted)]"
-                  : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              )}
-              title={showSystemFiles ? "Ocultar archivos del sistema" : "Mostrar archivos del sistema"}
-            >
-              {showSystemFiles ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            </button>
+            {expertModeEnabled && (
+              <button
+                onClick={toggleShowSystemFiles}
+                className={clsx(
+                  "rounded p-1 transition-colors",
+                  showSystemFiles
+                    ? "text-[color:var(--accent)] hover:bg-[color:var(--accent-muted)]"
+                    : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
+                )}
+                title={showSystemFiles ? "Ocultar archivos del sistema" : "Mostrar archivos del sistema"}
+              >
+                {showSystemFiles ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              </button>
+            )}
             <button
               onClick={() => setCreateMemoryOpen(!isCreateMemoryOpen)}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
