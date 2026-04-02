@@ -41,6 +41,9 @@ const ObservabilityView = lazy(() =>
 const SettingsView = lazy(() =>
   import("./views/SettingsView").then((module) => ({ default: module.SettingsView })),
 );
+const ConnectorsView = lazy(() =>
+  import("./views/ConnectorsView").then((module) => ({ default: module.ConnectorsView })),
+);
 const SearchModal = lazy(() =>
   import("./components/layout/SearchModal").then((module) => ({
     default: module.SearchModal,
@@ -223,6 +226,7 @@ function AppContent() {
                 <Route path="/simulation" element={<SimulationView />} />
                 <Route path="/governance" element={<GovernanceView />} />
                 <Route path="/observability" element={<ObservabilityView />} />
+                <Route path="/connectors" element={<ConnectorsView />} />
                 <Route path="/settings" element={<SettingsView />} />
               </Routes>
             </Suspense>

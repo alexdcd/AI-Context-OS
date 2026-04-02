@@ -1,8 +1,9 @@
 use crate::core::types::{Config, MemoryMeta, MemoryType};
 
-/// Generate the claude.md router file content.
+/// Generate the neutral router content.
 /// Order follows attention positioning: RULES at top, L0 index at bottom.
-pub fn generate_claude_md(memories: &[MemoryMeta], config: &Config) -> String {
+/// This output is consumed by adapters in compat.rs to produce tool-specific files.
+pub fn generate_router_content(memories: &[MemoryMeta], config: &Config) -> String {
     let mut out = String::with_capacity(8192);
 
     // ========== SECTION 1: RULES (top — maximum attention) ==========

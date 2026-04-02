@@ -8,10 +8,10 @@ use rmcp::ServiceExt as _;
 
 use std::sync::Arc;
 
-use core::compat::{generate_cursorrules, generate_windsurfrules};
+use core::compat::{render_claude_adapter, render_cursor_adapter, render_windsurf_adapter};
 use core::index::scan_memories;
 use core::memory::read_memory;
-use core::router::{generate_claude_md, generate_index_yaml};
+use core::router::{generate_router_content, generate_index_yaml};
 use core::scoring::compute_score;
 use core::types::{Config, Memory};
 
@@ -217,15 +217,16 @@ fn main() {
             let scanned = scan_memories(&root);
             let metas: Vec<_> = scanned.iter().map(|(m, _)| m.clone()).collect();
 
-            let claude_md = generate_claude_md(&metas, &config);
+            let neutral = generate_router_content(&metas, &config);
+            let claude_md = render_claude_adapter(&neutral);
             std::fs::write(root.join("claude.md"), &claude_md).unwrap();
 
             let index_yaml = generate_index_yaml(&metas);
             std::fs::write(root.join("_index.yaml"), &index_yaml).unwrap();
 
-            let cursorrules = generate_cursorrules(&claude_md);
+            let cursorrules = render_cursor_adapter(&neutral);
             std::fs::write(root.join(".cursorrules"), &cursorrules).ok();
-            let windsurfrules = generate_windsurfrules(&claude_md);
+            let windsurfrules = render_windsurf_adapter(&neutral);
             std::fs::write(root.join(".windsurfrules"), &windsurfrules).ok();
 
             println!(

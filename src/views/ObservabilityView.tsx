@@ -3,10 +3,8 @@ import {
   Activity,
   BarChart3,
   Zap,
-  Plug,
   Check,
   X,
-  Copy,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -18,7 +16,6 @@ import {
   applyOptimization,
   dismissOptimization,
   runOptimizationAnalysis,
-  getMcpConnectionInfo,
 } from "../lib/tauri";
 import type {
   ContextRequestRecord,
@@ -26,12 +23,11 @@ import type {
   TopMemoryRecord,
   UnusedMemoryRecord,
   OptimizationRecord,
-  McpConnectionInfo,
 } from "../lib/types";
 // Store not used in this view currently (live events not yet wired)
 // import { useObservabilityStore } from "../lib/observabilityStore";
 
-type Tab = "live" | "intelligence" | "optimizations" | "connect";
+type Tab = "live" | "intelligence" | "optimizations";
 
 export function ObservabilityView() {
   const [activeTab, setActiveTab] = useState<Tab>("live");
@@ -40,7 +36,6 @@ export function ObservabilityView() {
     { id: "live", icon: Activity, label: "En Vivo" },
     { id: "intelligence", icon: BarChart3, label: "Inteligencia" },
     { id: "optimizations", icon: Zap, label: "Optimizaciones" },
-    { id: "connect", icon: Plug, label: "Conectar IA" },
   ];
 
   return (
@@ -82,7 +77,6 @@ export function ObservabilityView() {
       {activeTab === "live" && <LiveTab />}
       {activeTab === "intelligence" && <IntelligenceTab />}
       {activeTab === "optimizations" && <OptimizationsTab />}
-      {activeTab === "connect" && <ConnectTab />}
     </div>
   );
 }
@@ -417,158 +411,3 @@ function OptimizationsTab() {
   );
 }
 
-// ─── Connect Tab ───
-
-function ConnectTab() {
-  const [info, setInfo] = useState<McpConnectionInfo | null>(null);
-
-  useEffect(() => {
-    getMcpConnectionInfo().then(setInfo).catch(console.error);
-  }, []);
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  if (!info) {
-    return <div style={{ color: "var(--text-2)", fontSize: 13 }}>Cargando informacion de conexion...</div>;
-  }
-
-  const claudeDesktopConfig = JSON.stringify(
-    {
-      mcpServers: {
-        "ai-context-os": {
-          command: info.binary_path,
-          args: ["mcp-server", "--root", info.workspace_root],
-        },
-      },
-    },
-    null,
-    2
-  );
-
-  const claudeCodeCommand = `claude mcp add ai-context-os -- "${info.binary_path}" mcp-server --root "${info.workspace_root}"`;
-
-  const cursorConfig = JSON.stringify(
-    {
-      mcpServers: {
-        "ai-context-os": {
-          url: info.http_url,
-        },
-      },
-    },
-    null,
-    2
-  );
-
-  const configs = [
-    {
-      title: "Claude Desktop",
-      description: "Agrega a claude_desktop_config.json:",
-      snippet: claudeDesktopConfig,
-      icon: "C",
-    },
-    {
-      title: "Claude Code",
-      description: "Ejecuta en terminal:",
-      snippet: claudeCodeCommand,
-      icon: ">",
-    },
-    {
-      title: "Cursor / Windsurf",
-      description: "Agrega a .cursor/mcp.json o similar:",
-      snippet: cursorConfig,
-      icon: "W",
-    },
-  ];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Status */}
-      <div className="card" style={{ padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-0)" }}>Servidor MCP HTTP</div>
-          <div style={{ fontSize: 12, color: "var(--text-2)" }}>
-            {info.http_url}
-          </div>
-        </div>
-        <div
-          style={{
-            padding: "4px 10px",
-            fontSize: 11,
-            fontWeight: 600,
-            borderRadius: 12,
-            background: info.is_http_running ? "#10b98122" : "#ef444422",
-            color: info.is_http_running ? "#10b981" : "#ef4444",
-          }}
-        >
-          {info.is_http_running ? "Activo" : "Inactivo"}
-        </div>
-      </div>
-
-      {/* Connection cards */}
-      {configs.map((cfg) => (
-        <div key={cfg.title} className="card" style={{ padding: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 6,
-                  background: "var(--bg-2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "var(--text-1)",
-                }}
-              >
-                {cfg.icon}
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-0)" }}>{cfg.title}</div>
-                <div style={{ fontSize: 11, color: "var(--text-2)" }}>{cfg.description}</div>
-              </div>
-            </div>
-            <button
-              onClick={() => copyToClipboard(cfg.snippet)}
-              title="Copiar"
-              style={{
-                padding: "4px 8px",
-                fontSize: 11,
-                background: "var(--bg-2)",
-                color: "var(--text-1)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-              }}
-            >
-              <Copy size={12} /> Copiar
-            </button>
-          </div>
-          <pre
-            style={{
-              padding: 10,
-              background: "var(--bg-0)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              fontSize: 11,
-              color: "var(--text-1)",
-              overflow: "auto",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-              margin: 0,
-            }}
-          >
-            {cfg.snippet}
-          </pre>
-        </div>
-      ))}
-    </div>
-  );
-}

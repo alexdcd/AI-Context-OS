@@ -3,8 +3,71 @@ use chrono::{DateTime, Utc};
 use crate::core::search::{bm25_score, build_doc_freq, l0_keyword_score, tag_match_score};
 use crate::core::types::{Memory, MemoryType, ScoreBreakdown};
 
+// ─── Scoring weights per intent profile ───────────────────────────────────────
+
+struct ScoringWeights {
+    semantic: f64,
+    bm25: f64,
+    graph: f64,
+    recency: f64,
+    importance: f64,
+    access_frequency: f64,
+}
+
+/// Detect intent from query and return appropriate weights (always sum to 1.0).
+fn detect_intent_weights(query: &str) -> ScoringWeights {
+    let q = query.to_lowercase();
+    let is_debug = q.contains("error") || q.contains("falla") || q.contains("bug")
+        || q.contains("panic") || q.contains("crash") || q.contains("exception");
+    let is_brainstorm = q.contains("idea") || q.contains("propon") || q.contains("actua")
+        || q.contains("brainstorm") || q.contains("suger");
+
+    if is_debug {
+        // Debug: BM25 + graph elevated for precise term & dependency matching
+        ScoringWeights { semantic: 0.20, bm25: 0.30, graph: 0.30, recency: 0.10, importance: 0.05, access_frequency: 0.05 }
+    } else if is_brainstorm {
+        // Brainstorm: importance + recency elevated to surface relevant recent context
+        ScoringWeights { semantic: 0.30, bm25: 0.05, graph: 0.05, recency: 0.25, importance: 0.30, access_frequency: 0.05 }
+    } else {
+        // Default: balanced hybrid
+        ScoringWeights { semantic: 0.30, bm25: 0.15, graph: 0.10, recency: 0.15, importance: 0.20, access_frequency: 0.10 }
+    }
+}
+
+// ─── Query expansion ──────────────────────────────────────────────────────────
+
+/// Expand query with synonyms/related terms to increase lexical recall.
+/// Result is used for BM25 and semantic matching; original query still drives intent detection.
+fn expand_query(query: &str) -> String {
+    let q = query.to_lowercase();
+    let expansions: &[(&str, &str)] = &[
+        ("bug",      "bug error fix excepcion fallo"),
+        ("error",    "error bug fallo excepcion panic"),
+        ("fix",      "fix arreglar corregir bug error"),
+        ("crash",    "crash panic error fallo excepcion"),
+        ("idea",     "idea propuesta concepto brainstorm"),
+        ("task",     "task tarea pendiente accion action"),
+        ("refactor", "refactor mejora limpieza codigo deuda"),
+        ("deploy",   "deploy despliegue release publicar"),
+        ("test",     "test prueba testing verificar"),
+    ];
+    let mut terms: Vec<String> = q.split_whitespace().map(|term| term.to_string()).collect();
+    for (term, extra) in expansions {
+        if q.contains(term) {
+            for extra_term in extra.split_whitespace() {
+                if !terms.iter().any(|existing| existing == extra_term) {
+                    terms.push(extra_term.to_string());
+                }
+            }
+        }
+    }
+    terms.join(" ")
+}
+
+// ─── Main scoring function ────────────────────────────────────────────────────
+
 /// Compute the hybrid score for a memory given a query.
-/// Weights: semantic=0.30, bm25=0.15, recency=0.15, importance=0.20, access_freq=0.10, graph_prox=0.10
+/// Uses dynamic intent-based weights and query expansion for better recall.
 pub fn compute_score(
     query: &str,
     memory: &Memory,
@@ -12,19 +75,22 @@ pub fn compute_score(
     selected_ids: &[String],
     now: DateTime<Utc>,
 ) -> ScoreBreakdown {
-    let semantic = semantic_score_free(query, memory);
-    let bm25 = compute_bm25(query, memory, all_memories);
+    let weights = detect_intent_weights(query);
+    let expanded = expand_query(query);
+
+    let semantic = semantic_score_free(&expanded, memory);
+    let bm25 = compute_bm25(&expanded, memory, all_memories);
     let recency = recency_score(&memory.meta.last_access, now);
     let importance = memory.meta.importance;
     let access_frequency = access_frequency_score(memory.meta.access_count, max_access_count(all_memories));
-    let graph_proximity = graph_proximity_score(memory, selected_ids);
+    let graph_proximity = graph_proximity_score(memory, all_memories, selected_ids);
 
-    let final_score = 0.30 * semantic
-        + 0.15 * bm25
-        + 0.15 * recency
-        + 0.20 * importance
-        + 0.10 * access_frequency
-        + 0.10 * graph_proximity;
+    let final_score = weights.semantic * semantic
+        + weights.bm25 * bm25
+        + weights.recency * recency
+        + weights.importance * importance
+        + weights.access_frequency * access_frequency
+        + weights.graph * graph_proximity;
 
     ScoreBreakdown {
         semantic,
@@ -36,6 +102,8 @@ pub fn compute_score(
         final_score,
     }
 }
+
+// ─── Component scoring functions ──────────────────────────────────────────────
 
 /// Free-tier semantic approximation:
 /// 40% tag matching + 35% L0 keyword overlap + 25% type bonus
@@ -118,16 +186,46 @@ fn max_access_count(memories: &[Memory]) -> u32 {
     memories.iter().map(|m| m.meta.access_count).max().unwrap_or(1)
 }
 
-/// Graph proximity: how many of the selected memories are in this memory's `related` field.
-fn graph_proximity_score(memory: &Memory, selected_ids: &[String]) -> f64 {
+/// Graph proximity with two-level spreading activation.
+/// L1 (direct connection in selected_ids): +0.10 per match.
+/// L2 (connection-of-connection in selected_ids): +0.03 per match.
+/// Result is capped at 1.0.
+fn graph_proximity_score(memory: &Memory, all_memories: &[Memory], selected_ids: &[String]) -> f64 {
     if selected_ids.is_empty() {
         return 0.0;
     }
-    let matches = memory
-        .meta
-        .related
-        .iter()
-        .filter(|r| selected_ids.contains(r))
+
+    // Level 1: direct related IDs that appear in selected_ids
+    let l1_ids: Vec<&String> = memory.meta.related.iter()
+        .filter(|id| selected_ids.contains(id))
+        .collect();
+    let l1_score = l1_ids.len() as f64 * 0.10;
+
+    // Level 2: IDs referenced by L1 memories that also appear in selected_ids
+    // (excluding IDs already counted in L1 to avoid double-counting)
+    let l2_count = all_memories.iter()
+        .filter(|m| l1_ids.contains(&&m.meta.id))
+        .flat_map(|m| m.meta.related.iter())
+        .filter(|id| selected_ids.contains(id) && !memory.meta.related.contains(id))
         .count();
-    (matches as f64 / selected_ids.len() as f64).min(1.0)
+    let l2_score = l2_count as f64 * 0.03;
+
+    (l1_score + l2_score).min(1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expand_query;
+
+    #[test]
+    fn expand_query_only_uses_original_terms() {
+        let expanded = expand_query("bug");
+        assert_eq!(expanded, "bug error fix excepcion fallo");
+    }
+
+    #[test]
+    fn expand_query_deduplicates_added_terms() {
+        let expanded = expand_query("error bug");
+        assert_eq!(expanded, "error bug fix excepcion fallo panic");
+    }
 }

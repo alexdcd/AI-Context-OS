@@ -9,13 +9,10 @@ import {
   FolderOpen,
   User,
   Sparkles,
-  Check,
   Loader2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { runOnboarding, type OnboardingProfile } from "../../lib/tauri";
-
-const TOOLS = ["Claude", "Cursor", "GPT/ChatGPT", "Windsurf", "Copilot", "Gemini"];
 
 const TEMPLATES = [
   {
@@ -55,18 +52,16 @@ export function OnboardingWizard({ onComplete }: Props) {
 
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
-  const [tools, setTools] = useState<string[]>(["Claude"]);
   const [language, setLanguage] = useState("es");
   const [template, setTemplate] = useState("developer");
   const [rootDir, setRootDir] = useState("~/AI-Context-OS");
 
-  const steps = ["Ubicación", "Perfil", "Template", "Herramientas", "Confirmar"];
+  const steps = ["Ubicación", "Perfil", "Template", "Confirmar"];
 
   const canNext = () => {
     if (step === 0) return rootDir.trim().length > 0;
     if (step === 1) return name.trim().length > 0 && role.trim().length > 0;
     if (step === 2) return template.length > 0;
-    if (step === 3) return tools.length > 0;
     return true;
   };
 
@@ -77,7 +72,7 @@ export function OnboardingWizard({ onComplete }: Props) {
       const profile: OnboardingProfile = {
         name,
         role,
-        tools,
+        tools: [],
         language,
         template,
         root_dir: rootDir !== "~/AI-Context-OS" ? rootDir : undefined,
@@ -89,12 +84,6 @@ export function OnboardingWizard({ onComplete }: Props) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleTool = (tool: string) => {
-    setTools((prev) =>
-      prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool],
-    );
   };
 
   return (
@@ -248,53 +237,16 @@ export function OnboardingWizard({ onComplete }: Props) {
 
             {step === 3 && (
               <div className="space-y-4">
-                <div>
-                  <h2 className="text-sm font-medium text-[color:var(--text-0)]">
-                    Herramientas de IA
-                  </h2>
-                  <p className="mt-1 text-xs text-[color:var(--text-2)]">
-                    Se generarán archivos de compatibilidad para cada una.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {TOOLS.map((tool) => {
-                    const selected = tools.includes(tool);
-                    return (
-                      <button
-                        key={tool}
-                        onClick={() => toggleTool(tool)}
-                        className={clsx(
-                          "inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs transition-colors",
-                          selected
-                            ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
-                            : "border-[var(--border)] text-[color:var(--text-2)] hover:border-[var(--border-active)] hover:text-[color:var(--text-1)]",
-                        )}
-                      >
-                        {selected && <Check className="h-3 w-3" />}
-                        {tool}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {step === 4 && (
-              <div className="space-y-4">
                 <h2 className="text-sm font-medium text-[color:var(--text-0)]">Resumen</h2>
                 <div className="space-y-2 rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] p-3 text-xs">
                   <Row label="Nombre" value={name} />
                   <Row label="Rol" value={role} />
                   <Row label="Template" value={template} />
-                  <Row label="Herramientas" value={tools.join(", ")} />
                   <Row label="Ubicación" value={rootDir} mono />
                 </div>
                 <p className="text-xs text-[color:var(--text-2)]">
-                  Se creará el workspace con memorias iniciales y un{" "}
-                  <code className="rounded bg-[color:var(--bg-3)] px-1 py-0.5 font-mono text-[color:var(--accent)]">
-                    claude.md
-                  </code>{" "}
-                  auto-generado.
+                  Se creará el workspace con memorias iniciales y archivos de integración
+                  auto-generados.
                 </p>
                 {error && (
                   <p className="rounded-md bg-[color:var(--danger)]/10 px-3 py-2 text-xs text-[color:var(--danger)]">
@@ -316,7 +268,7 @@ export function OnboardingWizard({ onComplete }: Props) {
               Atrás
             </button>
 
-            {step < 4 ? (
+            {step < 3 ? (
               <button
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!canNext()}

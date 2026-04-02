@@ -1,3 +1,6 @@
+use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
+
 use tauri::State;
 
 use crate::core::health::{compute_health_score, HealthScore};
@@ -137,17 +140,20 @@ pub fn run_optimization_analysis(state: State<AppState>) -> Result<Vec<Optimizat
 pub fn get_mcp_connection_info(state: State<AppState>) -> Result<McpConnectionInfo, String> {
     let root = state.get_root();
     let port = crate::core::mcp_http::MCP_HTTP_PORT;
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     // Try to find the CLI binary path
     let binary_path = std::env::current_exe()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "ai-context-cli".to_string());
 
+    let is_http_running = TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok();
+
     Ok(McpConnectionInfo {
         http_port: port,
         http_url: format!("http://127.0.0.1:{}/mcp", port),
         workspace_root: root.to_string_lossy().to_string(),
         binary_path,
-        is_http_running: true, // If this command responds, the app is running
+        is_http_running,
     })
 }

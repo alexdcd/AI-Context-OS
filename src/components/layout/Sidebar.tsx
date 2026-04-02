@@ -8,6 +8,7 @@ import {
   BookOpen,
   ListTodo,
   Activity,
+  Plug,
   Settings,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -20,6 +21,7 @@ const navItems = [
   { to: "/simulation", icon: FlaskConical, label: "Simulation" },
   { to: "/governance", icon: Shield, label: "Governance" },
   { to: "/observability", icon: Activity, label: "Observabilidad" },
+  { to: "/connectors", icon: Plug, label: "Conectores" },
 ];
 
 export function Sidebar() {
