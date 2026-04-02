@@ -6,8 +6,11 @@ export type Theme = "dark" | "light" | "system";
 
 export interface SettingsStore {
   theme: Theme;
+  expertModeEnabled: boolean;
   showSystemFiles: boolean;
   setTheme: (theme: Theme) => void;
+  setExpertModeEnabled: (enabled: boolean) => void;
+  toggleExpertModeEnabled: () => void;
   setShowSystemFiles: (show: boolean) => void;
   toggleShowSystemFiles: () => void;
 }
@@ -16,8 +19,22 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       theme: "system",
+      expertModeEnabled: false,
       showSystemFiles: false,
       setTheme: (theme) => set({ theme }),
+      setExpertModeEnabled: (expertModeEnabled) =>
+        set((state) => ({
+          expertModeEnabled,
+          showSystemFiles: expertModeEnabled ? state.showSystemFiles : false,
+        })),
+      toggleExpertModeEnabled: () =>
+        set((state) => {
+          const nextEnabled = !state.expertModeEnabled;
+          return {
+            expertModeEnabled: nextEnabled,
+            showSystemFiles: nextEnabled ? state.showSystemFiles : false,
+          };
+        }),
       setShowSystemFiles: (showSystemFiles) => set({ showSystemFiles }),
       toggleShowSystemFiles: () =>
         set((state) => ({ showSystemFiles: !state.showSystemFiles })),
