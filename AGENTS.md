@@ -33,3 +33,12 @@ backup: backup_workspace, restore_workspace
 
 **useAppStore** (store.ts): initialized, fileTree, memories, activeMemory, activeRawFile, selectedPath, graphData, explorerOpen, loading, error
 **useSettingsStore** (settingsStore.ts): theme (dark/light/system)
+
+## Compilación & Releases (CI/CD)
+
+- **Instaladores automáticos (Mac, Windows, Linux):** a través de GitHub Actions
+- **Cómo publicar una versión:** crear un tag git que empiece por `v` y hacer un push.
+  ```bash
+  git tag v0.1.0
+  git push origin v0.1.0
+  ```
