@@ -1,6 +1,6 @@
 # AI Context OS
 
-Tauri v2 desktop app. Files ARE the database: ~/AI-Context-OS/ con 9 carpetas numeradas (01-context/ a 09-scratch/), archivos .md con YAML frontmatter + marcadores <!-- L1 --> / <!-- L2 -->.
+Tauri v2 desktop app. Files ARE the database: ~/AI-Context-OS/ con carpetas, archivos .md con YAML frontmatter + marcadores <!-- L1 --> / <!-- L2 -->.
 
 ## Gotchas
 
