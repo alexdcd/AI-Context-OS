@@ -4,6 +4,8 @@
 
 Documento principal en inglés: [README.md](/Users/alexdc/Documents/GitHub/AI-Context-OS/README.md)
 
+Documentación extendida del sistema: [documentation/README.md](/Users/alexdc/Documents/GitHub/AI-Context-OS/documentation/README.md)
+
 AI Context OS es una app desktop (`Tauri v2 + React + TypeScript + Rust`) que convierte una carpeta local en una capa de memoria universal y agnóstica de herramienta para agentes de IA.
 
 No es un chat ni un wrapper de un proveedor concreto. Es un brain layer filesystem-first con carga de contexto determinista (`L0/L1/L2`) e integraciones por adapters.
