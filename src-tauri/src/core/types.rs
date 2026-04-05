@@ -46,6 +46,26 @@ impl MemoryType {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MemoryOntology {
+    Source,
+    Entity,
+    Concept,
+    Synthesis,
+}
+
+pub fn default_ontology_for_memory_type(memory_type: &MemoryType) -> MemoryOntology {
+    match memory_type {
+        MemoryType::Resource => MemoryOntology::Source,
+        MemoryType::Project | MemoryType::Context | MemoryType::Task => MemoryOntology::Entity,
+        MemoryType::Skill | MemoryType::Rule => MemoryOntology::Concept,
+        MemoryType::Daily | MemoryType::Intelligence | MemoryType::Scratch => {
+            MemoryOntology::Synthesis
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryMeta {
     pub id: String,
@@ -83,6 +103,8 @@ pub struct MemoryMeta {
     pub optional: Vec<String>,
     #[serde(default)]
     pub output_format: Option<String>,
+    #[serde(default)]
+    pub ontology: Option<MemoryOntology>,
 }
 
 fn default_importance() -> f64 {

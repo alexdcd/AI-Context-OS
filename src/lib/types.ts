@@ -9,6 +9,12 @@ export type MemoryType =
   | "rule"
   | "scratch";
 
+export type MemoryOntology =
+  | "source"
+  | "entity"
+  | "concept"
+  | "synthesis";
+
 export interface MemoryMeta {
   id: string;
   memory_type: MemoryType;
@@ -28,6 +34,7 @@ export interface MemoryMeta {
   requires: string[];
   optional: string[];
   output_format: string | null;
+  ontology: MemoryOntology | null;
 }
 
 export interface Memory {
@@ -329,4 +336,11 @@ export const MEMORY_TYPE_LABELS: Record<MemoryType, string> = {
   task: "Tarea",
   rule: "Regla",
   scratch: "Scratch",
+};
+
+export const MEMORY_ONTOLOGY_LABELS: Record<MemoryOntology, string> = {
+  source: "Fuente",
+  entity: "Entidad",
+  concept: "Concepto",
+  synthesis: "Sintesis",
 };
