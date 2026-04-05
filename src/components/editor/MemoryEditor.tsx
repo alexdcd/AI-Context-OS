@@ -360,6 +360,7 @@ export function MemoryEditor() {
               onBlur={() => void handleSave()}
               className="min-h-[400px]"
               placeholder="Escribe aqui..."
+              editable={!isProtected}
             />
 
             {/* L1 — Collapsible summary */}
@@ -391,6 +392,7 @@ export function MemoryEditor() {
                     onBlur={() => void handleSave()}
                     className="min-h-[120px]"
                     placeholder="Resumen L1 (150-300 tokens)..."
+                    editable={!isProtected}
                   />
                 </div>
               )}
@@ -426,7 +428,7 @@ export function MemoryEditor() {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               {inspectorTab === "properties" && (
-                <FrontmatterForm meta={meta} onChange={handleMetaChange} />
+                <FrontmatterForm meta={meta} onChange={handleMetaChange} readonly={isProtected} />
               )}
               {inspectorTab === "links" && (
                 <LinksPanel
@@ -887,6 +889,10 @@ function toComparableMemoryMeta(meta: MemoryMeta) {
     requires: meta.requires,
     optional: meta.optional,
     output_format: meta.output_format,
+    ontology: meta.ontology,
+    status: meta.status,
+    protected: meta.protected,
+    derived_from: meta.derived_from,
   };
 }
 
