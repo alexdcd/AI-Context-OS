@@ -79,7 +79,7 @@ export function MemoryEditor() {
   }, []);
 
   useEffect(() => {
-    if (!activeMemory || !meta || !dirty) {
+    if (!activeMemory || !meta || !dirty || activeMemory.meta.id !== meta.id) {
       latestDraftRef.current = null;
       return;
     }
@@ -265,6 +265,7 @@ export function MemoryEditor() {
     ];
   }, [meta]);
   const isProtected = meta?.protected ?? false;
+  const isStateSynced = meta?.id === activeMemory?.meta.id;
 
   const handleOpenMemory = useCallback(
     async (id: string) => {
@@ -297,6 +298,10 @@ export function MemoryEditor() {
         </p>
       </div>
     );
+  }
+
+  if (!isStateSynced) {
+    return null;
   }
 
   return (
