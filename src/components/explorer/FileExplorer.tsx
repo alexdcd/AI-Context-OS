@@ -620,6 +620,7 @@ function isAdvancedOnlyFile(node: FileNode): boolean {
 function filterExplorerTree(
   nodes: FileNode[],
   showSystemFiles: boolean,
+  isRootLevel: boolean = true,
 ): { nodes: FileNode[]; hiddenCount: number } {
   if (showSystemFiles) {
     return { nodes, hiddenCount: 0 };
@@ -630,11 +631,12 @@ function filterExplorerTree(
 
   for (const node of nodes) {
     if (node.is_dir) {
-      const filteredChildren = filterExplorerTree(node.children, showSystemFiles);
+      const filteredChildren = filterExplorerTree(node.children, showSystemFiles, false);
       const shouldShowDirectory =
         node.memory_type !== null ||
         isSpecialWorkspaceNode(node) ||
         inferFolderTypeFromPath(node.path) !== null ||
+        isRootLevel ||
         filteredChildren.nodes.length > 0;
 
       hiddenCount += filteredChildren.hiddenCount;
@@ -1064,34 +1066,55 @@ export function FileExplorer() {
     const mode = pendingCreate;
     setPendingCreate(null);
 
-    // Find a target directory: selected path's directory, or first workspace folder
-    const findTargetDir = (): FileNode | null => {
-      if (selectedPath) {
-        const selectedNode = findNodeByPath(fileTree, selectedPath);
-        if (selectedNode?.is_dir && inferFolderTypeFromPath(selectedNode.path) !== null) {
-          return selectedNode;
-        }
-        const parentPath = getParentPath(selectedPath);
-        const parentNode = findNodeByPath(fileTree, parentPath);
-        if (parentNode?.is_dir && inferFolderTypeFromPath(parentNode.path) !== null) {
-          return parentNode;
-        }
-      }
-      // Fallback: first workspace folder
-      return fileTree.find((n) => n.is_dir && n.memory_type !== null) ?? null;
+    // Derive workspace root from the tree
+    const rootPath = fileTree.length > 0 ? getParentPath(fileTree[0].path) : null;
+
+    // Find a target directory from current selection
+    const findSelectedDir = (): FileNode | null => {
+      if (!selectedPath) return null;
+      const selectedNode = findNodeByPath(fileTree, selectedPath);
+      if (selectedNode?.is_dir) return selectedNode;
+      const parentPath = getParentPath(selectedPath);
+      return findNodeByPath(fileTree, parentPath);
     };
 
-    const target = findTargetDir();
-    if (!target) {
-      setError("No hay una carpeta de memoria disponible");
-      return;
-    }
+    const selectedDir = findSelectedDir();
 
-    openDirectory(target.path);
     if (mode === "folder") {
-      void handleCreateFolder(target);
+      // For folders: use selected dir, or workspace root
+      if (selectedDir) {
+        openDirectory(selectedDir.path);
+        void handleCreateFolder(selectedDir);
+      } else if (rootPath) {
+        // Create at workspace root
+        void (async () => {
+          try {
+            const existingNames = new Set(fileTree.map((n) => n.name));
+            const nextName = uniqueName("nueva-carpeta", existingNames);
+            const createdPath = await createDirectory(`${rootPath}/${nextName}`);
+            await loadFileTree();
+            setRenamingTarget({ path: createdPath, name: nextName, isDir: true });
+            setRenameValue(nextName);
+          } catch (error) {
+            setError(String(error));
+          }
+        })();
+      } else {
+        setError("No hay un workspace configurado");
+      }
     } else {
-      void handleCreateNote(target);
+      // For files: need a typed workspace folder
+      const targetDir =
+        selectedDir && inferFolderTypeFromPath(selectedDir.path) !== null
+          ? selectedDir
+          : fileTree.find((n) => n.is_dir && n.memory_type !== null) ?? null;
+
+      if (!targetDir) {
+        setError("No hay una carpeta de memoria disponible");
+        return;
+      }
+      openDirectory(targetDir.path);
+      void handleCreateNote(targetDir);
     }
   }, [pendingCreate]);
 
