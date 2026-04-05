@@ -86,7 +86,7 @@ Long-form detailed content.
 
 Key notes:
 
-- Journal pages are `02-daily/YYYY-MM-DD.md` (Logseq-style outline).
+- Journal pages are `02-daily/YYYY-MM-DD.md`
 - `daily-log.jsonl` is for system-style entries, not the primary daily editor.
 - Tasks are markdown files in `07-tasks/` with YAML frontmatter.
 - `claude.md` exists for compatibility, but the architecture target is adapter-first with neutral core output.
