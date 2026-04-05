@@ -220,6 +220,7 @@ export function MemoryEditor() {
     };
 
     meta.related.forEach((id) => pushLink(id, "related"));
+    meta.derived_from.forEach((id) => pushLink(id, "derived_from"));
     meta.requires.forEach((id) => pushLink(id, "requires"));
     meta.optional.forEach((id) => pushLink(id, "optional"));
 
@@ -237,6 +238,7 @@ export function MemoryEditor() {
       if (item.id === targetId) continue;
       const kinds: string[] = [];
       if (item.related.includes(targetId)) kinds.push("related");
+      if (item.derived_from.includes(targetId)) kinds.push("derived_from");
       if (item.requires.includes(targetId)) kinds.push("requires");
       if (item.optional.includes(targetId)) kinds.push("optional");
       if (kinds.length === 0) continue;
@@ -262,6 +264,7 @@ export function MemoryEditor() {
       { label: "Accesos", value: String(meta.access_count) },
     ];
   }, [meta]);
+  const isProtected = meta?.protected ?? false;
 
   const handleOpenMemory = useCallback(
     async (id: string) => {
