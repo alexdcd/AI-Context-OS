@@ -202,6 +202,11 @@ function getStringColor(str: string): string {
 }
 
 function getTypeColor(node: FileNode): string | undefined {
+  // Los archivos no editables (no markdown) no tienen color (serán grises)
+  if (!node.is_dir && !isMarkdownFile(node.name)) {
+    return undefined;
+  }
+
   if (node.memory_type) {
     return MEMORY_TYPE_COLORS[node.memory_type];
   }
