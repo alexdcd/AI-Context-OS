@@ -138,6 +138,10 @@ git commit -m "refactor: add Source variant to MemoryType and renumber folders"
 
 **Files:**
 - Modify: `src-tauri/src/core/types.rs:49-108` (MemoryStatus enum, MemoryMeta struct)
+- Modify: `src-tauri/src/core/mcp.rs:216-236` (MemoryMeta constructor — add new fields)
+- Modify: `src-tauri/src/commands/memory.rs:331-351` (MemoryMeta constructor in rename — add new fields)
+- Modify: `src-tauri/src/commands/memory.rs:461-481` (MemoryMeta constructor in create — add new fields)
+- Modify: `src-tauri/src/commands/onboarding.rs:103-123,169-189` (MemoryMeta constructors — add new fields)
 
 - [ ] **Step 1: Add `MemoryStatus` enum after `MemoryOntology`**
 
@@ -169,16 +173,44 @@ Add these fields at the end of the struct, before the closing brace:
 
 Note: `ontology` already exists — just add `status`, `protected`, and `derived_from` after it.
 
-- [ ] **Step 3: Verify it compiles**
+- [ ] **Step 3: Add new fields to ALL MemoryMeta constructors**
+
+Every place that constructs `MemoryMeta { ... }` with struct literal syntax needs the 3 new fields. Serde defaults only apply to deserialization, not to Rust struct literals. Add these three lines to each constructor:
+
+```rust
+            status: None,
+            protected: false,
+            derived_from: vec![],
+```
+
+**Locations (5 constructors):**
+
+1. `src-tauri/src/core/mcp.rs:216-236` — In the `create_memory` MCP tool, after `ontology: Some(ontology),` add the 3 fields.
+
+2. `src-tauri/src/commands/memory.rs:461-481` — In the `create_memory` command, after `ontology: Some(ontology),` add the 3 fields.
+
+3. `src-tauri/src/commands/memory.rs:331-351` — In the rename/copy constructor, after `ontology: source.meta.ontology,` add:
+```rust
+            status: source.meta.status,
+            protected: source.meta.protected,
+            derived_from: source.meta.derived_from.clone(),
+```
+(This one copies from the source memory instead of defaulting.)
+
+4. `src-tauri/src/commands/onboarding.rs:103-123` — In `create_profile_memory`, after `ontology: Some(default_ontology_for_memory_type(&MemoryType::Context)),` add the 3 default fields.
+
+5. `src-tauri/src/commands/onboarding.rs:169-189` — In `write_memory_file`, after `ontology: Some(ontology),` add the 3 default fields.
+
+- [ ] **Step 4: Verify it compiles**
 
 Run: `cd /Users/alexdc/Documents/GitHub/AI-Context-OS && cargo check --manifest-path src-tauri/Cargo.toml 2>&1 | head -30`
 
-Expected: Same folder-rename errors as before, but no new errors from the struct changes (new fields have defaults).
+Expected: Folder-rename errors from old paths (fixed in Task 3), but NO missing-field errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src-tauri/src/core/types.rs
+git add src-tauri/src/core/types.rs src-tauri/src/core/mcp.rs src-tauri/src/commands/memory.rs src-tauri/src/commands/onboarding.rs
 git commit -m "feat: add MemoryStatus enum and protected/status/derived_from fields to MemoryMeta"
 ```
 
@@ -774,13 +806,42 @@ If status is set, show it as a read-only display after the Type selector:
       )}
 ```
 
-- [ ] **Step 4: Verify it compiles**
+- [ ] **Step 4: Update `toComparableMemoryMeta` in MemoryEditor**
+
+In `src/components/editor/MemoryEditor.tsx`, the function `toComparableMemoryMeta` (around line 871) compares metadata to detect changes that need a derived state refresh. Add the new fields:
+
+```typescript
+function toComparableMemoryMeta(meta: MemoryMeta) {
+  return {
+    id: meta.id,
+    memory_type: meta.memory_type,
+    l0: meta.l0,
+    importance: meta.importance,
+    always_load: meta.always_load,
+    decay_rate: meta.decay_rate,
+    confidence: meta.confidence,
+    tags: meta.tags,
+    related: meta.related,
+    triggers: meta.triggers,
+    requires: meta.requires,
+    optional: meta.optional,
+    output_format: meta.output_format,
+    status: meta.status,
+    protected: meta.protected,
+    derived_from: meta.derived_from,
+  };
+}
+```
+
+Without this, toggling `protected` or changing `status`/`derived_from` in the inspector would not trigger a save.
+
+- [ ] **Step 5: Verify it compiles**
 
 Run: `cd /Users/alexdc/Documents/GitHub/AI-Context-OS && npx tsc --noEmit 2>&1 | head -20`
 
 Expected: Clean.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/components/editor/
