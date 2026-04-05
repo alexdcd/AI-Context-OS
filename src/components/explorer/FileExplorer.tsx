@@ -1334,35 +1334,51 @@ export function FileExplorer() {
 
   return (
     <div className="px-1 py-1">
-      {visibleTree.map((node) => (
-        <TreeNode
-          key={node.path}
-          node={node}
-          depth={0}
-          expanded={expanded}
-          toggleExpand={toggleExpand}
-          conflictIds={conflictIds}
-          onContextMenu={handleContextMenu}
-          dropTargetPath={dropTargetPath}
-          dragSourcePath={dragSourcePath}
-          isDragging={isDragging}
-          getDraggedItem={getDraggedItem}
-          canDropPathOnDirectory={canDropPathOnDirectory}
-          onPointerDragStart={handlePointerDragStart}
-          isClickSuppressed={isClickSuppressed}
-          onDragHoverDirectory={setDropTargetPath}
-          onDropOnDirectory={(target, sourcePath) => {
-            void handleDropOnDirectory(target, sourcePath);
-          }}
-          renamingPath={renamingTarget?.path ?? null}
-          renameValue={renameValue}
-          onRenameChange={setRenameValue}
-          onRenameCommit={() => {
-            void handleRenameCommit();
-          }}
-          onRenameCancel={cancelRename}
-        />
-      ))}
+      {visibleTree.map((node, index) => {
+        const previousNode = index > 0 ? visibleTree[index - 1] : null;
+        const showSpecialDivider =
+          !isSpecialWorkspaceNode(node) &&
+          previousNode !== null &&
+          isSpecialWorkspaceNode(previousNode);
+
+        return (
+          <div key={node.path}>
+            {showSpecialDivider && (
+              <div className="mx-3 my-2 flex items-center gap-2" aria-hidden="true">
+                <div className="h-px flex-1 bg-[color:var(--border)]" />
+                <div className="text-[10px] text-[color:var(--text-2)]">•</div>
+                <div className="h-px flex-1 bg-[color:var(--border)]" />
+              </div>
+            )}
+            <TreeNode
+              node={node}
+              depth={0}
+              expanded={expanded}
+              toggleExpand={toggleExpand}
+              conflictIds={conflictIds}
+              onContextMenu={handleContextMenu}
+              dropTargetPath={dropTargetPath}
+              dragSourcePath={dragSourcePath}
+              isDragging={isDragging}
+              getDraggedItem={getDraggedItem}
+              canDropPathOnDirectory={canDropPathOnDirectory}
+              onPointerDragStart={handlePointerDragStart}
+              isClickSuppressed={isClickSuppressed}
+              onDragHoverDirectory={setDropTargetPath}
+              onDropOnDirectory={(target, sourcePath) => {
+                void handleDropOnDirectory(target, sourcePath);
+              }}
+              renamingPath={renamingTarget?.path ?? null}
+              renameValue={renameValue}
+              onRenameChange={setRenameValue}
+              onRenameCommit={() => {
+                void handleRenameCommit();
+              }}
+              onRenameCancel={cancelRename}
+            />
+          </div>
+        );
+      })}
 
       {visibleTree.length === 0 && (
         <p className="px-3 py-8 text-center text-xs text-[color:var(--text-2)]">
