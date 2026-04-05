@@ -286,6 +286,7 @@ function TreeNode({
   const isExpanded = expanded.has(node.path);
   const isSelected = selectedPath === node.path;
   const color = getTypeColor(node);
+  const isSpecialFolder = isSpecialWorkspaceNode(node);
 
   const isMarkdown = isMarkdownFile(node.name);
   const memoryId = isMarkdown ? stripMdExtension(node.name) : "";
@@ -422,7 +423,14 @@ function TreeNode({
             onPointerDown={(event) => event.stopPropagation()}
           />
         ) : (
-          <span className="flex-1 truncate">{node.name}</span>
+          <span
+            className={clsx(
+              "flex-1 truncate",
+              isSpecialFolder && "font-semibold text-[color:var(--text-0)]",
+            )}
+          >
+            {node.name}
+          </span>
         )}
 
         {isProtectedMemory && (
