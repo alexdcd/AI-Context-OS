@@ -15,7 +15,9 @@ use crate::core::jsonl::append_jsonl;
 use crate::core::levels::join_levels;
 use crate::core::memory::read_memory;
 use crate::core::observability::{classify_task, ObservabilityDb};
-use crate::core::types::{Config, LoadLevel, MemoryMeta, MemoryType};
+use crate::core::types::{
+    default_ontology_for_memory_type, Config, LoadLevel, MemoryMeta, MemoryType,
+};
 
 /// Shared state accessible by the MCP server tools.
 pub struct McpSharedState {
@@ -229,6 +231,7 @@ impl AiContextMcpServer {
             requires: vec![],
             optional: vec![],
             output_format: None,
+            ontology: Some(default_ontology_for_memory_type(&memory_type)),
         };
 
         let body = join_levels(&params.l1_content, &params.l2_content);
