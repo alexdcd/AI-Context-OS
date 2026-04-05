@@ -385,7 +385,13 @@ function TreeNode({
             ) : (
               <ChevronRight className="h-3 w-3 shrink-0 text-[color:var(--text-2)]" />
             )}
-            <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: color ?? "var(--text-2)" }} />
+            {isInboxNode(node) ? (
+              <Inbox className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+            ) : isSourcesNode(node) ? (
+              <BookOpen className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+            ) : (
+              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: color ?? "var(--text-2)" }} />
+            )}
           </>
         ) : (
           <>
@@ -416,7 +422,26 @@ function TreeNode({
             onPointerDown={(event) => event.stopPropagation()}
           />
         ) : (
-          <span className="truncate">{node.name}</span>
+          <span className="flex-1 truncate">{node.name}</span>
+        )}
+
+        {isProtectedMemory && (
+          <Lock
+            className="h-3 w-3 shrink-0 text-[color:var(--text-2)]"
+            title="Archivo protegido"
+          />
+        )}
+
+        {!node.is_dir && isInboxPath(node.path) && memoryStatus && (
+          <span
+            className={clsx(
+              "h-1.5 w-1.5 shrink-0 rounded-full",
+              memoryStatus === "unprocessed"
+                ? "bg-[color:var(--warning)]"
+                : "bg-[color:var(--success)]",
+            )}
+            title={memoryStatus === "unprocessed" ? "Sin procesar" : "Procesado"}
+          />
         )}
 
         {isDropTarget && (
