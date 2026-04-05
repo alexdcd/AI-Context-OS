@@ -175,12 +175,44 @@ function ContextMenu({
   );
 }
 
+const FALLBACK_COLORS = [
+  "#f87171", // red
+  "#fb923c", // orange
+  "#fbbf24", // amber
+  "#a3e635", // lime
+  "#4ade80", // green
+  "#34d399", // emerald
+  "#2dd4bf", // teal
+  "#22d3ee", // cyan
+  "#38bdf8", // sky
+  "#818cf8", // indigo
+  "#a78bfa", // violet
+  "#c084fc", // purple
+  "#e879f9", // fuchsia
+  "#f472b6", // pink
+  "#fb7185", // rose
+];
+
+function getStringColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+}
+
 function getTypeColor(node: FileNode): string | undefined {
   if (node.memory_type) {
     return MEMORY_TYPE_COLORS[node.memory_type];
   }
   const folderType = inferFolderTypeFromPath(node.path);
-  return folderType ? MEMORY_TYPE_COLORS[folderType] : undefined;
+  if (folderType) {
+    return MEMORY_TYPE_COLORS[folderType];
+  }
+  
+  // Si no está mapeado a un tipo de memoria, generamos un color consistente
+  const stringToHash = node.is_dir ? node.name : (node.path.split("/").slice(-2, -1)[0] || node.name);
+  return getStringColor(stringToHash);
 }
 
 function folderToType(folder: string): MemoryType | null {
