@@ -30,12 +30,13 @@
 ## Graph
 
 
-- ⬚ **Clusters automáticos** — Agrupar memorias por comunidades detectadas en el grafo
+- ⬚ **Clusters automáticos (Leiden)** — Agrupar memorias visual y lógicamente usando el algoritmo de Leiden (por densidad de aristas, superando a K-means) para detectar comunidades topológicas en el grafo
 
 ## Governance
 
 - ⬚ **Consolidación ejecutable** — Aplicar sugerencias de consolidación con un click (merge entries → nueva memoria)
 - ⬚ **Historial de governance** — Log de acciones tomadas (archivados, promovidos, etc.)
+- ✅ **God nodes** — Detección de "Code Smells de contexto" comparando la alta centralidad de grado (Degree Centrality) vs baja importancia asignada.
 
 ## Explorer & Editor
 

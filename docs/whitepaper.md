@@ -110,7 +110,7 @@ When an AI tool calls `get_context` with a query (e.g., "implement error handlin
 5. Ranks memories by composite score
 6. Greedily loads memories within the token budget, choosing L1 or L2 based on remaining budget and score
 
-**Community detection:** Before scoring, the engine runs a Label Propagation Algorithm (LPA) over an enriched graph — explicit `related`/`requires`/`optional` links plus implicit edges between memories sharing ≥2 tags. This assigns each memory to a topical cluster. During scoring, a memory in the same community as any top-5 match gets a +0.08 graph proximity bonus. This activates the graph signal even when engineers haven't written explicit cross-references.
+**Community detection:** Before scoring, the engine leverages structural graph algorithms (like Leiden or LPA) over an enriched graph — explicit `related`/`requires`/`optional` links plus implicit edges between memories sharing ≥2 tags. Unlike K-means over embeddings, these detect communities purely by edge density and modularity without needing predefined 'K' clusters. This accurately assigns each memory to a topical cluster. During scoring, a memory in the same community as any top-5 match gets a +0.08 graph proximity bonus. This activates the graph signal even when engineers haven't written explicit cross-references.
 
 The entire pipeline runs in Rust and completes in single-digit milliseconds for typical workspaces (< 500 memories).
 
