@@ -60,36 +60,33 @@ Long-form detailed content.
 
 ## Workspace structure
 
+AI Context OS uses a "Zero Gravity" architecture: the physical folder a file lives in has **zero impact** on its semantic classification. The system scans recursively and classifies everything via YAML frontmatter.
+
 ```text
 ~/AI-Context-OS/
-├── 01-context/
-├── 02-daily/
-│   ├── YYYY-MM-DD.md
-│   ├── daily-log.jsonl
-│   └── sessions/
-├── 03-intelligence/
-├── 04-projects/
-├── 05-resources/
-├── 06-skills/
-├── 07-tasks/
-│   ├── task-xxxxxxxx.md
-│   └── backlog.jsonl
-├── 08-rules/
-├── 09-scratch/
+├── inbox/          ← temporary capture zone (landing pad)
+├── sources/        ← external references (read-only by default)
+├── .ai/            ← hidden system infrastructure
+│   ├── rules/      ← behavioral rules for AI agents (top attention)
+│   ├── journal/    ← daily logs and sessions
+│   ├── tasks/      ← task tracking
+│   ├── scratch/    ← temporary AI output buffer (TTL-based)
+│   ├── config.yaml ← workspace configuration
+│   └── index.yaml  ← auto-generated L0 catalog
+├── User_Folders/   ← cosmetic, user-defined (e.g., Projects/, Notes/)
 ├── .cache/
-├── _config.yaml
-├── _index.yaml
-├── claude.md
+├── claude.md       ← master router (auto-generated)
 ├── .cursorrules
 └── .windsurfrules
 ```
 
 Key notes:
 
-- Journal pages are `02-daily/YYYY-MM-DD.md`
-- `daily-log.jsonl` is for system-style entries, not the primary daily editor.
-- Tasks are markdown files in `07-tasks/` with YAML frontmatter.
+- System infrastructure is fixed: `inbox/`, `sources/`, and `.ai/` — everything else is user-defined.
+- Journal pages live in `.ai/journal/YYYY-MM-DD.md`.
+- Tasks are markdown files in `.ai/tasks/` with YAML frontmatter.
 - `claude.md` exists for compatibility, but the architecture target is adapter-first with neutral core output.
+- Moving a memory file between user folders does **not** break indexing — classification comes from `type:` in frontmatter.
 
 ## Architecture
 
