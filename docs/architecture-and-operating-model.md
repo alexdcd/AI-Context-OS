@@ -118,31 +118,29 @@ So the intended long-term separation is:
 
 ### Current stable workspace
 
-The workspace still uses the existing numbered structure:
+The workspace uses the new "Zero Gravity" structure, decoupling physical layout from semantic meaning:
 
 ```text
 workspace/
-├── 00-inbox/
-├── 01-context/
-├── 02-daily/
-├── 03-intelligence/
-├── 04-projects/
-├── 05-resources/
-├── 06-skills/
-├── 07-tasks/
-├── 08-rules/
-├── 09-scratch/
-├── _config.yaml
-├── _index.yaml
+├── inbox/
+├── sources/
+├── .ai/
+│   ├── rules/
+│   ├── journal/
+│   ├── tasks/
+│   ├── scratch/
+│   ├── config.yaml
+│   └── index.yaml
+├── User_Folders/   ← cosmetic, user-defined
 ├── claude.md
 ├── .cursorrules
 ├── .windsurfrules
 └── .cache/
 ```
 
-### Meaning of `00-inbox`
+### Meaning of `inbox/`
 
-`00-inbox/` is now the intake area for future ingestion workflows.
+`inbox/` is the intake area for future ingestion workflows.
 
 Its role is:
 
@@ -152,9 +150,9 @@ Its role is:
 
 Important:
 
-- `00-inbox/` is not currently a full memory folder
+- `inbox/` is not currently a full memory folder
 - files there can be opened as raw files in the explorer
-- but they are not yet part of the regular memory index unless they are moved into a memory folder or future ingestion logic promotes them
+- but they are not yet part of the regular memory index unless they are moved into a user folder or future ingestion logic promotes them
 
 ## Routing model
 
@@ -214,7 +212,7 @@ This is conceptually close to the "lint" operation described in LLM-maintained w
 
 The intended ingestion workflow is:
 
-1. a source lands in `00-inbox/`
+1. a source lands in `inbox/`
 2. the user triggers ingestion explicitly
 3. the system reads the source
 4. the system proposes ontology, summary, tags, and affected pages
