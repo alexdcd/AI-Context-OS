@@ -78,7 +78,13 @@ fn get_root(root_opt: &Option<String>) -> PathBuf {
 }
 
 fn load_config(root: &PathBuf) -> Config {
-    let config_path = root.join("_config.yaml");
+    let paths = core::paths::SystemPaths::new(root);
+    // Try .ai/config.yaml first (new path), fall back to legacy _config.yaml
+    let config_path = if paths.config_yaml().exists() {
+        paths.config_yaml()
+    } else {
+        root.join("_config.yaml")
+    };
     if config_path.exists() {
         let content = std::fs::read_to_string(&config_path).unwrap_or_default();
         serde_yaml::from_str(&content).unwrap_or_else(|_| Config {
