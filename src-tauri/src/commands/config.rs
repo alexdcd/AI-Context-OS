@@ -122,36 +122,16 @@ If the user is not available, classify it using your best judgment.
     Ok(config)
 }
 
-fn migrate_legacy_workspace_structure(root: &Path) -> Result<bool, String> {
-    let mut migrated = false;
-
-    for (old_name, new_name) in LEGACY_FOLDER_MIGRATIONS {
-        let old_path = root.join(old_name);
-        let new_path = root.join(new_name);
-
-        if !old_path.exists() || new_path.exists() {
-            continue;
-        }
-
-        fs::rename(&old_path, &new_path).map_err(|e| {
-            format!(
-                "Failed to migrate workspace folder {} to {}: {}",
-                old_path.display(),
-                new_path.display(),
-                e
-            )
-        })?;
-        migrated = true;
-    }
-
-    Ok(migrated)
-}
-
 pub fn read_config_from_root(root: &Path) -> Result<Option<Config>, String> {
-    let config_path = root.join("_config.yaml");
-    if !config_path.exists() {
+    let paths = SystemPaths::new(root);
+    // Try new path first, fall back to legacy
+    let config_path = if paths.config_yaml().exists() {
+        paths.config_yaml()
+    } else if root.join("_config.yaml").exists() {
+        root.join("_config.yaml")
+    } else {
         return Ok(None);
-    }
+    };
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config {}: {}", config_path.display(), e))?;
     let config: Config = serde_yaml::from_str(&content)
