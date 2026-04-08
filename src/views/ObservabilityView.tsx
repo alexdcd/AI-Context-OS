@@ -33,9 +33,9 @@ export function ObservabilityView() {
   const [activeTab, setActiveTab] = useState<Tab>("live");
 
   const tabs: { id: Tab; icon: typeof Activity; label: string }[] = [
-    { id: "live", icon: Activity, label: "En Vivo" },
-    { id: "intelligence", icon: BarChart3, label: "Inteligencia" },
-    { id: "optimizations", icon: Zap, label: "Optimizaciones" },
+    { id: "live", icon: Activity, label: "Live" },
+    { id: "intelligence", icon: BarChart3, label: "Intelligence" },
+    { id: "optimizations", icon: Zap, label: "Optimizations" },
   ];
 
   return (
@@ -43,9 +43,7 @@ export function ObservabilityView() {
       className="view-container h-full overflow-y-auto"
       style={{ padding: 24 }}
     >
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: "var(--text-0)" }}>
-        Observabilidad
-      </h1>
+        Observability
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)" }}>
@@ -104,13 +102,13 @@ function LiveTab() {
       {/* Last request card */}
       {last ? (
         <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 4 }}>Ultima peticion</div>
+          <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 4 }}>Last request</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-0)", marginBottom: 8 }}>
             "{last.query}"
           </div>
           <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--text-1)" }}>
-            <span>Fuente: {last.source}</span>
-            <span>Tipo: {last.task_type}</span>
+            <span>Source: {last.source}</span>
+            <span>Type: {last.task_type}</span>
             <span>{new Date(last.timestamp).toLocaleString()}</span>
           </div>
           {/* Token bar */}
@@ -125,23 +123,21 @@ function LiveTab() {
               }}
             />
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-2)", marginTop: 4 }}>
-            {last.tokens_used} / {last.token_budget} tokens ({last.memories_loaded} memorias cargadas)
-          </div>
+            {last.tokens_used} / {last.token_budget} tokens ({last.memories_loaded} memories loaded)
         </div>
       ) : (
         <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
-          Sin peticiones de contexto aun. Conecta una herramienta de IA para comenzar.
+          No context requests yet. Connect an AI tool to get started.
         </div>
       )}
 
       {/* History */}
       <div>
         <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)", marginBottom: 8 }}>
-          Historial de peticiones
+          Request history
         </h3>
         {requests.length === 0 ? (
-          <div style={{ color: "var(--text-2)", fontSize: 12 }}>Sin historial</div>
+          <div style={{ color: "var(--text-2)", fontSize: 12 }}>No history</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {requests.map((req) => (
@@ -192,20 +188,20 @@ function IntelligenceTab() {
       {/* Stat cards */}
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          <StatCard label="Peticiones/semana" value={stats.requests_this_week} delta={stats.requests_this_week - stats.requests_prev_week} />
-          <StatCard label="Tokens servidos" value={stats.tokens_served_total} />
-          <StatCard label="Memorias activas" value={`${stats.active_memories}/${stats.total_memories}`} />
-          <StatCard label="Eficiencia" value={`${stats.efficiency_percent.toFixed(0)}%`} />
+          <StatCard label="Requests/week" value={stats.requests_this_week} delta={stats.requests_this_week - stats.requests_prev_week} />
+          <StatCard label="Tokens served" value={stats.tokens_served_total} />
+          <StatCard label="Active memories" value={`${stats.active_memories}/${stats.total_memories}`} />
+          <StatCard label="Efficiency" value={`${stats.efficiency_percent.toFixed(0)}%`} />
         </div>
       )}
 
       {/* Top memories */}
       <div>
         <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)", marginBottom: 8 }}>
-          Top memorias (30 dias)
+          Top memories (30 days)
         </h3>
         {topMemories.length === 0 ? (
-          <div style={{ color: "var(--text-2)", fontSize: 12 }}>Sin datos suficientes</div>
+          <div style={{ color: "var(--text-2)", fontSize: 12 }}>Insufficient data</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {topMemories.map((mem) => (
@@ -236,7 +232,7 @@ function IntelligenceTab() {
       {unusedMemories.length > 0 && (
         <div>
           <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)", marginBottom: 8 }}>
-            Memorias sin uso ({unusedMemories.length})
+            Unused memories ({unusedMemories.length})
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {unusedMemories.map((mem) => (
@@ -247,7 +243,7 @@ function IntelligenceTab() {
               >
                 <span style={{ color: "var(--text-0)" }}>{mem.memory_id}</span>
                 <span style={{ color: "var(--text-2)" }}>
-                  {mem.days_since_use} dias sin uso
+                  {mem.days_since_use} days unused
                 </span>
               </div>
             ))}
@@ -265,7 +261,7 @@ function StatCard({ label, value, delta }: { label: string; value: string | numb
       <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-0)" }}>{value}</div>
       {delta !== undefined && delta !== 0 && (
         <div style={{ fontSize: 11, color: delta > 0 ? "#10b981" : "#ef4444", marginTop: 2 }}>
-          {delta > 0 ? "+" : ""}{delta} vs semana anterior
+          {delta > 0 ? "+" : ""}{delta} vs last week
         </div>
       )}
     </div>
@@ -313,7 +309,7 @@ function OptimizationsTab() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 13, color: "var(--text-1)" }}>
-          {optimizations.length} optimizaciones pendientes
+          {optimizations.length} pending optimizations
         </span>
         <button
           onClick={handleAnalyze}
@@ -330,19 +326,19 @@ function OptimizationsTab() {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? "Analizando..." : "Analizar"}
+          {loading ? "Analyzing..." : "Analyze"}
         </button>
       </div>
 
       {(["high", "medium", "low"] as const).map((impact) => {
         const items = grouped[impact];
         if (items.length === 0) return null;
-        const impactLabels = { high: "Alta", medium: "Media", low: "Baja" };
+        const impactLabels = { high: "High", medium: "Medium", low: "Low" };
         const impactColors = { high: "#ef4444", medium: "#f59e0b", low: "#71717a" };
         return (
           <div key={impact}>
             <h3 style={{ fontSize: 12, fontWeight: 700, color: impactColors[impact], marginBottom: 6, textTransform: "uppercase" }}>
-              Impacto {impactLabels[impact]} ({items.length})
+              {impactLabels[impact]} impact ({items.length})
             </h3>
             {items.map((opt) => (
               <div key={opt.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
@@ -354,13 +350,13 @@ function OptimizationsTab() {
                     <div style={{ fontSize: 12, color: "var(--text-1)" }}>{opt.description}</div>
                     <div style={{ fontSize: 11, color: "var(--text-2)", marginTop: 4 }}>
                       {opt.evidence}
-                      {opt.estimated_token_saving && ` — ~${opt.estimated_token_saving} tokens ahorro`}
+                      {opt.estimated_token_saving && ` — ~${opt.estimated_token_saving} tokens saved`}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 12 }}>
                     <button
                       onClick={() => handleApply(opt.id)}
-                      title="Aplicar"
+                      title="Apply"
                       style={{
                         padding: "4px 8px",
                         fontSize: 11,
@@ -374,11 +370,11 @@ function OptimizationsTab() {
                         gap: 3,
                       }}
                     >
-                      <Check size={12} /> Hecho
+                      <Check size={12} /> Apply
                     </button>
                     <button
                       onClick={() => handleDismiss(opt.id)}
-                      title="Descartar"
+                      title="Dismiss"
                       style={{
                         padding: "4px 8px",
                         fontSize: 11,
@@ -392,7 +388,7 @@ function OptimizationsTab() {
                         gap: 3,
                       }}
                     >
-                      <X size={12} /> Descartar
+                      <X size={12} /> Dismiss
                     </button>
                   </div>
                 </div>
@@ -404,7 +400,7 @@ function OptimizationsTab() {
 
       {optimizations.length === 0 && (
         <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
-          Sin optimizaciones pendientes. Ejecuta un analisis para detectar oportunidades.
+          No pending optimizations. Run an analysis to find opportunities.
         </div>
       )}
     </div>
