@@ -49,7 +49,7 @@ mod tests {
     fn test_parse_roundtrip() {
         let raw = r#"---
 id: test-memory
-type: context
+type: entity
 l0: "Test memory for unit testing"
 importance: 0.8
 tags: [test, unit]
@@ -64,9 +64,44 @@ This is the complete content.
 "#;
         let (meta, body) = parse_frontmatter(raw).unwrap();
         assert_eq!(meta.id, "test-memory");
+        assert_eq!(meta.ontology, crate::core::types::MemoryOntology::Entity);
         assert_eq!(meta.l0, "Test memory for unit testing");
         assert!((meta.importance - 0.8).abs() < 0.001);
         assert!(body.contains("<!-- L1 -->"));
         assert!(body.contains("<!-- L2 -->"));
+    }
+
+    #[test]
+    fn test_serialize_skips_derived_runtime_fields() {
+        let meta = MemoryMeta {
+            id: "test-memory".to_string(),
+            ontology: crate::core::types::MemoryOntology::Concept,
+            l0: "Serialized memory".to_string(),
+            importance: 0.5,
+            always_load: false,
+            decay_rate: 0.998,
+            last_access: chrono::Utc::now(),
+            access_count: 0,
+            confidence: 0.9,
+            tags: vec!["tag".to_string()],
+            related: vec![],
+            created: chrono::Utc::now(),
+            modified: chrono::Utc::now(),
+            version: 1,
+            triggers: vec![],
+            requires: vec![],
+            optional: vec![],
+            output_format: None,
+            status: None,
+            protected: false,
+            derived_from: vec![],
+            folder_category: Some("ideas".to_string()),
+            system_role: Some(crate::core::types::SystemRole::Skill),
+        };
+
+        let serialized = serialize_frontmatter(&meta, "<!-- L1 -->\nBody").unwrap();
+        assert!(serialized.contains("type: concept"));
+        assert!(!serialized.contains("folder_category"));
+        assert!(!serialized.contains("system_role"));
     }
 }

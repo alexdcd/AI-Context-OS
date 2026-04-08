@@ -102,7 +102,8 @@ When processing files from `inbox/`, follow this protocol:
 If the user is not available, classify it using your best judgment.
 
 ## 3. Process
-- Generate complete YAML frontmatter (`id`, `type`, `l0`, `importance`, `tags`, `ontology`, etc.)
+- Generate complete YAML frontmatter (`id`, `type`, `l0`, `importance`, `tags`, etc.)
+- `type` must be the ontology (`source`, `entity`, `concept`, or `synthesis`)
 - Structure the content with `<!-- L1 -->` and `<!-- L2 -->`
 - L1: executive summary (2-3 lines)
 - L2: fully processed content
