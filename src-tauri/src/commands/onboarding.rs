@@ -37,10 +37,13 @@ pub fn run_onboarding(
     let config = crate::commands::config::create_workspace_structure(&root, &profile.tools)?;
     *state.config.write().unwrap() = config;
 
-    // Step 3: Generate perfil-profesional.md
+    // Step 3: Create starter folders for user content
+    create_starter_folders(&root)?;
+
+    // Step 4: Generate perfil-profesional.md
     create_profile_memory(&root, &profile)?;
 
-    // Step 4: Generate template-specific skills and rules
+    // Step 5: Generate template-specific skills and rules
     match profile.template.as_str() {
         "developer" => create_developer_template(&root)?,
         "creator" => create_creator_template(&root)?,
@@ -97,6 +100,14 @@ fn tool_summary(tools: &[String]) -> String {
     } else {
         tools.join(", ")
     }
+}
+
+fn create_starter_folders(root: &std::path::Path) -> Result<(), String> {
+    for folder in &["context", "projects", "resources", "decisions"] {
+        fs::create_dir_all(root.join(folder))
+            .map_err(|e| format!("Failed to create {}: {}", folder, e))?;
+    }
+    Ok(())
 }
 
 fn create_profile_memory(
