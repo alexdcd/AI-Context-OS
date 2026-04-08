@@ -202,7 +202,7 @@ fn nest_blocks(flat: Vec<JournalBlock>) -> Vec<JournalBlock> {
             }
         }
 
-        if let Some(&(_, parent_idx)) = stack.last() {
+        if let Some(&(_, _parent_idx)) = stack.last() {
             // This is a child — but for simplicity we flatten with indent info
             // The frontend will handle tree rendering based on indent level
             let mut b = block;

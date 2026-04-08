@@ -1,11 +1,10 @@
 mod commands;
-mod core;
+pub mod core;
 mod state;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use rmcp::ServiceExt as _;
 use tauri::Manager;
 
 use state::AppState;

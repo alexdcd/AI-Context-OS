@@ -1,10 +1,8 @@
-mod core;
-
 use std::path::PathBuf;
-
+ 
+use ai_context_os::core;
 use chrono::Utc;
 use clap::{Parser, Subcommand};
-use rmcp::ServiceExt as _;
 
 use std::sync::Arc;
 

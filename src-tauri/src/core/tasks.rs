@@ -1,8 +1,6 @@
 use std::fs;
 use std::path::Path;
 
-use chrono::Utc;
-use regex::Regex;
 use uuid::Uuid;
 
 use crate::core::paths::SystemPaths;
@@ -80,7 +78,7 @@ fn read_task_file(path: &Path) -> Result<TaskItem, String> {
 }
 
 /// Parse a task .md file with YAML frontmatter.
-fn parse_task_md(raw: &str, path: &Path) -> Result<TaskItem, String> {
+fn parse_task_md(raw: &str, _path: &Path) -> Result<TaskItem, String> {
     let trimmed = raw.trim_start();
     if !trimmed.starts_with("---") {
         return Err("No frontmatter".to_string());
