@@ -204,13 +204,9 @@ pub fn sync_workspace_runtime(
 #[tauri::command]
 pub fn init_workspace(app: AppHandle, state: State<AppState>) -> Result<bool, String> {
     let root = state.get_root();
-    let migrated = migrate_legacy_workspace_structure(&root)?;
 
     if root.join("claude.md").exists() {
-        if migrated {
-            sync_workspace_runtime(state.inner(), Some(&app))?;
-        }
-        return Ok(migrated);
+        return Ok(false);
     }
 
     let config = create_workspace_structure(&root, &[])?;
@@ -244,9 +240,11 @@ pub fn save_config(config: Config, app: AppHandle, state: State<AppState>) -> Re
     fs::create_dir_all(&root)
         .map_err(|e| format!("Failed to create workspace root {}: {}", root.display(), e))?;
 
+    let paths = SystemPaths::new(&root);
+    fs::create_dir_all(paths.ai_dir()).ok();
     let config_yaml =
         serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
-    fs::write(root.join("_config.yaml"), config_yaml)
+    fs::write(paths.config_yaml(), config_yaml)
         .map_err(|e| format!("Failed to write config: {}", e))?;
     state.set_root(root)?;
     *state.config.write().unwrap() = config;

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use chrono::Utc;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::core::index::{memory_folder, scan_memories};
+use crate::core::index::scan_memories;
 use crate::core::memory::{read_memory, write_memory};
 use crate::core::types::{
     default_ontology_for_memory_type, CreateMemoryInput, Memory, MemoryFilter, MemoryMeta,
@@ -107,7 +107,7 @@ pub fn get_memory(id: String, state: State<AppState>) -> Result<Memory, String> 
     Ok(memory)
 }
 
-/// Create a new memory file.
+/// Create a new memory file. Defaults to inbox/ as landing zone.
 #[tauri::command]
 pub fn create_memory(
     input: CreateMemoryInput,
@@ -115,8 +115,8 @@ pub fn create_memory(
     state: State<AppState>,
 ) -> Result<Memory, String> {
     let root = state.get_root();
-    let folder = memory_folder(&root, &input.memory_type);
-    create_memory_internal(input, folder, app, state)
+    let paths = crate::core::paths::SystemPaths::new(&root);
+    create_memory_internal(input, paths.inbox_dir(), app, state)
 }
 
 /// Create a new memory file inside a specific directory.
