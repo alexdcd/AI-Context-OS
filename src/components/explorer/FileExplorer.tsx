@@ -1496,19 +1496,27 @@ export function FileExplorer() {
   );
 }
 
+// .ai/ subdirectories that are system-managed and should not receive dropped files
+const AI_SYSTEM_SUBDIRS = new Set(["tasks", "scratch", "journal"]);
+
+function isAiSystemSubdir(node: FileNode): boolean {
+  const segments = pathSegments(node.path);
+  const aiIdx = segments.lastIndexOf(AI_SYSTEM_DIR);
+  if (aiIdx === -1) return false;
+  const subdir = segments[aiIdx + 1];
+  return subdir !== undefined && AI_SYSTEM_SUBDIRS.has(subdir);
+}
+
 function canDropOnDirectory(draggedItem: DraggedItem | null, target: FileNode): boolean {
   if (!draggedItem || !target.is_dir) return false;
   if (draggedItem.isProtected) return false;
+  // Block drops into .ai/ system-managed subdirs
+  if (isAiSystemSubdir(target)) return false;
 
   const currentParent = getParentPath(draggedItem.path);
   if (currentParent === target.path) return false;
 
-  // Zero Gravity: markdown files can be dropped on any directory
-  if (draggedItem.isMarkdown) {
-    return true;
-  }
-
-  return true;
+  return draggedItem.isMarkdown;
 }
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
