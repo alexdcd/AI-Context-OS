@@ -159,14 +159,12 @@ pub fn save_memory(
     meta.version += 1;
     meta.id = meta.id.trim().to_string();
 
-    let target_parent = if meta.memory_type == old_memory_type {
-        old_file_path
-            .parent()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| memory_folder(&root, &meta.memory_type))
-    } else {
-        memory_folder(&root, &meta.memory_type)
-    };
+    // Zero Gravity: file stays in its current location regardless of type change.
+    // Only the frontmatter type field changes.
+    let target_parent = old_file_path
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.clone());
     let target_file_path = target_parent.join(format!("{}.md", meta.id));
     if target_file_path.exists() && target_file_path != old_file_path {
         return Err(format!(
