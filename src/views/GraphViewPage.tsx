@@ -471,7 +471,7 @@ export function GraphViewPage() {
 
       {layouting && (
         <div className="pointer-events-none absolute right-8 top-20 rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1 text-xs text-[color:var(--text-1)]">
-          Calculando layout...
+          Calculating layout...
         </div>
       )}
     </div>

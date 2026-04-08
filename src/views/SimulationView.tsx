@@ -89,10 +89,10 @@ export function SimulationView() {
               });
             }}
             className="flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
-            title="Copiar contexto al clipboard"
+            title="Copy context to clipboard"
           >
             {copied ? <Check className="h-3 w-3 text-[color:var(--success)]" /> : <Copy className="h-3 w-3" />}
-            {copied ? "Copiado" : "Copiar"}
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
       )}
