@@ -79,11 +79,11 @@ pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthS
         let mut type_counts: std::collections::HashMap<String, u32> =
             std::collections::HashMap::new();
         for (meta, _) in &all_entries {
-            let type_name = format!("{:?}", meta.memory_type);
-            *type_counts.entry(type_name).or_insert(0) += 1;
+            let ontology_name = format!("{:?}", meta.ontology);
+            *type_counts.entry(ontology_name).or_insert(0) += 1;
         }
         let num_types = type_counts.len() as f64;
-        // Ideal: at least 4 different types populated
+        // Ideal: at least 4 different ontologies populated
         let type_diversity = (num_types / 4.0).min(1.0);
         // Check for extreme concentration (one type > 60%)
         let max_pct = type_counts

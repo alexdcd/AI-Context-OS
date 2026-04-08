@@ -18,7 +18,7 @@ pub fn run_optimizations(
     // Load all memories for analysis
     let mut memories = Vec::new();
     for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(std::path::Path::new(path)) {
+        if let Ok(mem) = read_memory(root, std::path::Path::new(path)) {
             memories.push(mem);
         }
     }
@@ -163,10 +163,10 @@ pub fn run_optimizations(
         }
     }
 
-    // Detector 6: Merge candidates — high tag overlap + same type
+    // Detector 6: Merge candidates — high tag overlap + same ontology
     for (i, mem_a) in memories.iter().enumerate() {
         for mem_b in memories.iter().skip(i + 1) {
-            if mem_a.meta.memory_type != mem_b.meta.memory_type {
+            if mem_a.meta.ontology != mem_b.meta.ontology {
                 continue;
             }
             if mem_a.meta.tags.is_empty() || mem_b.meta.tags.is_empty() {
