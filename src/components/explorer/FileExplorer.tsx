@@ -567,6 +567,10 @@ function isProtectedNode(node: FileNode): boolean {
   return PROTECTED_FILE_NAMES.has(node.name);
 }
 
+function isAiRootNode(node: FileNode): boolean {
+  return node.is_dir && node.name === AI_SYSTEM_DIR;
+}
+
 function stripMdExtension(name: string): string {
   return name.replace(/\.md$/i, "");
 }
@@ -618,6 +622,12 @@ function isAdvancedOnlyFile(node: FileNode): boolean {
   if (node.name.startsWith("_")) return true;
   // Zero Gravity: all .md files are visible by default regardless of folder
   return false;
+}
+
+function canStoreMemoryInDirectory(node: FileNode): boolean {
+  if (!node.is_dir) return false;
+  if (isSourcesNode(node) || isAiRootNode(node)) return false;
+  return !isAiSystemSubdir(node);
 }
 
 function filterExplorerTree(
@@ -1027,6 +1037,10 @@ export function FileExplorer() {
 
   const handleCreateNote = async (node: FileNode) => {
     if (!node.is_dir) return;
+    if (!canStoreMemoryInDirectory(node)) {
+      setError("This folder is reserved for system or protected content");
+      return;
+    }
 
     // Zero Gravity: notes can be created in any directory.
     // Default type is "context" — user can change it from the editor.
@@ -1090,13 +1104,14 @@ export function FileExplorer() {
       const findTargetDir = (): FileNode | null => {
         if (selectedPath) {
           const sel = findNodeByPath(fileTree, selectedPath);
-          if (sel?.is_dir) return sel;
+          if (sel?.is_dir && canStoreMemoryInDirectory(sel)) return sel;
           const parent = findNodeByPath(fileTree, getParentPath(selectedPath));
-          if (parent?.is_dir) return parent;
+          if (parent?.is_dir && canStoreMemoryInDirectory(parent)) return parent;
         }
         // Zero Gravity: any directory works, prefer inbox as default
         return fileTree.find((n) => n.is_dir && n.name === "inbox")
-          ?? fileTree.find((n) => n.is_dir) ?? null;
+          ?? fileTree.find((n) => n.is_dir && canStoreMemoryInDirectory(n))
+          ?? null;
       };
       const targetDir = findTargetDir();
       if (!targetDir) {
@@ -1111,9 +1126,9 @@ export function FileExplorer() {
   const currentNode = ctxMenu?.node ?? null;
   const currentNodeIsProtected = currentNode ? isProtectedNode(currentNode) : false;
   const currentNodeIsManagedMemory = currentNode ? isManagedMemoryFile(currentNode, memoryIds) : false;
-  // Zero Gravity: all directories support note creation (except inbox)
+  // Zero Gravity still keeps protected/system folders off-limits for user memories.
   const currentFolderSupportsNotes = currentNode?.is_dir
-    ? !isInboxNode(currentNode)
+    ? canStoreMemoryInDirectory(currentNode)
     : false;
 
   const handleMoveMemory = async (node: FileNode) => {
@@ -1516,7 +1531,11 @@ function canDropOnDirectory(draggedItem: DraggedItem | null, target: FileNode): 
   const currentParent = getParentPath(draggedItem.path);
   if (currentParent === target.path) return false;
 
-  return draggedItem.isMarkdown;
+  if (draggedItem.isMarkdown) {
+    return canStoreMemoryInDirectory(target);
+  }
+
+  return true;
 }
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {

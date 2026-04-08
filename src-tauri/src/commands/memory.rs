@@ -1,11 +1,12 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::core::index::scan_memories;
 use crate::core::memory::{read_memory, write_memory};
+use crate::core::paths::SystemPaths;
 use crate::core::types::{
     default_ontology_for_memory_type, CreateMemoryInput, Memory, MemoryFilter, MemoryMeta,
     SaveMemoryInput,
@@ -29,6 +30,42 @@ fn should_regenerate_router(
         || old_meta.related != new_meta.related
         || old_meta.requires != new_meta.requires
         || old_meta.optional != new_meta.optional
+}
+
+fn normalize_existing_dir(path: &Path) -> Result<PathBuf, String> {
+    std::fs::canonicalize(path)
+        .map_err(|e| format!("Failed to resolve directory {}: {}", path.display(), e))
+}
+
+fn validate_memory_directory(root: &Path, dir: &Path) -> Result<PathBuf, String> {
+    if !dir.exists() {
+        return Err(format!("Destination does not exist: {}", dir.display()));
+    }
+    if !dir.is_dir() {
+        return Err(format!("Destination is not a directory: {}", dir.display()));
+    }
+
+    let normalized_root = normalize_existing_dir(root)?;
+    let normalized_dir = normalize_existing_dir(dir)?;
+    if !normalized_dir.starts_with(&normalized_root) {
+        return Err("Destination must stay inside the workspace".to_string());
+    }
+
+    let paths = SystemPaths::new(&normalized_root);
+    if normalized_dir == paths.sources_dir() {
+        return Err("Cannot store memories inside sources/".to_string());
+    }
+    if normalized_dir == paths.ai_dir() {
+        return Err("Cannot store memories in the .ai/ system directory".to_string());
+    }
+    if normalized_dir.starts_with(paths.tasks_dir())
+        || normalized_dir.starts_with(paths.journal_dir())
+        || normalized_dir.starts_with(paths.scratch_dir())
+    {
+        return Err("Cannot store memories in system-managed .ai/ subdirectories".to_string());
+    }
+
+    Ok(normalized_dir)
 }
 
 /// List all memory metadata (L0 level).
@@ -127,7 +164,9 @@ pub fn create_memory_at_path(
     app: AppHandle,
     state: State<AppState>,
 ) -> Result<Memory, String> {
-    create_memory_internal(input, PathBuf::from(parent_dir), app, state)
+    let root = state.get_root();
+    let parent_dir = validate_memory_directory(&root, Path::new(&parent_dir))?;
+    create_memory_internal(input, parent_dir, app, state)
 }
 
 /// Save/update an existing memory.
@@ -395,18 +434,8 @@ pub fn move_memory_file(
     }
 
     let destination_dir = PathBuf::from(&destination_dir);
-    if !destination_dir.exists() {
-        return Err(format!(
-            "Destination does not exist: {}",
-            destination_dir.display()
-        ));
-    }
-    if !destination_dir.is_dir() {
-        return Err(format!(
-            "Destination is not a directory: {}",
-            destination_dir.display()
-        ));
-    }
+    let root = state.get_root();
+    let destination_dir = validate_memory_directory(&root, &destination_dir)?;
 
     let mut memory = read_memory(&source_path)?;
     let target_path = destination_dir.join(format!("{}.md", memory.meta.id));
@@ -525,4 +554,3 @@ fn create_memory_internal(
 
     Ok(memory)
 }
-
