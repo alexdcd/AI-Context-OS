@@ -10,7 +10,9 @@ It is designed for two audiences at the same time:
 ## Recommended reading order
 
 1. [Architecture And Operating Model](./architecture-and-operating-model.md)
-2. [Current State, Implemented Changes, And Roadmap](./current-state-and-roadmap.md)
+2. [Technical Paper](./paper.md)
+3. [Technical Whitepaper](./whitepaper.md)
+4. [Current State, Implemented Changes, And Roadmap](./current-state-and-roadmap.md)
 
 ## Scope of this folder
 

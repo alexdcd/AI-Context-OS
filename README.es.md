@@ -4,7 +4,10 @@
 
 Documento principal en inglés: [README.md](./README.md)
 
-Documentación extendida del sistema: [docs/README.md](./docs/README.md)
+Documentación extendida del sistema:
+- [Índice de Documentación](./docs/README.md)
+- [Paper Técnico](./docs/paper.md)
+- [Whitepaper Técnico](./docs/whitepaper.md)
 
 AI Context OS es una app desktop (`Tauri v2 + React + TypeScript + Rust`) que convierte una carpeta local en una capa de memoria universal y agnóstica de herramienta para agentes de IA.
 
@@ -60,36 +63,33 @@ Contenido largo y detallado.
 
 ## Estructura del workspace
 
+AI Context OS utiliza una arquitectura "Zero Gravity": la carpeta física donde reside un archivo tiene **impacto cero** en su clasificación semántica. El sistema escanea recursivamente y clasifica todo a través del frontmatter YAML.
+
 ```text
 ~/AI-Context-OS/
-├── 01-context/
-├── 02-daily/
-│   ├── YYYY-MM-DD.md
-│   ├── daily-log.jsonl
-│   └── sessions/
-├── 03-intelligence/
-├── 04-projects/
-├── 05-resources/
-├── 06-skills/
-├── 07-tasks/
-│   ├── task-xxxxxxxx.md
-│   └── backlog.jsonl
-├── 08-rules/
-├── 09-scratch/
+├── inbox/          ← zona de captura temporal (landing pad)
+├── sources/        ← referencias externas (solo lectura por defecto)
+├── .ai/            ← infraestructura oculta del sistema
+│   ├── rules/      ← reglas de comportamiento para agentes (máxima atención)
+│   ├── journal/    ← registros diarios y sesiones
+│   ├── tasks/      ← subsistema de seguimiento de tareas
+│   ├── scratch/    ← buffer temporal de salida de IA (basado en TTL)
+│   ├── config.yaml ← configuración del workspace
+│   └── index.yaml  ← catálogo L0 autogenerado
+├── User_Folders/   ← estructura cosmética del usuario (ej. Proyectos/, Notas/)
 ├── .cache/
-├── _config.yaml
-├── _index.yaml
-├── claude.md
+├── claude.md       ← master router (autogenerado)
 ├── .cursorrules
 └── .windsurfrules
 ```
 
 Notas:
 
-- El journal principal es `02-daily/YYYY-MM-DD.md`.
-- `daily-log.jsonl` es para entradas tipo sistema, no para el editor diario principal.
-- Las tareas son markdown con YAML en `07-tasks/`.
+- La infraestructura del sistema es fija: `inbox/`, `sources/` y `.ai/`. Todo lo demás es definido por el usuario.
+- Las páginas del Journal viven en `.ai/journal/YYYY-MM-DD.md`.
+- Las tareas son archivos markdown en `.ai/tasks/` con frontmatter YAML.
 - `claude.md` existe por compatibilidad, pero el objetivo arquitectónico es core neutral + adapters.
+- Mover un archivo de memoria entre carpetas de usuario **no** rompe la indexación — la clasificación viene del campo `type:` en el frontmatter.
 
 ## Qué está funcionando hoy (verificado)
 
