@@ -635,12 +635,11 @@ function filterExplorerTree(
   for (const node of nodes) {
     if (node.is_dir) {
       const filteredChildren = filterExplorerTree(node.children, showSystemFiles, false);
-      // Zero Gravity: all directories are shown (user controls their structure)
+      // Zero Gravity: show directory if it's at root level, is a special node, or has visible children
       const shouldShowDirectory =
         isRootLevel ||
         isSpecialWorkspaceNode(node) ||
-        filteredChildren.nodes.length > 0 ||
-        node.memory_type !== null;
+        filteredChildren.nodes.length > 0;
 
       hiddenCount += filteredChildren.hiddenCount;
 

@@ -265,9 +265,9 @@ fn create_developer_template(root: &std::path::Path) -> Result<(), String> {
         &[],
     )?;
 
-    // Context
+    // Context (written to inbox — type=context comes from frontmatter)
     write_memory_file(
-        root, ".ai/context", "stack-tecnologico.md", "stack-tecnologico",
+        root, "inbox", "stack-tecnologico.md", "stack-tecnologico",
         MemoryType::Context,
         "Stack tecnológico del proyecto principal",
         0.9,
