@@ -155,9 +155,7 @@ fn create_profile_memory(
         .map_err(|e| format!("Failed to serialize profile: {}", e))?;
 
     let paths = crate::core::paths::SystemPaths::new(root);
-    let path = paths.ai_dir().join("context/perfil-profesional.md");
-    fs::create_dir_all(paths.ai_dir().join("context")).ok();
-    fs::create_dir_all(path.parent().unwrap()).ok();
+    let path = paths.inbox_dir().join("perfil-profesional.md");
     fs::write(&path, content).map_err(|e| format!("Failed to write profile: {}", e))?;
 
     Ok(())
