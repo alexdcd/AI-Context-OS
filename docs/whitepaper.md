@@ -38,26 +38,25 @@ AI Context OS addresses all four problems with a single, file-based memory works
 
 ### The Workspace
 
-The workspace is a directory (`~/AI-Context-OS/` by default) with a fixed structure:
+The workspace is a directory (`~/AI-Context-OS/` by default) with a structure divided between fixed system infrastructure and completely free user space:
 
 ```
 ~/AI-Context-OS/
-├── inbox/          ← staging area for new content
-├── sources/        ← protected reference materials
-├── 01-context/     ← who you are, your stack, your conventions
-├── 02-daily/       ← daily log + journal (Logseq-style)
-├── 03-projects/    ← project-specific knowledge
-├── 04-skills/      ← reusable procedures
-├── 05-resources/   ← reference materials
-├── 06-decisions/   ← architectural decisions (ADRs)
-├── 07-tasks/       ← task tracking
-├── 08-rules/       ← behavioral rules for the AI
-├── 09-scratch/     ← temporary outputs (TTL-based cleanup)
-├── claude.md       ← auto-generated master router
-└── _index.yaml     ← auto-generated L0 catalog
+├── inbox/          ← temporary capture zone (landing pad)
+├── sources/        ← external references (read-only by default)
+├── .ai/            ← hidden system infrastructure
+│   ├── rules/      ← behavioral rules for AI agents (top attention)
+│   ├── journal/    ← daily logs and sessions
+│   ├── tasks/      ← subsystem for task tracking
+│   ├── scratch/    ← temporary AI output buffer (TTL-based)
+│   ├── config.yaml ← workspace configuration
+│   └── index.yaml  ← auto-generated L0 catalog
+├── User_Folders/   ← cosmetic, user-defined structure (e.g., Projects, Notes)
+├── claude.md       ← master router (auto-generated)
+└── .cursorrules    ← tool-specific adapter
 ```
 
-Every folder serves a distinct semantic purpose. This is not a generic file dump — it is a typed ontology.
+The system infrastructure is completely contained within the fixed `inbox/`, `sources/`, and the hidden `.ai/` directory. Everything else in the workspace is cosmetically structured by the user. The system uses a recursive scanner to find markdown files across all user-created directories (ignoring `.git` or `node_modules`), ensuring the engineer has absolute freedom to organize their files without breaking the AI's memory.
 
 ### Memory Files
 
@@ -118,8 +117,8 @@ The entire pipeline runs in Rust and completes in single-digit milliseconds for 
 
 The selected memories are assembled into a context document (`claude.md`) using attention positioning:
 
-- **Top**: Rules (08-rules/) — highest attention position
-- **Middle**: Selected memories at appropriate tiers
+- **Top**: System Rules (`.ai/rules/`) — the router is hardcoded to extract these behavioral constraints and inject them at the absolute top of the prompt window, guaranteeing maximum attention regardless of token budgets
+- **Middle**: Selected memories at appropriate tiers, injected based strictly on their hybrid multi-signal score, entirely ignoring where files are stored on disk
 - **Bottom**: L0 index — full catalog of available memories for agent reference
 
 This document is auto-generated and auto-regenerated whenever the workspace changes. Tool-specific adapters render variants for different tools:
@@ -222,7 +221,7 @@ Left unmanaged, any memory system accumulates stale information. AI Context OS i
 
 **God nodes**: Memories with high graph degree (many explicit links) but low engineer-assigned importance. This mismatch — the graph says it's central, the engineer hasn't reflected that — surfaces in a dedicated tab. Resolving it means bumping the importance score so the scoring engine reflects the structural reality of your knowledge base.
 
-**Scratch cleanup**: Files in `09-scratch/` older than their TTL — temporary outputs that should be archived or deleted.
+**Scratch cleanup**: Files in `.ai/scratch/` older than their TTL — temporary AI outputs that should be archived or deleted.
 
 **Health score**: A 0-100 composite metric visible in the app header at all times:
 
@@ -300,7 +299,7 @@ This gives you a complete audit trail of what your AI tools have been reading �
 │         │              │                │            │
 │  ┌──────▼──────────────▼────────────────▼───────┐   │
 │  │              Workspace (~/AI-Context-OS/)      │   │
-│  │  inbox/ sources/ 01-context/ ... 09-scratch/  │   │
+│  └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 │  │  claude.md  _index.yaml  .cache/              │   │
 │  └──────────────────────────┬────────────────────┘   │
 └─────────────────────────────┼──────────────────────┘
