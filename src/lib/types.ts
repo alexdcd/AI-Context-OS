@@ -197,10 +197,10 @@ export interface TaskFilter {
 }
 
 export const TASK_STATE_LABELS: Record<TaskState, string> = {
-  todo: "Por hacer",
-  in_progress: "En progreso",
-  done: "Hecho",
-  cancelled: "Cancelado",
+  todo: "Todo",
+  in_progress: "In Progress",
+  done: "Done",
+  cancelled: "Cancelled",
 };
 
 export const TASK_STATE_COLORS: Record<TaskState, string> = {
@@ -211,9 +211,9 @@ export const TASK_STATE_COLORS: Record<TaskState, string> = {
 };
 
 export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
-  a: "Alta",
-  b: "Media",
-  c: "Baja",
+  a: "High",
+  b: "Medium",
+  c: "Low",
 };
 
 export interface CreateMemoryInput {
@@ -344,21 +344,21 @@ export const MEMORY_TYPE_COLORS: Record<MemoryType, string> = {
 };
 
 export const MEMORY_TYPE_LABELS: Record<MemoryType, string> = {
-  source: "Fuente",
-  context: "Contexto",
+  source: "Source",
+  context: "Context",
   daily: "Daily",
-  intelligence: "Inteligencia",
-  project: "Proyecto",
-  resource: "Recurso",
+  intelligence: "Intelligence",
+  project: "Project",
+  resource: "Resource",
   skill: "Skill",
-  task: "Tarea",
-  rule: "Regla",
+  task: "Task",
+  rule: "Rule",
   scratch: "Scratch",
 };
 
 export const MEMORY_ONTOLOGY_LABELS: Record<MemoryOntology, string> = {
-  source: "Fuente",
-  entity: "Entidad",
-  concept: "Concepto",
-  synthesis: "Sintesis",
+  source: "Source",
+  entity: "Entity",
+  concept: "Concept",
+  synthesis: "Synthesis",
 };
