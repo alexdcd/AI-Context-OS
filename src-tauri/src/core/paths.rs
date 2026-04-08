@@ -141,3 +141,29 @@ pub fn enrich_memory_meta(meta: &mut MemoryMeta, path: &Path, root: &Path) {
     meta.folder_category = folder_category(path, root);
     meta.system_role = system_role(path, root);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn folder_category_uses_first_workspace_segment() {
+        let root = PathBuf::from("/workspace");
+        let path = root.join("ideas/nota.md");
+        assert_eq!(folder_category(&path, &root), Some("ideas".to_string()));
+    }
+
+    #[test]
+    fn system_role_detects_skills_and_rules_by_reserved_folder() {
+        let root = PathBuf::from("/workspace");
+        assert_eq!(
+            system_role(&root.join(".ai/skills/mi-skill.md"), &root),
+            Some(SystemRole::Skill)
+        );
+        assert_eq!(
+            system_role(&root.join(".ai/rules/mi-regla.md"), &root),
+            Some(SystemRole::Rule)
+        );
+        assert_eq!(system_role(&root.join("ideas/nota.md"), &root), None);
+    }
+}
