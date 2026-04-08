@@ -416,7 +416,7 @@ function TreeNode({
         }}
         data-explorer-dir-path={node.is_dir ? node.path : undefined}
         draggable={false}
-        title={canDrag ? "Arrastra para mover a otra carpeta" : undefined}
+        title={canDrag ? "Drag to move to another folder" : undefined}
         onClick={handleClick}
         onContextMenu={(event) => onContextMenu(event, node)}
         onPointerDown={(event) => {
@@ -482,7 +482,7 @@ function TreeNode({
         )}
 
         {isProtectedMemory && (
-          <span title="Archivo protegido">
+          <span title="Protected file">
             <Lock className="h-3 w-3 shrink-0 text-[color:var(--text-2)]" />
           </span>
         )}
@@ -495,13 +495,13 @@ function TreeNode({
                 ? "bg-[color:var(--warning)]"
                 : "bg-[color:var(--success)]",
             )}
-            title={memoryStatus === "unprocessed" ? "Sin procesar" : "Procesado"}
+            title={memoryStatus === "unprocessed" ? "Unprocessed" : "Processed"}
           />
         )}
 
         {isDropTarget && (
           <span className="rounded-full bg-[color:var(--accent)]/14 px-1.5 py-[1px] text-[10px] font-medium text-[color:var(--accent)]">
-            Soltar para mover
+            Drop to move
           </span>
         )}
 
@@ -944,7 +944,7 @@ export function FileExplorer() {
       return;
     }
     if (/[\\/]/.test(rawValue)) {
-      setError("El nombre no puede contener / ni \\");
+      setError("Name cannot contain / or \\");
       return;
     }
 
@@ -955,7 +955,7 @@ export function FileExplorer() {
       if (isManagedMemory) {
         const newId = normalizeMemoryId(rawValue);
         if (!newId) {
-          setError("El nombre de la memoria no es valido");
+          setError("Memory name is not valid");
           return;
         }
         if (newId === stripMdExtension(renamingTarget.name)) {
@@ -990,13 +990,13 @@ export function FileExplorer() {
     try {
       await navigator.clipboard.writeText(node.path);
     } catch {
-      setError("No se pudo copiar la ruta al portapapeles");
+      setError("Could not copy path to clipboard");
     }
   };
 
   const handleDelete = async (node: FileNode) => {
-    const label = node.is_dir ? `la carpeta "${node.name}"` : `el archivo "${node.name}"`;
-    if (!window.confirm(`¿Seguro que quieres borrar ${label}?`)) return;
+    const label = node.is_dir ? `the folder "${node.name}"` : `the file "${node.name}"`;
+    if (!window.confirm(`Are you sure you want to delete ${label}?`)) return;
 
     try {
       await deletePath(node.path);
@@ -1047,7 +1047,7 @@ export function FileExplorer() {
 
     try {
       const nextName = uniqueName(
-        "nueva-carpeta",
+        "new-folder",
         new Set(node.children.map((child) => child.name)),
       );
       const createdPath = await createDirectory(`${node.path}/${nextName}`);
@@ -1065,7 +1065,7 @@ export function FileExplorer() {
 
     const memoryType = inferFolderTypeFromPath(node.path);
     if (!memoryType) {
-      setError("Solo se pueden crear notas dentro de carpetas de memoria");
+      setError("Notes can only be created inside memory folders");
       return;
     }
 
@@ -1107,13 +1107,13 @@ export function FileExplorer() {
       // Toolbar folder → always at workspace root
       const rootPath = fileTree.length > 0 ? getParentPath(fileTree[0].path) : null;
       if (!rootPath) {
-        setError("No hay un workspace configurado");
+        setError("No workspace configured");
         return;
       }
       void (async () => {
         try {
           const existingNames = new Set(fileTree.map((n) => n.name));
-          const nextName = uniqueName("nueva-carpeta", existingNames);
+          const nextName = uniqueName("new-folder", existingNames);
           const createdPath = await createDirectory(`${rootPath}/${nextName}`);
           await loadFileTree();
           setRenamingTarget({ path: createdPath, name: nextName, isDir: true });
@@ -1135,7 +1135,7 @@ export function FileExplorer() {
       };
       const targetDir = findTargetDir();
       if (!targetDir) {
-        setError("No hay una carpeta de memoria disponible");
+        setError("No memory folder available");
         return;
       }
       openDirectory(targetDir.path);
@@ -1157,7 +1157,7 @@ export function FileExplorer() {
       directory: true,
       multiple: false,
       defaultPath: getParentPath(node.path),
-      title: "Mover archivo a...",
+      title: "Move file to...",
     });
     if (!destination || Array.isArray(destination)) return;
 
@@ -1347,36 +1347,36 @@ export function FileExplorer() {
       ? [
           [
             {
-              label: "Nueva nota",
+              label: "New note",
               icon: FilePlus,
               onSelect: () => handleCreateNote(currentNode),
               disabled: !currentFolderSupportsNotes || isInboxNode(currentNode),
             },
             {
-              label: "Nueva carpeta",
+              label: "New folder",
               icon: FolderPlus,
               onSelect: () => handleCreateFolder(currentNode),
             },
           ],
           [
             {
-              label: "Copiar ruta",
+              label: "Copy path",
               icon: Clipboard,
               onSelect: () => handleCopyPath(currentNode),
             },
             {
-              label: "Mostrar en Finder",
+              label: "Show in Finder",
               icon: FolderSearch,
               onSelect: () => handleShowInFinder(currentNode),
             },
             {
-              label: "Renombrar",
+              label: "Rename",
               icon: Pencil,
               onSelect: () => startRename(currentNode),
               disabled: currentNodeIsProtected,
             },
             {
-              label: "Borrar",
+              label: "Delete",
               icon: Trash2,
               onSelect: () => handleDelete(currentNode),
               danger: true,
@@ -1387,7 +1387,7 @@ export function FileExplorer() {
       : [
           [
             {
-              label: "Duplicar",
+              label: "Duplicate",
               icon: Copy,
               onSelect: () => handleDuplicate(currentNode),
               disabled: currentNodeIsProtected,
@@ -1395,7 +1395,7 @@ export function FileExplorer() {
             ...(currentNodeIsManagedMemory
               ? [
                   {
-                    label: "Mover archivo a...",
+                    label: "Move file to...",
                     icon: MoveRight,
                     onSelect: () => handleMoveMemory(currentNode),
                     disabled: currentNodeIsProtected,
@@ -1405,23 +1405,23 @@ export function FileExplorer() {
           ],
           [
             {
-              label: "Copiar ruta",
+              label: "Copy path",
               icon: Clipboard,
               onSelect: () => handleCopyPath(currentNode),
             },
             {
-              label: "Mostrar en Finder",
+              label: "Show in Finder",
               icon: FolderSearch,
               onSelect: () => handleShowInFinder(currentNode),
             },
             {
-              label: "Renombrar",
+              label: "Rename",
               icon: Pencil,
               onSelect: () => startRename(currentNode),
               disabled: currentNodeIsProtected,
             },
             {
-              label: "Borrar",
+              label: "Delete",
               icon: Trash2,
               onSelect: () => handleDelete(currentNode),
               danger: true,
@@ -1481,7 +1481,7 @@ export function FileExplorer() {
 
       {visibleTree.length === 0 && (
         <p className="px-3 py-8 text-center text-xs text-[color:var(--text-2)]">
-          {showSystemFiles ? "No hay archivos todavía." : "No hay memorias visibles en esta vista."}
+          {showSystemFiles ? "No files yet." : "No visible memories in this view."}
         </p>
       )}
 
@@ -1496,7 +1496,7 @@ export function FileExplorer() {
           ) : (
             <EyeOff className="h-3 w-3 shrink-0" />
           )}
-          <span>{showSystemFiles ? "Modo experto" : "Archivos de sistema ocultos"}</span>
+          <span>{showSystemFiles ? "Expert mode" : "System files hidden"}</span>
         </button>
       )}
 
@@ -1522,7 +1522,7 @@ export function FileExplorer() {
             {dragPreview.name}
           </span>
           <span className="rounded-full bg-[color:var(--accent)]/12 px-1.5 py-[1px] text-[10px] uppercase tracking-wide text-[color:var(--accent)]">
-            mover
+            move
           </span>
         </div>
       )}

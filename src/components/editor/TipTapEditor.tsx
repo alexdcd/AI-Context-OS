@@ -74,7 +74,7 @@ export function TipTapEditor({
   if (!editor) {
     return (
       <div className="rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] p-3 text-sm text-[color:var(--text-2)]">
-        Cargando...
+        Loading...
       </div>
     );
   }

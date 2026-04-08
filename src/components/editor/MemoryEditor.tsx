@@ -862,7 +862,7 @@ function parseJsonl(content: string): Array<{
         line: index + 1,
         raw: line,
         pretty: line,
-        error: `Error al parsear JSON: ${String(e)}`,
+        error: `Error parsing JSON: ${String(e)}`,
       });
     }
   });

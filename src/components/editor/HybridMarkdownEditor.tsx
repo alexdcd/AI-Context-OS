@@ -208,7 +208,7 @@ export function HybridMarkdownEditor({
           />
         ) : (
           <p className="px-1 py-0.5 text-sm text-[color:var(--text-2)]/40">
-            {placeholder ?? "Escribe aquí..."}
+            {placeholder ?? "Type here..."}
           </p>
         )}
       </div>
