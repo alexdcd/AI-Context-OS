@@ -231,7 +231,8 @@ fn main() {
             std::fs::write(root.join("claude.md"), &claude_md).unwrap();
 
             let index_yaml = generate_index_yaml(&metas);
-            std::fs::write(root.join("_index.yaml"), &index_yaml).unwrap();
+            let paths = core::paths::SystemPaths::new(&root);
+            std::fs::write(paths.index_yaml(), &index_yaml).unwrap();
 
             let cursorrules = render_cursor_adapter(&neutral);
             std::fs::write(root.join(".cursorrules"), &cursorrules).ok();
@@ -239,7 +240,7 @@ fn main() {
             std::fs::write(root.join(".windsurfrules"), &windsurfrules).ok();
 
             println!(
-                "Regenerated: claude.md, _index.yaml, .cursorrules, .windsurfrules ({} memories)",
+                "Regenerated: claude.md, .ai/index.yaml, .cursorrules, .windsurfrules ({} memories)",
                 metas.len()
             );
         }

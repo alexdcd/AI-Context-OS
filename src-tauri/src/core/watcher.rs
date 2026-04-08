@@ -76,8 +76,10 @@ pub fn start_watcher(
                         }
                         if path_str.ends_with("/claude.md")
                             || path_str.ends_with("\\claude.md")
-                            || path_str.ends_with("/_index.yaml")
-                            || path_str.ends_with("\\_index.yaml")
+                            || path_str.ends_with("/.ai/index.yaml")
+                            || path_str.ends_with("\\.ai\\index.yaml")
+                            || path_str.ends_with("/.ai/config.yaml")
+                            || path_str.ends_with("\\.ai\\config.yaml")
                             || path_str.ends_with("/.cursorrules")
                             || path_str.ends_with("\\.cursorrules")
                             || path_str.ends_with("/.windsurfrules")
