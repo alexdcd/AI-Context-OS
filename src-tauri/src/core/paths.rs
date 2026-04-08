@@ -16,6 +16,10 @@ pub const SOURCES_DIR: &str = "sources";
 
 pub const SCAN_SKIP_DIRS: &[&str] = &[".git", "node_modules", ".cache"];
 
+/// `.ai/` subdirectories that are system-managed and should NOT be indexed as memories.
+/// Rules, skills, and context subdirs ARE scannable (they contain user-authored memory files).
+pub const AI_SKIP_SUBDIRS: &[&str] = &["tasks", "scratch", "journal"];
+
 impl SystemPaths {
     pub fn new(root: &Path) -> Self {
         Self {

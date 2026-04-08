@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::core::frontmatter::parse_frontmatter;
-use crate::core::paths::SCAN_SKIP_DIRS;
+use crate::core::paths::{AI_DIR, AI_SKIP_SUBDIRS, SCAN_SKIP_DIRS};
 use crate::core::types::MemoryMeta;
 
 /// Scan the entire workspace recursively and collect all memory metadata.
@@ -27,6 +27,12 @@ fn scan_dir_recursive(dir: &Path, results: &mut Vec<(MemoryMeta, String)>) {
         if path.is_dir() {
             // Skip directories that should never be scanned
             if SCAN_SKIP_DIRS.iter().any(|skip| *skip == name.as_ref()) {
+                continue;
+            }
+            // Skip system-managed .ai/ subdirs that don't contain memory files
+            if dir.file_name().map_or(false, |d| d == AI_DIR)
+                && AI_SKIP_SUBDIRS.iter().any(|skip| *skip == name.as_ref())
+            {
                 continue;
             }
             scan_dir_recursive(&path, results);
