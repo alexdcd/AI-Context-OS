@@ -7,7 +7,7 @@
 
 ## Abstract
 
-Large language models exhibit a fundamental architectural limitation: they are stateless across sessions. Every conversation begins without memory of prior interactions, decisions, code written, or domain knowledge accumulated. The engineering community has converged on two dominant responses to this limitation — retrieval-augmented generation (RAG) with vector databases, and manually maintained context files — each carrying significant costs in transparency, portability, and cognitive overhead. This paper proposes a third approach: treating the local filesystem as the native substrate for AI agent memory, structured through a principled ontology of typed memory files, hierarchical content tiers, and a hybrid multi-signal scoring engine that selects and delivers context adaptively within token budgets. We describe the architecture of AI Context OS, a desktop application implementing this model, and argue that filesystem-native memory is not merely a pragmatic compromise but a theoretically superior primitive for human-AI collaborative work: it is inspectable, versionable, portable, composable, and simultaneously legible by both humans and machines. We discuss the governance problem (memory aging, conflict, consolidation), the MCP integration layer that exposes memory to any AI tool, and compare the approach against existing alternatives along dimensions of transparency, control, and scalability.
+Large language models exhibit a fundamental architectural limitation: they are stateless across sessions. Every conversation begins without memory of prior interactions, decisions, code written, or domain knowledge accumulated. The engineering community has converged on two dominant responses to this limitation — retrieval-augmented generation (RAG) with vector databases, and manually maintained context files — each carrying significant costs in transparency, portability, and cognitive overhead. This paper proposes a third approach: treating the local filesystem as the native substrate for AI agent memory, structured through a principled ontology of typed memory files, a metadata-driven ontology completely decoupled from physical folder structures, hierarchical content tiers, and a hybrid multi-signal scoring engine that selects and delivers context adaptively within token budgets. We describe the architecture of AI Context OS, a desktop application implementing this model, and argue that filesystem-native memory is not merely a pragmatic compromise but a theoretically superior primitive for human-AI collaborative work: it is inspectable, versionable, portable, composable, and simultaneously legible by both humans and machines. We discuss the governance problem (memory aging, conflict, consolidation), the MCP integration layer that exposes memory to any AI tool, and compare the approach against existing alternatives along dimensions of transparency, control, and scalability.
 
 ---
 
@@ -145,29 +145,25 @@ AI Context OS provides all of these layers on top of the file primitive.
 
 ### 4.1 The Workspace as a Structured Filesystem
 
-The AI Context OS workspace is a directory on the local filesystem, typically located at `~/AI-Context-OS/`. Its structure is defined by a fixed ontology of typed subdirectories:
+The AI Context OS workspace relies on a "Zero Gravity" architecture. It completely decouples a file's physical location from its semantic meaning, dividing the workspace into a rigid system infrastructure and a completely free user space. The structure is defined as follows:
 
 ```
 ~/AI-Context-OS/
-├── inbox/          ← temporary capture zone (staging)
-├── sources/        ← accepted sources (protected, read-only by default)
-├── 01-context/     ← static user/project information
-├── 02-daily/       ← daily logs and journal (Logseq-style outliner)
-├── 03-projects/    ← project-specific memories
-├── 04-skills/      ← reusable procedures and how-tos
-├── 05-resources/   ← reference materials
-├── 06-decisions/   ← architectural and design decisions
-├── 07-tasks/       ← task tracking
-├── 08-rules/       ← behavioral rules for AI agents
-├── 09-scratch/     ← temporary workspace (TTL-based expiry)
+├── inbox/          ← temporary capture zone (landing pad)
+├── sources/        ← external references (read-only by default)
+├── .ai/            ← hidden system infrastructure
+│   ├── rules/      ← behavioral rules for AI agents (top attention)
+│   ├── journal/    ← daily logs and sessions
+│   ├── tasks/      ← subsystem for task tracking
+│   ├── scratch/    ← temporary AI output buffer (TTL-based)
+│   ├── config.yaml ← workspace configuration
+│   └── index.yaml  ← auto-generated L0 catalog
+├── User_Folders/   ← cosmetic, user-defined structure (e.g., Projects, Notes)
 ├── claude.md       ← master router (auto-generated)
-├── _index.yaml     ← auto-generated L0 catalog
-└── _config.yaml    ← workspace configuration
+└── .cursorrules    ← tool-specific adapter
 ```
 
-The numbering of directories is significant: it encodes a default priority order that the delivery layer uses for attention positioning. Rules (08) always appear first in the generated context; scratch (09) is deprioritized.
-
-The `inbox/` directory serves as a capture staging area. External files, web content, or documents can be dropped here for human review before being promoted to a permanent location in the typed hierarchy. The `sources/` directory stores accepted reference materials that are protected from accidental modification.
+The system infrastructure is completely contained within the fixed `inbox/`, `sources/`, and the hidden `.ai/` directory. Everything else in the workspace is cosmetically structured by the user. The system uses a recursive scanner to find markdown files across all user-created directories (ignoring `.git` or `node_modules`), ensuring the engineer has absolute freedom to organize their files without breaking the AI's memory.
 
 ### 4.2 YAML Frontmatter as the Metadata Layer
 
@@ -190,6 +186,8 @@ protected: false     # if true, requires explicit unlock to edit
 ```
 
 The `type` field encodes the memory's position in the ontology, which determines its default scoring profile, its decay characteristics, and its rendering in the router. The `importance` field is set by the engineer and carries their assessment of the memory's centrality — high-importance memories are loaded even when less directly relevant. The `l0` field contains the one-line summary that is always available without loading the full file. The `related` field enables graph-based connectivity scoring.
+
+Crucially, this frontmatter is the absolute source of truth for the system. Because AI Context OS operates on a "Zero Gravity" principle, the physical folder a file resides in has zero impact on its semantic classification. An engineer can move a `type: decision` file from a root folder into a deeply nested `/Projects/Backend/Archive/` directory, and the system will continue to index, score, and retrieve it perfectly based solely on its YAML metadata.
 
 ### 4.3 The L0/L1/L2 Tiered Content Model
 
@@ -279,8 +277,10 @@ The output of the scoring engine is a ranked, token-budgeted selection of memori
 
 The design of the router is informed by the "lost in the middle" phenomenon (Liu et al., 2023): language models attend most reliably to content at the beginning and end of their context window. The router exploits this by using a principled attention positioning strategy:
 
-1. **Rules** appear first — these are the behavioral constraints the AI should always follow
-2. **L0 index** appears last — giving the AI a full catalog of available memories it can request
+1. **System Rules (`.ai/rules/`)** appear first — the router is hardcoded to extract these behavioral constraints and inject them at the absolute top of the prompt window, guaranteeing maximum attention regardless of token budgets.
+2. **L0 index** appears last — giving the AI a full catalog of available memories it can request.
+
+Between these two anchors, the router injects the dynamically retrieved memories based strictly on their hybrid multi-signal score, entirely ignoring where the user has chosen to store those files on their local disk.
 
 The router generates a neutral intermediate representation (`claude.md`, `_index.yaml`) that is then adapted by tool-specific adapters:
 
@@ -324,11 +324,11 @@ AI Context OS implements a governance layer that monitors the memory corpus and 
 
 **Conflict detection**: Memories that contain contradictory information, detected through a combination of tag overlap and semantic similarity. Two memories with high semantic similarity but marked as different types, or with high token overlap and different importance scores, are flagged as potential conflicts.
 
-**Consolidation suggestions**: Clusters of memories with high topical overlap that might be merged into a single, more comprehensive memory. This addresses the accumulation of redundant information across multiple files.
+**Consolidation suggestions**: Clusters of memories with high topical overlap that might be merged. The system suggests a unified `type` for the consolidated memory, allowing the user to merge redundant information without dictating where the resulting file must be saved.
 
 **God nodes**: A structural analysis of the memory graph identifies nodes with high degree centrality — memories that many other memories link to. These are compared against the engineer-assigned importance score. A memory with high degree centrality but low importance score represents a calibration mismatch: the graph structure indicates the memory is central to the knowledge base, but the engineer has not recognized this in their explicit importance assignment. These candidates are surfaced in the governance view for importance recalibration, helping the scoring engine better reflect structural reality.
 
-**Scratch TTL**: The `09-scratch/` directory is a temporary workspace for volatile content (large tool outputs, exploratory notes, intermediate computations). Files here automatically become candidates for cleanup after a configurable TTL, preventing the accumulation of debris.
+**Scratch TTL**: The `.ai/scratch/` directory is a hidden system workspace for volatile AI output (large tool outputs, intermediate computations). Files here automatically become candidates for cleanup after a configurable TTL, preventing the accumulation of debris.
 
 ### 5.3 The Health Score
 
@@ -366,6 +366,7 @@ We compare AI Context OS against the three alternatives discussed in Section 2 a
 | Agent-writable memory | ✓ | ✓ | ✓ | ✗ |
 | Typed ontology | ✓ | Partial | ✗ | ✗ |
 | Scales with project size | ✓ | ✓ | ✗ | ✗ |
+| Directory-structure agnostic | ✓ | ✓ | N/A | ✗ |
 
 The most significant differentiators are inspectable retrieval and zero infrastructure. RAG systems are powerful but opaque and heavyweight. Conversation history is transparent but fails to scale and is tool-specific. Manual context files are transparent and portable but do not scale and have no dynamic retrieval. AI Context OS combines the transparency of manual files with dynamic, scored retrieval and multi-tool portability.
 
