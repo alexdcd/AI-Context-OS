@@ -18,7 +18,7 @@ pub fn get_conflicts(state: State<AppState>) -> Result<Vec<Conflict>, String> {
 
     let mut memories = Vec::new();
     for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(std::path::Path::new(path)) {
+        if let Ok(mem) = read_memory(&root, std::path::Path::new(path)) {
             memories.push(mem);
         }
     }

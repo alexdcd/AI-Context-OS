@@ -15,7 +15,7 @@ pub fn get_graph_data(state: State<AppState>) -> Result<GraphData, String> {
 
     let mut memories = Vec::new();
     for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(std::path::Path::new(path)) {
+        if let Ok(mem) = read_memory(&root, std::path::Path::new(path)) {
             memories.push(mem);
         }
     }
@@ -32,7 +32,7 @@ pub fn get_god_nodes(state: State<AppState>) -> Result<Vec<GodNode>, String> {
 
     let mut memories = Vec::new();
     for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(std::path::Path::new(path)) {
+        if let Ok(mem) = read_memory(&root, std::path::Path::new(path)) {
             memories.push(mem);
         }
     }
