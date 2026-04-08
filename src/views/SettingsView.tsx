@@ -42,7 +42,7 @@ export function SettingsView() {
     });
     if (!result) return;
     const ok = window.confirm(
-      "¿Restaurar backup? Los archivos actuales serán sobreescritos."
+      "Restore backup? Current files will be overwritten."
     );
     if (!ok) return;
     setRestoreStatus("loading");
@@ -58,19 +58,19 @@ export function SettingsView() {
   }, [initialize]);
 
   const themeOptions: { value: Theme; label: string; icon: typeof Monitor; describe: string }[] = [
-    { value: "system", label: "Sistema", icon: Monitor, describe: "Sigue la apariencia de tu sistema operativo" },
-    { value: "light", label: "Claro", icon: Sun, describe: "Siempre usar el tema claro" },
-    { value: "dark", label: "Oscuro", icon: Moon, describe: "Siempre usar el tema oscuro" },
+    { value: "system", label: "System", icon: Monitor, describe: "Follows your operating system's appearance" },
+    { value: "light", label: "Light", icon: Sun, describe: "Always use light theme" },
+    { value: "dark", label: "Dark", icon: Moon, describe: "Always use dark theme" },
   ];
 
   return (
     <div className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="mb-8 text-2xl font-semibold text-[color:var(--text-0)]">Ajustes</h1>
+        <h1 className="mb-8 text-2xl font-semibold text-[color:var(--text-0)]">Settings</h1>
 
         {/* Appearance */}
         <section className="obs-panel border border-[color:var(--border)] p-6">
-          <h2 className="mb-4 text-lg font-medium text-[color:var(--text-0)]">Apariencia</h2>
+          <h2 className="mb-4 text-lg font-medium text-[color:var(--text-0)]">Appearance</h2>
 
           <div className="flex flex-col gap-3">
             {themeOptions.map((option) => {
@@ -115,9 +115,9 @@ export function SettingsView() {
         </section>
 
         <section className="obs-panel border border-[color:var(--border)] p-6">
-          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">Explorador</h2>
+          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">Explorer</h2>
           <p className="mb-4 text-sm text-[color:var(--text-2)]">
-            Activa los controles avanzados del explorador solo si quieres trabajar también con archivos internos.
+            Enable advanced explorer controls only if you want to work with internal files.
           </p>
 
           <button
@@ -132,11 +132,11 @@ export function SettingsView() {
             <div className="flex-1">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="font-medium text-[color:var(--text-0)]">Modo experto</div>
+                  <div className="font-medium text-[color:var(--text-0)]">Expert mode</div>
                   <p className="mt-2 text-sm text-[color:var(--text-2)]">
                     {expertModeEnabled
-                      ? "Los controles avanzados ya están disponibles en esta pantalla y al final del explorador."
-                      : "Oculta archivos internos y evita ruido visual para la mayoría de usuarios."}
+                      ? "Advanced controls are now available on this screen and at the bottom of the explorer."
+                      : "Hides internal files and prevents visual noise for most users."}
                   </p>
                 </div>
                 <span
@@ -175,7 +175,7 @@ export function SettingsView() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-[color:var(--text-0)]">Mostrar archivos del sistema</span>
+                  <span className="font-medium text-[color:var(--text-0)]">Show system files</span>
                   <span
                     className={clsx(
                       "rounded-full px-2 py-0.5 text-[11px] font-medium",
@@ -184,13 +184,13 @@ export function SettingsView() {
                         : "bg-[color:var(--bg-2)] text-[color:var(--text-2)]"
                     )}
                   >
-                    {showSystemFiles ? "Activo" : "Ocultos"}
+                    {showSystemFiles ? "Active" : "Hidden"}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-[color:var(--text-2)]">
                   {showSystemFiles
-                    ? "Verás YAML, JSONL, claude.md y otros artefactos avanzados junto a las memorias."
-                    : "Mantiene el explorador centrado en memorias, aunque el modo experto siga disponible."}
+                    ? "You will see YAML, JSONL, claude.md and other advanced artifacts alongside memories."
+                    : "Keeps the explorer focused on memories, although expert mode remains available."}
                 </p>
               </div>
             </button>
@@ -201,7 +201,7 @@ export function SettingsView() {
         <section className="obs-panel border border-[color:var(--border)] p-6">
           <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">Backup & Restore</h2>
           <p className="mb-4 text-sm text-[color:var(--text-2)]">
-            Exporta o importa todo tu workspace como archivo .zip
+            Export or import your entire workspace as a .zip file
           </p>
 
           <div className="flex flex-col gap-3">
@@ -218,13 +218,13 @@ export function SettingsView() {
                 <Download className="h-5 w-5 text-[color:var(--text-1)]" />
               )}
               <div>
-                <span className="font-medium text-[color:var(--text-1)]">Exportar backup</span>
+                <span className="font-medium text-[color:var(--text-1)]">Export backup</span>
                 <p className="mt-0.5 text-sm text-[color:var(--text-2)]">
                   {backupStatus === "done"
-                    ? "Backup creado correctamente"
+                    ? "Backup created successfully"
                     : backupStatus === "error"
-                      ? "Error al crear backup"
-                      : "Guarda una copia de seguridad de todo el workspace"}
+                      ? "Error creating backup"
+                      : "Save a backup of the entire workspace"}
                 </p>
               </div>
             </button>
@@ -242,13 +242,13 @@ export function SettingsView() {
                 <Upload className="h-5 w-5 text-[color:var(--text-1)]" />
               )}
               <div>
-                <span className="font-medium text-[color:var(--text-1)]">Restaurar backup</span>
+                <span className="font-medium text-[color:var(--text-1)]">Restore backup</span>
                 <p className="mt-0.5 text-sm text-[color:var(--text-2)]">
                   {restoreStatus === "done"
-                    ? "Workspace restaurado correctamente"
+                    ? "Workspace restored successfully"
                     : restoreStatus === "error"
-                      ? "Error al restaurar backup"
-                      : "Importa un archivo .zip para reemplazar el workspace actual"}
+                      ? "Error restoring backup"
+                      : "Import a .zip file to replace the current workspace"}
                 </p>
               </div>
             </button>

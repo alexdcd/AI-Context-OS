@@ -59,7 +59,7 @@ export function ExplorerView() {
         <aside className="flex w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[color:var(--bg-0)] transition-all duration-300">
         <div className="flex shrink-0 h-[38px] items-center justify-between px-3 border-b border-[var(--border)]">
           <span className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
-            Memorias
+            Memories
             <span className="ml-1.5 font-normal tabular-nums">{memories.length}</span>
           </span>
           <div className="flex gap-0.5">
@@ -72,7 +72,7 @@ export function ExplorerView() {
                     ? "text-[color:var(--accent)] hover:bg-[color:var(--accent-muted)]"
                     : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
                 )}
-                title={showSystemFiles ? "Ocultar archivos del sistema" : "Mostrar archivos del sistema"}
+                title={showSystemFiles ? "Hide system files" : "Show system files"}
               >
                 {showSystemFiles ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               </button>
@@ -80,21 +80,21 @@ export function ExplorerView() {
             <button
               onClick={() => setPendingCreate("file")}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="Nueva nota (Cmd+N)"
+              title="New note (Cmd+N)"
             >
               <FilePlus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setPendingCreate("folder")}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="Nueva carpeta"
+              title="New folder"
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleRegenerate}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="Regenerar router"
+              title="Regenerate router"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>

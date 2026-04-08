@@ -13,7 +13,7 @@ Tauri v2 desktop app. Files ARE the database: ~/AI-Context-OS/ con `inbox/`, `so
 - **Journal: 02-daily/YYYY-MM-DD.md** (outliner bullets estilo Logseq). El daily-log.jsonl es SOLO para eventos de sistema
 - **Tasks: 07-tasks/task-{id}.md** con frontmatter YAML (state/priority)
 - **Ingesta:** `inbox/` es staging, `sources/` guarda fuentes aceptadas. `protected: true` bloquea edición salvo desbloqueo explícito.
-- **UI text en español** (labels, placeholders, empty states)
+- **UI text en inglés** (labels, placeholders, empty states) — inglés es el idioma base de la app; el español u otros idiomas se añaden vía i18n encima
 - **CSS variables para todo el theming** (--bg-0..3, --text-0..2, --accent, --border), nunca colores hardcoded
 
 ## IPC Commands (tauri.ts ↔ lib.rs)
