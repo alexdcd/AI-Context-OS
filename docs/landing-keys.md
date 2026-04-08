@@ -6,22 +6,22 @@
 ---
 
 ## Hero Section
+The Soul of your AI.
+A local, portable, and universal 🧠 for any LLM -> from local models to frontier systems.
+
+MEMM OS is the native intelligence layer that captures your reasoning, wisdom, and project history. Stop re-explaining, resultados inconsistentes y quema de tokens (dinero); give your AI a persistent memory it actually controls.
 
 ### Headline options (pick one, A/B test)
 
-**A (problem-first):**
-> Your AI starts every session with amnesia.
-> AI Context OS gives it a memory worth trusting.
+
 
 **B (solution-first):**
-> Persistent, inspectable memory for every AI tool you use.
+> Persistent, inspectable memory for every AI tool you use. (añade que crece y se perfecciona)
 > Built on files. Owned by you.
 
-**C (contrast-first):**
-> Stop re-explaining your codebase every morning.
 
 ### Subheadline
-> AI Context OS is a desktop app that manages your AI context as structured local files — scored, governed, and delivered to Claude, Cursor, Windsurf, and Codex through a single MCP server.
+> AI Context OS is a desktop app that manages your AI context as structured local files — scored, governed, and delivered to (any model) through a single MCP server.
 
 ### Primary CTA
 > **Download for Mac** (0.1.0 · free · open source)
@@ -120,7 +120,7 @@ Screenshot of the Simulation view: a query typed in, and a list of scored memori
 
 *One table or comparison block. Keep it factual, not smug.*
 
-| | AI Context OS | RAG / vector DB | Manual CLAUDE.md |
+| | AI Context OS | RAG / vector DB | Manual CLAUDE.md | (añadir Legacy (Obsidian)	)
 |--|:--:|:--:|:--:|
 | You can read the memory | ✓ | ✗ | ✓ |
 | You can see what AI will retrieve | ✓ | ✗ | — |
@@ -128,6 +128,17 @@ Screenshot of the Simulation view: a query typed in, and a list of scored memori
 | No database infrastructure | ✓ | ✗ | ✓ |
 | Scales with project complexity | ✓ | ✓ | ✗ |
 | Built-in governance & health | ✓ | ✗ | ✗ |
+
+
+datos para tabal mejroada: 
+Capability	MEMM OS	Vector RAG (Embeddings)	Legacy (Obsidian)	Manual Context
+Inspectable Retrieval	Yes (Transparent)	No (Blackbox)	Manual only	Full
+Real-time Token Budgeting	Yes (Tiered L0-L2)	Static Window	None	Manual / Slow
+Era-Native Design	Born for AI	Partial Adapter	Legacy Adaptation	N/A
+Local Model Support	Native / Hybrid	Limited / API intensive	Via Plugins	High
+Context Health & Decay	Automated	Static Database	Human Maintenance	Rotting
+Sovereign Portability	Filesystem-Native	DB Lock-in	Filesystem-Native	High
+Infrastructure Required	Zero (Local App)	Vector DB / Cloud	Local (App)	None
 
 ---
 
