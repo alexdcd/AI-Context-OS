@@ -123,7 +123,7 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
         </Field>
       )}
 
-      <Field label="Ontologia">
+      <Field label="Type (AI Ontology)">
         <select
           value={meta.ontology}
           onChange={(e) => update({ ontology: e.target.value as MemoryOntology })}

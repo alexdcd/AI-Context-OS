@@ -321,10 +321,10 @@ export const MEMORY_ONTOLOGY_COLORS: Record<MemoryOntology, string> = {
 };
 
 export const MEMORY_ONTOLOGY_LABELS: Record<MemoryOntology, string> = {
-  source: "Fuente",
-  entity: "Entidad",
-  concept: "Concepto",
-  synthesis: "Sintesis",
+  source: "Source",
+  entity: "Entity",
+  concept: "Concept",
+  synthesis: "Synthesis",
 };
 
 export const SYSTEM_ROLE_LABELS: Record<SystemRole, string> = {
