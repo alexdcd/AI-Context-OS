@@ -6,6 +6,8 @@ Tauri v2 desktop app. Files ARE the database: ~/AI-Context-OS/ con carpetas, arc
 
 - **Nuevo comando Rust → registrar en 3 sitios**: `core/mod.rs`, `commands/mod.rs`, Y `lib.rs` invoke_handler. **Actualizar también la sección IPC de este AGENTS.md**
 - **types.ts debe ser espejo exacto de types.rs** — desajustes causan fallos IPC silenciosos
+- **`type` en frontmatter = ontología** (`source/entity/concept/synthesis`) — la categoría visible se deriva de la carpeta actual, no se persiste
+- **Skills/Rules dependen de carpeta reservada** — `.ai/skills` y `.ai/rules` activan comportamiento del sistema; no existe ya `memory_type`
 - **Todos los useState ANTES de cualquier return condicional** — violar esto causa pantalla negra
 - **titleBarStyle: "Overlay"** — traffic lights de macOS se solapan; top bar tiene spacer de 72px con data-tauri-drag-region
 - **TipTap sin toolbar** — formato markdown solo por atajos de teclado, diseño intencional
