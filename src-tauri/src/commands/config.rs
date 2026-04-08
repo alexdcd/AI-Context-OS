@@ -4,50 +4,23 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 use crate::core::jsonl::create_jsonl_with_schema;
+use crate::core::paths::SystemPaths;
 use crate::core::types::Config;
 use crate::core::watcher::start_watcher;
 use crate::state::AppState;
 
-const LEGACY_FOLDER_MIGRATIONS: [(&str, &str); 11] = [
-    ("00-inbox", "inbox"),
-    ("01-sources", "sources"),
-    ("02-context", "01-context"),
-    ("03-daily", "02-daily"),
-    ("04-intelligence", "03-intelligence"),
-    ("05-projects", "04-projects"),
-    ("06-resources", "05-resources"),
-    ("07-skills", "06-skills"),
-    ("08-tasks", "07-tasks"),
-    ("09-rules", "08-rules"),
-    ("10-scratch", "09-scratch"),
-];
-
 /// Create the workspace directory structure and starter files.
 /// Reusable by both init_workspace and onboarding.
 pub fn create_workspace_structure(root: &Path, active_tools: &[String]) -> Result<Config, String> {
-    // Create all directories
-    let dirs = [
-        "inbox",
-        "sources",
-        "01-context",
-        "02-daily",
-        "02-daily/sessions",
-        "03-intelligence",
-        "04-projects",
-        "05-resources",
-        "06-skills",
-        "07-tasks",
-        "08-rules",
-        "09-scratch",
-        ".cache",
-    ];
+    let paths = SystemPaths::new(root);
 
-    for dir in &dirs {
-        fs::create_dir_all(root.join(dir))
-            .map_err(|e| format!("Failed to create {}: {}", dir, e))?;
+    // Create all system directories
+    for dir in paths.system_dirs() {
+        fs::create_dir_all(&dir)
+            .map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
     }
 
-    // Create _config.yaml
+    // Create config
     let config = Config {
         root_dir: root.to_string_lossy().to_string(),
         default_token_budget: 4000,
@@ -61,87 +34,57 @@ pub fn create_workspace_structure(root: &Path, active_tools: &[String]) -> Resul
     };
     let config_yaml =
         serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
-    fs::write(root.join("_config.yaml"), config_yaml)
-        .map_err(|e| format!("Failed to write _config.yaml: {}", e))?;
+    fs::write(paths.config_yaml(), config_yaml)
+        .map_err(|e| format!("Failed to write config: {}", e))?;
 
     // Create initial claude.md
     let initial_router = r#"# AI Context OS — Router
 
-Este archivo se genera automáticamente. No editar manualmente.
+This file is auto-generated. Do not edit manually.
 
-> Sistema inicializado. Añade memorias para ver el índice aquí.
+> System initialized. Add memories to see the index here.
 
 # RULES
 
-_No hay reglas definidas. Añade archivos en 08-rules/_
+_No rules defined yet. Add files in .ai/rules/_
 
-# Reglas de Lectura y Escritura de Memorias
+# Memory Read/Write Rules
 
-## Lectura
-1. Lee SOLO los archivos que necesites para la tarea actual
-2. Empieza siempre por el nivel L1 (resumen)
-3. Carga L2 (completo) SOLO si L1 no tiene suficiente detalle
-4. NUNCA cargues más de 5 archivos L2 en una sola consulta
-5. Prioriza: rules > context > skills > projects > resources
+## Reading
+1. Only read the files you need for the current task
+2. Always start with L1 level (summary)
+3. Load L2 (full) ONLY if L1 doesn't have enough detail
+4. NEVER load more than 5 L2 files in a single query
+5. Priority: rules > context > skills > projects > resources
 
-## Escritura
-- Usa frontmatter YAML estándar (id, type, l0, importance, tags, related)
-- Separa contenido con <!-- L1 --> y <!-- L2 -->
-- Incrementa version: y actualiza modified: al editar
+## Writing
+- Use standard YAML frontmatter (id, type, l0, importance, tags, related)
+- Separate content with <!-- L1 --> and <!-- L2 -->
+- Increment version: and update modified: when editing
+- The `type` field in frontmatter determines the memory's semantic category, NOT the folder
 
-## Ingesta
-- Si trabajas con archivos de `inbox/`, lee primero `inbox/_INGEST.md` y sigue su protocolo
-- Archivos protegidos (`protected: true`) no deben editarse sin confirmación explícita del usuario
+## Ingestion
+- When working with files from `inbox/`, read `inbox/_INGEST.md` first and follow its protocol
+- Protected files (`protected: true`) must not be edited without explicit user confirmation
 
-# Índice de Memorias Disponibles
+# Available Memories Index
 
-_No hay memorias aún. Crea tu primera memoria desde la app._
+_No memories yet. Create your first memory from the app._
 "#;
-    fs::write(root.join("claude.md"), initial_router)
+    fs::write(paths.claude_md(), initial_router)
         .map_err(|e| format!("Failed to write claude.md: {}", e))?;
 
     // Create JSONL files with schema lines
     create_jsonl_with_schema(
-        &root.join("02-daily/daily-log.jsonl"),
+        &paths.daily_log(),
         "timestamp,type,summary,tags,source",
     )?;
-    create_jsonl_with_schema(
-        &root.join("07-tasks/backlog.jsonl"),
-        "timestamp,id,title,status,priority,tags",
-    )?;
 
-    // Create _index.yaml
+    // Create index
     let index =
         "# AI Context OS — Index L0 (autogenerated)\n# Do not edit manually\n\nmemories: []\n";
-    fs::write(root.join("_index.yaml"), index)
-        .map_err(|e| format!("Failed to write _index.yaml: {}", e))?;
-
-    // Create skill instructions file
-    let skill_instructions = r#"---
-id: _skill-instructions
-type: skill
-l0: "Instrucciones para crear y usar skills"
-importance: 0.7
-tags: [meta, skills, instrucciones]
----
-
-<!-- L1 -->
-Los skills son instrucciones reutilizables que la IA ejecuta bajo demanda.
-Cada skill sabe qué memorias necesita (campo requires/optional).
-
-<!-- L2 -->
-## Cómo crear un skill
-
-1. Crea un archivo .md en 06-skills/
-2. Añade frontmatter con: id, type: skill, triggers, requires, optional
-3. Escribe las instrucciones detalladas en la sección L2
-4. El sistema cargará automáticamente las memorias requeridas
-"#;
-    fs::write(
-        root.join("06-skills/_skill-instructions.md"),
-        skill_instructions,
-    )
-    .map_err(|e| format!("Failed to write skill instructions: {}", e))?;
+    fs::write(paths.index_yaml(), index)
+        .map_err(|e| format!("Failed to write index.yaml: {}", e))?;
 
     // Create inbox ingestion protocol
     let ingest_instructions = r#"# Ingestion Instructions — AI Context OS
