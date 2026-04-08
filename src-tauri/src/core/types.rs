@@ -16,48 +16,6 @@ pub enum MemoryType {
     Scratch,
 }
 
-impl MemoryType {
-    pub fn folder_name(&self) -> &str {
-        match self {
-            MemoryType::Source => "sources",
-            MemoryType::Context => "01-context",
-            MemoryType::Daily => "02-daily",
-            MemoryType::Intelligence => "03-intelligence",
-            MemoryType::Project => "04-projects",
-            MemoryType::Resource => "05-resources",
-            MemoryType::Skill => "06-skills",
-            MemoryType::Task => "07-tasks",
-            MemoryType::Rule => "08-rules",
-            MemoryType::Scratch => "09-scratch",
-        }
-    }
-
-    pub fn from_folder(folder: &str) -> Option<Self> {
-        match folder {
-            "sources" => Some(MemoryType::Source),
-            "01-sources" => Some(MemoryType::Source),
-            "01-context" => Some(MemoryType::Context),
-            "02-context" => Some(MemoryType::Context),
-            "02-daily" => Some(MemoryType::Daily),
-            "03-daily" => Some(MemoryType::Daily),
-            "03-intelligence" => Some(MemoryType::Intelligence),
-            "04-intelligence" => Some(MemoryType::Intelligence),
-            "04-projects" => Some(MemoryType::Project),
-            "05-projects" => Some(MemoryType::Project),
-            "05-resources" => Some(MemoryType::Resource),
-            "06-resources" => Some(MemoryType::Resource),
-            "06-skills" => Some(MemoryType::Skill),
-            "07-skills" => Some(MemoryType::Skill),
-            "07-tasks" => Some(MemoryType::Task),
-            "08-tasks" => Some(MemoryType::Task),
-            "08-rules" => Some(MemoryType::Rule),
-            "09-rules" => Some(MemoryType::Rule),
-            "09-scratch" => Some(MemoryType::Scratch),
-            "10-scratch" => Some(MemoryType::Scratch),
-            _ => None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -279,7 +237,6 @@ pub struct Conflict {
 pub struct ConsolidationSuggestion {
     pub entries: Vec<DailyEntry>,
     pub suggested_type: MemoryType,
-    pub suggested_folder: String,
     pub summary: String,
 }
 

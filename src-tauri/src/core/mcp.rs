@@ -210,8 +210,8 @@ impl AiContextMcpServer {
         };
         let ontology = default_ontology_for_memory_type(&memory_type);
 
-        let folder = memory_type.folder_name();
-        let file_path = root.join(folder).join(format!("{}.md", params.id));
+        let paths = crate::core::paths::SystemPaths::new(&root);
+        let file_path = paths.inbox_dir().join(format!("{}.md", params.id));
 
         let now = Utc::now();
         let meta = MemoryMeta {
@@ -351,9 +351,8 @@ impl AiContextMcpServer {
     async fn log_session(&self, Parameters(params): Parameters<LogSessionParams>) -> String {
         let root = self.state.root_dir.read().unwrap().clone();
         let today = Utc::now().format("%Y-%m-%d").to_string();
-        let log_path = root
-            .join("02-daily")
-            .join("sessions")
+        let log_path = crate::core::paths::SystemPaths::new(&root)
+            .sessions_dir()
             .join(format!("{}.jsonl", today));
 
         let entry = SessionLogEntry {

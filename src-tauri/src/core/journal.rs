@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 use chrono::{NaiveDate, Utc};
 use regex::Regex;
 
+use crate::core::paths::SystemPaths;
 use crate::core::types::{JournalBlock, JournalDateInfo, JournalPage, TaskPriority, TaskState};
 
 /// Get the path for a journal date file.
 pub fn journal_path(root: &Path, date: &str) -> PathBuf {
-    root.join("02-daily").join(format!("{}.md", date))
+    SystemPaths::new(root).journal_dir().join(format!("{}.md", date))
 }
 
 /// Read a journal page from disk.
@@ -52,7 +53,7 @@ pub fn save_journal_page(root: &Path, date: &str, content: &str) -> Result<Strin
 
 /// List all journal dates that have files, sorted descending.
 pub fn list_journal_dates(root: &Path) -> Result<Vec<JournalDateInfo>, String> {
-    let daily_dir = root.join("02-daily");
+    let daily_dir = SystemPaths::new(root).journal_dir();
     if !daily_dir.exists() {
         return Ok(Vec::new());
     }

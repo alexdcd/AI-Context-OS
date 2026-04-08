@@ -5,11 +5,12 @@ use chrono::Utc;
 use regex::Regex;
 use uuid::Uuid;
 
+use crate::core::paths::SystemPaths;
 use crate::core::types::{TaskFilter, TaskItem, TaskPriority, TaskState};
 
-/// List all task files from 07-tasks/ directory.
+/// List all task files from .ai/tasks/ directory.
 pub fn list_tasks(root: &Path, filter: &Option<TaskFilter>) -> Result<Vec<TaskItem>, String> {
-    let tasks_dir = root.join("07-tasks");
+    let tasks_dir = SystemPaths::new(root).tasks_dir();
     if !tasks_dir.exists() {
         return Ok(Vec::new());
     }
@@ -136,9 +137,9 @@ struct TaskMeta {
     due: Option<String>,
 }
 
-/// Create a new task and write it to 07-tasks/.
+/// Create a new task and write it to .ai/tasks/.
 pub fn create_task(root: &Path, task: &TaskItem) -> Result<String, String> {
-    let tasks_dir = root.join("07-tasks");
+    let tasks_dir = SystemPaths::new(root).tasks_dir();
     fs::create_dir_all(&tasks_dir).map_err(|e| format!("Failed to create tasks dir: {}", e))?;
 
     let file_path = tasks_dir.join(format!("{}.md", &task.id));
@@ -151,7 +152,7 @@ pub fn create_task(root: &Path, task: &TaskItem) -> Result<String, String> {
 
 /// Update an existing task.
 pub fn update_task(root: &Path, task: &TaskItem) -> Result<String, String> {
-    let file_path = root.join("07-tasks").join(format!("{}.md", &task.id));
+    let file_path = SystemPaths::new(root).tasks_dir().join(format!("{}.md", &task.id));
     let content = serialize_task(task);
 
     fs::write(&file_path, &content).map_err(|e| format!("Failed to write task: {}", e))?;
@@ -161,7 +162,7 @@ pub fn update_task(root: &Path, task: &TaskItem) -> Result<String, String> {
 
 /// Delete a task file.
 pub fn delete_task(root: &Path, id: &str) -> Result<(), String> {
-    let file_path = root.join("07-tasks").join(format!("{}.md", id));
+    let file_path = SystemPaths::new(root).tasks_dir().join(format!("{}.md", id));
     if file_path.exists() {
         fs::remove_file(&file_path).map_err(|e| format!("Failed to delete task: {}", e))?;
     }

@@ -7,6 +7,7 @@ pub mod graph;
 pub mod health;
 pub mod index;
 pub mod journal;
+pub mod paths;
 pub mod jsonl;
 pub mod levels;
 pub mod mcp;

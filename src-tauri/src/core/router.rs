@@ -13,7 +13,7 @@ pub fn generate_router_content(memories: &[MemoryMeta], config: &Config) -> Stri
         .filter(|m| m.memory_type == MemoryType::Rule)
         .collect();
     if rules.is_empty() {
-        out.push_str("_No rules defined yet. Add rules in 08-rules/_\n\n");
+        out.push_str("_No rules defined yet. Add rules in .ai/rules/_\n\n");
     } else {
         for rule in &rules {
             out.push_str(&format!("- **{}**: {}\n", rule.id, rule.l0));
@@ -22,64 +22,62 @@ pub fn generate_router_content(memories: &[MemoryMeta], config: &Config) -> Stri
     }
 
     // ========== SECTION 2: Read/Write Rules ==========
-    out.push_str("# Reglas de Lectura y Escritura de Memorias\n\n");
-    out.push_str("## Lectura\n");
-    out.push_str("1. Lee SOLO los archivos que necesites para la tarea actual\n");
-    out.push_str("2. Empieza siempre por el nivel L1 (resumen)\n");
-    out.push_str("3. Carga L2 (completo) SOLO si L1 no tiene suficiente detalle\n");
-    out.push_str("4. NUNCA cargues más de 5 archivos L2 en una sola consulta\n");
-    out.push_str("5. Si la tarea es simple, 2-3 archivos L1 deberían ser suficientes\n");
-    out.push_str("6. Prioriza: rules > context > skills > projects > resources\n");
+    out.push_str("# Memory Read/Write Rules\n\n");
+    out.push_str("## Reading\n");
+    out.push_str("1. Only read the files you need for the current task\n");
+    out.push_str("2. Always start with L1 level (summary)\n");
+    out.push_str("3. Load L2 (full) ONLY if L1 doesn't have enough detail\n");
+    out.push_str("4. NEVER load more than 5 L2 files in a single query\n");
+    out.push_str("5. For simple tasks, 2-3 L1 files should be enough\n");
+    out.push_str("6. Priority: rules > context > skills > projects > resources\n");
     out.push_str(
-        "7. Memorias con always_load: true se cargan SIEMPRE como L1 para su tipo de tarea\n",
+        "7. Memories with always_load: true are ALWAYS loaded as L1 for their task type\n",
     );
-    out.push_str("8. Si un output de herramienta supera 2000 tokens, escríbelo en 09-scratch/\n\n");
+    out.push_str("8. If a tool output exceeds 2000 tokens, write it to .ai/scratch/\n\n");
 
-    out.push_str("## Escritura\n");
-    out.push_str("- Usa el frontmatter YAML estándar (id, type, l0, importance, tags, related)\n");
-    out.push_str("- Separa contenido con <!-- L1 --> y <!-- L2 -->\n");
-    out.push_str("- Incrementa version: y actualiza modified: al editar\n");
-    out.push_str("- Archivos temporales van a 09-scratch/ con nombre descriptivo + timestamp\n\n");
+    out.push_str("## Writing\n");
+    out.push_str("- Use standard YAML frontmatter (id, type, l0, importance, tags, related)\n");
+    out.push_str("- Separate content with <!-- L1 --> and <!-- L2 -->\n");
+    out.push_str("- Increment version: and update modified: when editing\n");
+    out.push_str("- Temporary files go to .ai/scratch/ with descriptive name + timestamp\n");
+    out.push_str("- The `type` field in frontmatter determines the memory's semantic category, NOT the folder it lives in\n\n");
 
     // ========== SECTION 3: Ingestion Rule ==========
-    out.push_str("## Ingesta\n");
-    out.push_str("- Si trabajas con archivos de `inbox/`, lee primero `inbox/_INGEST.md` y sigue su protocolo\n");
-    out.push_str("- Archivos protegidos (protected: true) NO deben editarse sin desbloqueo explícito del usuario\n\n");
+    out.push_str("## Ingestion\n");
+    out.push_str("- When working with files from `inbox/`, read `inbox/_INGEST.md` first and follow its protocol\n");
+    out.push_str("- Protected files (protected: true) must NOT be edited without explicit user unlock\n\n");
 
-    // ========== SECTION 4: Folder Structure ==========
-    out.push_str("# Estructura de Carpetas\n\n");
+    // ========== SECTION 4: Workspace Structure ==========
+    out.push_str("# Workspace Structure\n\n");
+    out.push_str("This workspace uses a Zero Gravity architecture: the folder structure is free-form.\n");
+    out.push_str("Memory type is determined by the `type` field in YAML frontmatter, not by folder location.\n");
+    out.push_str("The user can organize files in any folder hierarchy they prefer.\n\n");
     out.push_str("```\n");
     out.push_str(&format!("{}/\n", config.root_dir));
-    out.push_str("├── inbox/                       ← zona temporal de captura\n");
-    out.push_str("├── sources/                     ← fuentes aceptadas (protegidas)\n");
-    out.push_str("├── claude.md                    ← ESTE ARCHIVO (enrutador maestro)\n");
-    out.push_str("├── _index.yaml                  ← catálogo L0 autogenerado\n");
-    out.push_str("├── _config.yaml                 ← configuración global\n");
-    out.push_str("├── 01-context/                  ← información estática del usuario\n");
-    out.push_str("├── 02-daily/                    ← registros diarios (JSONL)\n");
-    out.push_str("│   ├── daily-log.jsonl\n");
-    out.push_str("│   └── sessions/\n");
-    out.push_str("├── 03-intelligence/             ← investigación, mercado\n");
-    out.push_str("├── 04-projects/                 ← un subdirectorio por proyecto\n");
-    out.push_str("├── 05-resources/                ← plantillas, ejemplos\n");
-    out.push_str("├── 06-skills/                   ← habilidades/instrucciones IA\n");
-    out.push_str("├── 07-tasks/                    ← tareas (JSONL)\n");
-    out.push_str("│   └── backlog.jsonl\n");
-    out.push_str("├── 08-rules/                    ← restricciones y directrices\n");
-    out.push_str("└── 09-scratch/                  ← buffer temporal de la IA\n");
+    out.push_str("├── inbox/                  ← staging area for new files\n");
+    out.push_str("├── sources/                ← accepted reference material (protected)\n");
+    out.push_str("├── claude.md               ← THIS FILE (master router)\n");
+    out.push_str("├── .ai/                    ← system infrastructure (do not edit manually)\n");
+    out.push_str("│   ├── config.yaml\n");
+    out.push_str("│   ├── index.yaml\n");
+    out.push_str("│   ├── rules/              ← AI behavior directives\n");
+    out.push_str("│   ├── journal/            ← daily log and session notes\n");
+    out.push_str("│   ├── tasks/              ← task files\n");
+    out.push_str("│   └── scratch/            ← temporary AI outputs\n");
+    out.push_str("└── [your folders]/         ← any structure you want\n");
     out.push_str("```\n\n");
 
     // ========== SECTION 5: Compaction Rule ==========
-    out.push_str("# Regla de Compaction de Sesión\n\n");
-    out.push_str("Si llevas más de 15-20 intercambios en esta sesión:\n");
-    out.push_str("1. Escribe un resumen estructurado en 02-daily/sessions/YYYY-MM-DD-resumen.md\n");
-    out.push_str("2. Incluye: decisiones tomadas, hechos nuevos, tareas pendientes\n");
-    out.push_str("3. Appenda los hechos clave al daily-log.jsonl\n");
-    out.push_str("4. Sugiere al usuario iniciar nueva sesión para tareas no relacionadas\n\n");
-    out.push_str("Si generas un output largo (análisis, búsqueda, código):\n");
-    out.push_str("1. Escríbelo en 09-scratch/ con nombre descriptivo + timestamp\n");
-    out.push_str("2. Referencia la ruta en la conversación\n");
-    out.push_str("3. Lee selectivamente cuando necesites datos específicos\n\n");
+    out.push_str("# Session Compaction Rule\n\n");
+    out.push_str("If you have been exchanging for more than 15-20 turns in this session:\n");
+    out.push_str("1. Write a structured summary in .ai/journal/sessions/YYYY-MM-DD-summary.md\n");
+    out.push_str("2. Include: decisions made, new facts, pending tasks\n");
+    out.push_str("3. Append key facts to the daily-log.jsonl\n");
+    out.push_str("4. Suggest the user start a new session for unrelated tasks\n\n");
+    out.push_str("If you generate a long output (analysis, search, code):\n");
+    out.push_str("1. Write it to .ai/scratch/ with descriptive name + timestamp\n");
+    out.push_str("2. Reference the path in the conversation\n");
+    out.push_str("3. Read selectively when you need specific data\n\n");
 
     // ========== SECTION 6: L0 Memory Index (bottom — high attention) ==========
     out.push_str("# Índice de Memorias Disponibles\n\n");
