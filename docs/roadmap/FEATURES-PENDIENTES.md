@@ -1,6 +1,6 @@
 # AI Context OS — Features Pendientes
 
-> Actualizado: 2026-03-26
+> Actualizado: 2026-04-09
 > ✅ = implementado | ⬚ = pendiente
 
 ---
@@ -31,6 +31,18 @@
 
 
 - ⬚ **Clusters automáticos (Leiden)** — Agrupar memorias visual y lógicamente usando el algoritmo de Leiden (por densidad de aristas, superando a K-means) para detectar comunidades topológicas en el grafo
+
+## Observability
+
+- ⬚ **Unificar Governance + Observability en una vista "Health"** — La separación actual es arbitraria desde el punto de vista del usuario. Una sola vista con resumen ejecutivo arriba y tabs específicos daría una imagen completa del estado del sistema sin saltar entre secciones. *Pendiente de decisión de producto.*
+- ⬚ **Badge proactivo en la nav de Observability** — Mostrar un contador cuando hay optimizaciones de impacto alto pendientes (similar al badge existente en Governance). El usuario no debería tener que entrar para saber si hay algo que hacer.
+- ⬚ **Memory IDs clicables** — En Top Memories, Unused Memories y Unused de Intelligence, los IDs deberían ser enlaces directos al editor de esa memoria. Actualmente son texto muerto.
+- ⬚ **Breakdown por source (herramienta)** — Desglose de requests por fuente (Claude, Cursor, etc.) para saber qué herramientas están usando más el contexto y si la integración MCP de alguna no está tirando.
+- ⬚ **Rango de tiempo seleccionable** — Intelligence actualmente está hardcodeado a 7/30 días. Permitir al usuario elegir la ventana de análisis.
+- ✅ **Health score global** — Banner con score 0-100, breakdown por dimensión (coverage, efficiency, freshness, balance, cleanliness) y tendencia vs día anterior.
+- ✅ **Trend de eficiencia** — Indicador visual (TrendingUp/Down) en la card de Efficiency + texto explicativo contextual.
+- ✅ **Live tab reactiva** — Dot pulsante verde + contador "updated X sec ago" que ticks cada segundo para dar sensación de actividad real.
+- ✅ **Auto-análisis en Optimizations** — Al entrar en la pestaña se carga el estado pendiente y se lanza análisis automático si no hay items. Muestra "Last analyzed X min ago" con botón de re-análisis.
 
 ## Governance
 

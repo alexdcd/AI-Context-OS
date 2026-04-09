@@ -257,6 +257,32 @@ textarea {
   display: none;
 }
 
+/* ─── Observability: live dot + spin ─── */
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success, #2f9e44);
+  animation: pulse-dot 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
 /* Selection / focus */
 ::selection {
   background: rgba(124, 138, 255, 0.25);
