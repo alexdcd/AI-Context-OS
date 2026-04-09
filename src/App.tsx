@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -86,6 +87,7 @@ function AppContent() {
   const explorerOpen = useAppStore((s) => s.explorerOpen);
   const setExplorerOpen = useAppStore((s) => s.setExplorerOpen);
 
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -198,7 +200,7 @@ function AppContent() {
           <button
             onClick={toggleExplorer}
             className="flex h-6 w-6 items-center justify-center rounded-md text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-            title="Toggle Explorer"
+            title={t("common.toggleExplorer")}
           >
             <PanelLeft className="h-[15px] w-[15px]" pointerEvents="none" />
           </button>
