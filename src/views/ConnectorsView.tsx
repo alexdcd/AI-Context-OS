@@ -609,9 +609,7 @@ export function ConnectorsView() {
               )}
 
               {!info && active.tier === "Local Native" && (
-                <div style={{ fontSize: 13, color: "var(--text-2)" }}>
-                  Loading connection info...
-                </div>
+                <NullInfoBanner />
               )}
             </div>
           )}
@@ -664,8 +662,9 @@ function BridgePanel({
             color: "var(--text-2)",
           }}
         >
-          Copilot reads <code style={{ color: "var(--accent)" }}>.cursorrules</code> in some
-          editors. If your editor supports it, the base context will be available automatically.
+          <strong>Note:</strong> <code style={{ color: "var(--accent)" }}>.cursorrules</code> is
+          read by <strong>Cursor</strong> even with Copilot enabled. It is <strong>not</strong> read
+          by GitHub Copilot in VS Code — use the clipboard handoff below instead.
         </div>
       )}
 
