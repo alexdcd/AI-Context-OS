@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Eye, EyeOff, FilePlus, FolderPlus, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 import { FileExplorer } from "../components/explorer/FileExplorer";
 import { useAppStore } from "../lib/store";
 import { useSettingsStore } from "../lib/settingsStore";
@@ -12,6 +13,7 @@ const MemoryEditor = lazy(() =>
 );
 
 export function ExplorerView() {
+  const { t } = useTranslation();
   const {
     initialized,
     initialize,
@@ -72,7 +74,7 @@ export function ExplorerView() {
                     ? "text-[color:var(--accent)] hover:bg-[color:var(--accent-muted)]"
                     : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
                 )}
-                title={showSystemFiles ? "Hide system files" : "Show system files"}
+                title={showSystemFiles ? t("explorer.hideSystemFiles") : t("explorer.showSystemFiles")}
               >
                 {showSystemFiles ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               </button>
@@ -80,21 +82,21 @@ export function ExplorerView() {
             <button
               onClick={() => setPendingCreate("file")}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="New note (Cmd+N)"
+              title={t("explorer.newNoteShortcut")}
             >
               <FilePlus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setPendingCreate("folder")}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="New folder"
+              title={t("explorer.newFolder")}
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleRegenerate}
               className="rounded p-1 text-[color:var(--text-2)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]"
-              title="Regenerate router"
+              title={t("explorer.regenerateRouter")}
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>

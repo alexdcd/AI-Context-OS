@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Calendar,
   ChevronLeft,
@@ -23,7 +24,7 @@ import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
 
 // ─── Helpers ───
 
-function formatDateLabel(dateStr: string): string {
+function formatDateLabel(dateStr: string, t: (key: string) => string): string {
   const d = new Date(dateStr + "T12:00:00");
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
@@ -31,8 +32,8 @@ function formatDateLabel(dateStr: string): string {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-  if (dateStr === todayStr) return "Today";
-  if (dateStr === yesterdayStr) return "Yesterday";
+  if (dateStr === todayStr) return t("journal.today");
+  if (dateStr === yesterdayStr) return t("journal.yesterday");
 
   return d.toLocaleDateString("en-US", {
     weekday: "long",
@@ -178,6 +179,7 @@ interface DayPageProps {
 }
 
 function DayPage({ date, isToday }: DayPageProps) {
+  const { t } = useTranslation();
   const memories = useAppStore((s) => s.memories);
   const [loaded, setLoaded] = useState(false);
   const [blocks, setBlocks] = useState<JournalBlock[]>([]);
@@ -326,7 +328,7 @@ function DayPage({ date, isToday }: DayPageProps) {
     return (
       <div className="mb-8">
         <div className="mb-3 flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-[color:var(--text-0)]">{formatDateLabel(date)}</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-0)]">{formatDateLabel(date, t)}</h2>
           <Loader2 className="h-3.5 w-3.5 animate-spin text-[color:var(--text-2)]" />
         </div>
       </div>
@@ -343,7 +345,7 @@ function DayPage({ date, isToday }: DayPageProps) {
             isToday ? "text-[color:var(--accent)]" : "text-[color:var(--text-0)]",
           )}
         >
-          {formatDateLabel(date)}
+          {formatDateLabel(date, t)}
         </h2>
         <span className="font-mono text-[11px] text-[color:var(--text-2)]">
           {date}
@@ -355,7 +357,7 @@ function DayPage({ date, isToday }: DayPageProps) {
           <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--warning)]" />
         )}
         {error && (
-          <span className="text-[10px] text-[color:var(--danger)]">Backend error</span>
+          <span className="text-[10px] text-[color:var(--danger)]">{t("journal.backendError")}</span>
         )}
       </div>
 
@@ -382,10 +384,11 @@ function DayPage({ date, isToday }: DayPageProps) {
 // ─── Linked references ───
 
 function LinkedReferences({ date, memories }: { date: string; memories: MemoryMeta[] }) {
+  const { t } = useTranslation();
   const refs = memories.filter(
     (m) =>
       m.related.some((r) => r.includes(date)) ||
-      m.tags.some((t) => t === date) ||
+      m.tags.some((tag) => tag === date) ||
       m.l0.includes(date),
   );
 
@@ -394,7 +397,7 @@ function LinkedReferences({ date, memories }: { date: string; memories: MemoryMe
   return (
     <div className="mt-3">
       <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
-        Linked references ({refs.length})
+        {t("journal.linkedReferences", { count: refs.length })}
       </p>
       <div className="space-y-1">
         {refs.map((m) => (

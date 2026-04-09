@@ -1,0 +1,263 @@
+{
+  "sidebar": {
+    "explorer": "Explorer",
+    "journal": "Journal",
+    "tasks": "Tasks",
+    "graph": "Graph",
+    "simulation": "Simulation",
+    "governance": "Governance",
+    "observability": "Observability",
+    "connectors": "Connectors",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "theme": {
+      "system": "System",
+      "systemDesc": "Follows your operating system's appearance",
+      "light": "Light",
+      "lightDesc": "Always use light theme",
+      "dark": "Dark",
+      "darkDesc": "Always use dark theme"
+    },
+    "language": {
+      "label": "Language",
+      "en": "English",
+      "es": "Spanish"
+    },
+    "explorer": {
+      "label": "Explorer",
+      "expertMode": "Expert mode",
+      "expertModeDesc": "Enable advanced explorer controls only if you want to work with internal files.",
+      "expertModeActive": "Advanced controls are now available on this screen and at the bottom of the explorer.",
+      "showSystemFiles": "Show system files",
+      "showSystemFilesDesc": "Hides internal files and prevents visual noise for most users.",
+      "showSystemFilesActive": "Active",
+      "showSystemFilesHidden": "Hidden",
+      "showSystemFilesVisible": "You will see YAML, JSONL, claude.md and other advanced artifacts alongside memories.",
+      "showSystemFilesHiddenDesc": "Keeps the explorer focused on memories, although expert mode remains available."
+    },
+    "backup": {
+      "title": "Backup & Restore",
+      "desc": "Export or import your entire workspace as a .zip file",
+      "export": "Export backup",
+      "exportDesc": "Save a backup of the entire workspace",
+      "exportSuccess": "Backup created successfully",
+      "exportError": "Error creating backup",
+      "restore": "Restore backup",
+      "restoreDesc": "Import a .zip file to replace the current workspace",
+      "restoreSuccess": "Workspace restored successfully",
+      "restoreError": "Error restoring backup",
+      "restoreConfirm": "Restore backup? Current files will be overwritten."
+    }
+  },
+  "search": {
+    "placeholder": "Search memories by id, description or tags...",
+    "hint": "↑↓ navigate · Enter to open · Esc to close",
+    "noResults": "No results"
+  },
+  "onboarding": {
+    "steps": {
+      "location": "Location",
+      "profile": "Profile",
+      "template": "Template",
+      "confirm": "Confirm"
+    },
+    "location": {
+      "title": "Workspace location",
+      "desc": "A workspace folder will be created with system infrastructure and starter directories for your AI memory.",
+      "structure": "inbox/ · sources/ · .ai/ (rules, journal, tasks, scratch)"
+    },
+    "profile": {
+      "title": "Your profile",
+      "desc": "It will be saved as context memory for your AIs.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Your name",
+      "roleLabel": "Role / Profession",
+      "rolePlaceholder": "e.g. Full-stack developer, startup CEO...",
+      "languageLabel": "Language",
+      "en": "English",
+      "es": "Spanish"
+    },
+    "template": {
+      "title": "Template",
+      "desc": "Pre-designed skills and rules. Customizable later.",
+      "developer": "Developer",
+      "developerDesc": "Code review, debugging, architecture. Conventions & stack.",
+      "creator": "Creator",
+      "creatorDesc": "Writing, LinkedIn, newsletters, repurposing. Brand & voice.",
+      "entrepreneur": "Entrepreneur",
+      "entrepreneurDesc": "Strategic analysis, minutes, prioritization. Constraints.",
+      "custom": "Custom",
+      "customDesc": "Empty workspace. Configure it your way."
+    },
+    "confirm": {
+      "title": "Summary",
+      "desc": "The workspace will be created with initial memories and auto-generated integration files."
+    },
+    "actions": {
+      "back": "Back",
+      "next": "Next",
+      "create": "Create Workspace",
+      "creating": "Creating..."
+    }
+  },
+  "explorer": {
+    "newNote": "New note",
+    "newNoteShortcut": "New note (Cmd+N)",
+    "newFolder": "New folder",
+    "regenerateRouter": "Regenerate router",
+    "hideSystemFiles": "Hide system files",
+    "showSystemFiles": "Show system files",
+    "copyPath": "Copy path",
+    "showInFinder": "Show in Finder",
+    "rename": "Rename",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "moveTo": "Move file to...",
+    "dropToMove": "Drop to move",
+    "dragToMove": "Drag to move to another folder",
+    "protected": "Protected file",
+    "unprocessed": "Unprocessed",
+    "processed": "Processed",
+    "deleteFolder": "Are you sure you want to delete the folder \"{{name}}\"?",
+    "deleteFile": "Are you sure you want to delete the file \"{{name}}\"?",
+    "errorInvalidName": "Name cannot contain / or \\",
+    "errorInvalidMemoryName": "Memory name is not valid",
+    "errorReserved": "This folder is reserved for system or protected content",
+    "errorNoWorkspace": "No workspace configured",
+    "errorNoFolder": "No memory folder available",
+    "errorCopyPath": "Could not copy path to clipboard"
+  },
+  "tasks": {
+    "filterAllStatuses": "All statuses",
+    "filterAllPriorities": "All priorities",
+    "newPlaceholder": "New task...",
+    "noPriority": "No priority",
+    "priorityHigh": "A · High",
+    "priorityMedium": "B · Medium",
+    "priorityLow": "C · Low",
+    "create": "Create",
+    "statusLabel": "Status",
+    "priorityLabel": "Priority",
+    "dueLabel": "Due",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Add notes, context, bullets...",
+    "notesHint": "Use bullets (- ), lists, or free text to expand context.",
+    "save": "Save",
+    "saving": "Saving...",
+    "unsaved": "Unsaved",
+    "close": "Close",
+    "deleteTask": "Delete task",
+    "emptyAll": "No tasks. Create a new one above.",
+    "emptyFilter": "No tasks with this filter.",
+    "overdue": "Overdue {{n}}d",
+    "today": "Today",
+    "tomorrow": "Tomorrow"
+  },
+  "journal": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "linkedReferences": "Linked references ({{count}})",
+    "loadMore": "Load more days...",
+    "backendError": "Backend error"
+  },
+  "graph": {
+    "nodesEdges": "{{nodes}} nodes · {{edges}} edges",
+    "filterAll": "All ontologies",
+    "colorByOntology": "Color by ontology",
+    "colorByCommunity": "Color by community",
+    "relayout": "Re-layout",
+    "hideInspector": "Hide inspector",
+    "showInspector": "Show inspector",
+    "ontology": "Ontology",
+    "collection": "Collection",
+    "importance": "Importance",
+    "decay": "Decay",
+    "community": "Community",
+    "openInExplorer": "Open in Explorer",
+    "clickToInspect": "Click a node to inspect. Double-click to open.",
+    "noNodes": "No nodes for current filter.",
+    "calculatingLayout": "Calculating layout..."
+  },
+  "governance": {
+    "tabs": {
+      "stats": "Stats",
+      "conflicts": "Conflicts {{count}}",
+      "decay": "Decay {{count}}",
+      "consolidation": "Consolidation {{count}}",
+      "scratch": "Scratch TTL {{count}}",
+      "godNodes": "God Nodes {{count}}"
+    },
+    "total": "Total",
+    "avgImportance": "Avg Importance",
+    "conflicts": "Conflicts",
+    "byOntology": "By ontology",
+    "noConflicts": "No conflicts detected",
+    "archiveAll": "Archive all ({{count}})",
+    "archive": "Archive",
+    "noDecay": "No decay candidates",
+    "noConsolidation": "No consolidation suggestions",
+    "godNodesDesc": "Memories whose graph connectivity (degree) significantly exceeds their assigned importance. Consider increasing their importance score.",
+    "noGodNodes": "No god nodes detected — importance scores are well-calibrated",
+    "clearAll": "Clear all ({{count}})",
+    "noScratch": "No expired scratch files"
+  },
+  "observability": {
+    "tabs": {
+      "live": "Live",
+      "intelligence": "Intelligence",
+      "optimizations": "Optimizations"
+    },
+    "lastRequest": "Last request",
+    "source": "Source: {{value}}",
+    "type": "Type: {{value}}",
+    "tokenBudget": "{{tokens}} / {{budget}} tokens ({{memories}} memories loaded)",
+    "noRequests": "No context requests yet. Connect an AI tool to get started.",
+    "requestHistory": "Request history",
+    "noHistory": "No history",
+    "requestsPerWeek": "Requests/week",
+    "tokensServed": "Tokens served",
+    "activeMemories": "Active memories",
+    "efficiency": "Efficiency",
+    "vsLastWeek": "{{value}} vs last week",
+    "topMemories": "Top memories (30 days)",
+    "insufficientData": "Insufficient data",
+    "unusedMemories": "Unused memories ({{count}})",
+    "pendingOptimizations": "{{count}} pending optimizations",
+    "analyze": "Analyze",
+    "analyzing": "Analyzing...",
+    "highImpact": "High impact",
+    "mediumImpact": "Medium impact",
+    "lowImpact": "Low impact",
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "noOptimizations": "No pending optimizations. Run an analysis to find opportunities."
+  },
+  "common": {
+    "toggleExplorer": "Toggle Explorer",
+    "back": "Back",
+    "next": "Next",
+    "save": "Save",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "ontologies": {
+    "source": "Source",
+    "entity": "Entity",
+    "concept": "Concept",
+    "synthesis": "Synthesis"
+  },
+  "systemRoles": {
+    "rule": "Rule",
+    "skill": "Skill"
+  },
+  "taskStates": {
+    "todo": "Todo",
+    "inProgress": "In Progress",
+    "done": "Done",
+    "cancelled": "Cancelled"
+  }
+}

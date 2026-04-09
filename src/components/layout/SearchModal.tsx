@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { useAppStore } from "../../lib/store";
-import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../../lib/types";
+import { MEMORY_ONTOLOGY_COLORS } from "../../lib/types";
+import { useTranslation } from "react-i18next";
 
 export function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -74,7 +76,7 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search memories by id, description or tags..."
+            placeholder={t("search.placeholder")}
             className="flex-1 bg-transparent text-sm text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] outline-none"
           />
           <button onClick={onClose} className="text-[color:var(--text-2)] hover:text-[color:var(--text-1)]">
@@ -99,16 +101,16 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
               <span className="flex-1 truncate text-xs font-medium">{m.id}</span>
               <span className="max-w-[180px] truncate text-[10px] text-[color:var(--text-2)]">{m.l0}</span>
               <span className="shrink-0 text-[10px] text-[color:var(--text-2)]">
-                {MEMORY_ONTOLOGY_LABELS[m.ontology]}
+                {t(`ontologies.${m.ontology}` as const)}
               </span>
             </button>
           ))}
           {results.length === 0 && (
-            <p className="px-3 py-6 text-center text-xs text-[color:var(--text-2)]">No results</p>
+            <p className="px-3 py-6 text-center text-xs text-[color:var(--text-2)]">{t("search.noResults")}</p>
           )}
         </div>
         <div className="border-t border-[var(--border)] px-3 py-1.5 text-[10px] text-[color:var(--text-2)]">
-          ↑↓ navigate · Enter to open · Esc to close
+          {t("search.hint")}
         </div>
       </div>
     </div>

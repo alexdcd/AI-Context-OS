@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Circle,
   CheckCircle2,
@@ -42,6 +43,7 @@ function TaskStateIcon({ state, size = 16 }: { state: TaskState; size?: number }
 }
 
 function PriorityDot({ priority }: { priority: TaskPriority | null }) {
+  const { t } = useTranslation();
   if (!priority) return null;
   const colors: Record<TaskPriority, string> = {
     a: "bg-[color:var(--danger)]",
@@ -51,18 +53,18 @@ function PriorityDot({ priority }: { priority: TaskPriority | null }) {
   return (
     <span
       className={clsx("inline-block h-2 w-2 rounded-full", colors[priority])}
-      title={`Prioridad ${priority.toUpperCase()}`}
+      title={t("tasks.priorityLabel") + " " + priority.toUpperCase()}
     />
   );
 }
 
-function relativeDate(dateStr: string): string {
+function relativeDate(dateStr: string, t: (key: string, opts?: object) => string): string {
   const d = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / 86400000);
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
+  if (days === 0) return t("tasks.today");
+  if (days === 1) return t("tasks.tomorrow");
   if (days < 7) return `${days}d ago`;
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -70,6 +72,7 @@ function relativeDate(dateStr: string): string {
 // ─── New task form ───
 
 function NewTaskForm({ onCreated }: { onCreated: () => void }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority | "">("");
   const [creating, setCreating] = useState(false);
@@ -108,7 +111,7 @@ function NewTaskForm({ onCreated }: { onCreated: () => void }) {
         onKeyDown={(e) => {
           if (e.key === "Enter") create();
         }}
-        placeholder="New task..."
+        placeholder={t("tasks.newPlaceholder")}
         className="flex-1 bg-transparent text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:outline-none"
       />
       <select
@@ -116,10 +119,10 @@ function NewTaskForm({ onCreated }: { onCreated: () => void }) {
         onChange={(e) => setPriority(e.target.value as TaskPriority | "")}
         className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-1.5 py-0.5 text-[10px] text-[color:var(--text-1)]"
       >
-        <option value="">No priority</option>
-        <option value="a">A · High</option>
-        <option value="b">B · Medium</option>
-        <option value="c">C · Low</option>
+        <option value="">{t("tasks.noPriority")}</option>
+        <option value="a">{t("tasks.priorityHigh")}</option>
+        <option value="b">{t("tasks.priorityMedium")}</option>
+        <option value="c">{t("tasks.priorityLow")}</option>
       </select>
       <button
         type="button"
@@ -127,7 +130,7 @@ function NewTaskForm({ onCreated }: { onCreated: () => void }) {
         disabled={creating || !title.trim()}
         className="rounded-md bg-[color:var(--accent)] px-2.5 py-1 text-[10px] font-medium text-white disabled:opacity-40"
       >
-        Create
+        {t("tasks.create")}
       </button>
     </div>
   );
@@ -146,6 +149,7 @@ function TaskCard({
   onDelete: () => void;
   onUpdate: (updated: TaskItem) => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editPriority, setEditPriority] = useState<TaskPriority | "">(task.priority ?? "");
@@ -279,7 +283,13 @@ function TaskCard({
                 const now = new Date();
                 const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / 86400000);
                 const color = diffDays < 0 ? "var(--danger)" : diffDays <= 1 ? "var(--warning)" : "var(--text-2)";
-                const label = diffDays < 0 ? `Overdue ${-diffDays}d` : diffDays === 0 ? "Today" : diffDays === 1 ? "Tomorrow" : task.due;
+                const label = diffDays < 0
+                  ? t("tasks.overdue", { n: -diffDays })
+                  : diffDays === 0
+                  ? t("tasks.today")
+                  : diffDays === 1
+                  ? t("tasks.tomorrow")
+                  : task.due;
                 return (
                   <span className="flex items-center gap-0.5 text-[10px] font-medium" style={{ color }}>
                     <Calendar className="h-2.5 w-2.5" />
@@ -312,7 +322,7 @@ function TaskCard({
               )}
 
               <span className="ml-auto text-[10px] text-[color:var(--text-2)]">
-                {relativeDate(task.modified)}
+                {relativeDate(task.modified, t)}
               </span>
             </div>
           )}
@@ -322,7 +332,7 @@ function TaskCard({
           type="button"
           onClick={onDelete}
           className="shrink-0 rounded p-1 text-[color:var(--text-2)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[color:var(--danger)]"
-          title="Delete"
+          title={t("tasks.deleteTask")}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -334,7 +344,7 @@ function TaskCard({
           {/* Controls row */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[color:var(--text-2)]">Status</span>
+              <span className="text-[10px] text-[color:var(--text-2)]">{t("tasks.statusLabel")}</span>
               <select
                 value={editState}
                 onChange={(e) => {
@@ -350,7 +360,7 @@ function TaskCard({
             </label>
 
             <label className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[color:var(--text-2)]">Priority</span>
+              <span className="text-[10px] text-[color:var(--text-2)]">{t("tasks.priorityLabel")}</span>
               <select
                 value={editPriority}
                 onChange={(e) => {
@@ -360,14 +370,14 @@ function TaskCard({
                 className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-1.5 py-0.5 text-[11px] text-[color:var(--text-1)]"
               >
                 <option value="">—</option>
-                <option value="a">A · High</option>
-                <option value="b">B · Medium</option>
-                <option value="c">C · Low</option>
+                <option value="a">{t("tasks.priorityHigh")}</option>
+                <option value="b">{t("tasks.priorityMedium")}</option>
+                <option value="c">{t("tasks.priorityLow")}</option>
               </select>
             </label>
 
             <label className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[color:var(--text-2)]">Due</span>
+              <span className="text-[10px] text-[color:var(--text-2)]">{t("tasks.dueLabel")}</span>
               <input
                 type="date"
                 value={editDue}
@@ -387,13 +397,13 @@ function TaskCard({
             )}
 
             <span className="ml-auto text-[10px] text-[color:var(--text-2)]">
-              {relativeDate(task.modified)}
+              {relativeDate(task.modified, t)}
             </span>
           </div>
 
           {/* Notes editor */}
           <div className="space-y-1.5">
-            <span className="text-[10px] text-[color:var(--text-2)]">Notes</span>
+            <span className="text-[10px] text-[color:var(--text-2)]">{t("tasks.notesLabel")}</span>
             <textarea
               ref={notesRef}
               value={editNotes}
@@ -404,11 +414,11 @@ function TaskCard({
               }}
               onInput={autoResize}
               rows={3}
-              placeholder="Add notes, context, bullets..."
+              placeholder={t("tasks.notesPlaceholder")}
               className="w-full resize-none rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 font-mono text-[12px] leading-relaxed text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:border-[var(--border-active)] focus:outline-none"
             />
             <p className="text-[10px] text-[color:var(--text-2)] opacity-60">
-              Use bullets (- ), lists, or free text to expand context.
+              {t("tasks.notesHint")}
             </p>
           </div>
 
@@ -426,17 +436,17 @@ function TaskCard({
               )}
             >
               <Save className="h-3 w-3" />
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("tasks.saving") : t("tasks.save")}
             </button>
             {dirty && (
-              <span className="text-[10px] text-[color:var(--warning)]">Unsaved</span>
+              <span className="text-[10px] text-[color:var(--warning)]">{t("tasks.unsaved")}</span>
             )}
             <button
               type="button"
               onClick={() => setExpanded(false)}
               className="ml-auto text-[11px] text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
             >
-              Close
+              {t("tasks.close")}
             </button>
           </div>
         </div>
@@ -448,6 +458,7 @@ function TaskCard({
 // ─── Main view ───
 
 export function TaskView() {
+  const { t } = useTranslation();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [stateFilter, setStateFilter] = useState<TaskState | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
@@ -516,7 +527,7 @@ export function TaskView() {
             onChange={(e) => setStateFilter(e.target.value as TaskState | "all")}
             className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
           >
-            <option value="all">All statuses</option>
+            <option value="all">{t("tasks.filterAllStatuses")}</option>
             {(["todo", "in_progress", "done", "cancelled"] as TaskState[]).map((s) => (
               <option key={s} value={s}>{TASK_STATE_LABELS[s]}</option>
             ))}
@@ -528,7 +539,7 @@ export function TaskView() {
             onChange={(e) => setPriorityFilter(e.target.value as TaskPriority | "all")}
             className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
           >
-            <option value="all">All priorities</option>
+            <option value="all">{t("tasks.filterAllPriorities")}</option>
             {(["a", "b", "c"] as TaskPriority[]).map((p) => (
               <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>
             ))}
@@ -558,8 +569,8 @@ export function TaskView() {
               <CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-[color:var(--text-2)]" />
               <p className="text-xs text-[color:var(--text-2)]">
                 {stateFilter === "all" && priorityFilter === "all"
-                  ? "No tasks. Create a new one above."
-                  : "No tasks with this filter."}
+                  ? t("tasks.emptyAll")
+                  : t("tasks.emptyFilter")}
               </p>
             </div>
           )}

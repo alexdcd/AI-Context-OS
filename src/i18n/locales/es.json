@@ -1,0 +1,263 @@
+{
+  "sidebar": {
+    "explorer": "Explorador",
+    "journal": "Diario",
+    "tasks": "Tareas",
+    "graph": "Grafo",
+    "simulation": "Simulación",
+    "governance": "Gobernanza",
+    "observability": "Observabilidad",
+    "connectors": "Conectores",
+    "settings": "Ajustes"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "appearance": "Apariencia",
+    "theme": {
+      "system": "Sistema",
+      "systemDesc": "Sigue la apariencia de tu sistema operativo",
+      "light": "Claro",
+      "lightDesc": "Usar siempre el tema claro",
+      "dark": "Oscuro",
+      "darkDesc": "Usar siempre el tema oscuro"
+    },
+    "language": {
+      "label": "Idioma",
+      "en": "English",
+      "es": "Español"
+    },
+    "explorer": {
+      "label": "Explorador",
+      "expertMode": "Modo experto",
+      "expertModeDesc": "Activa controles avanzados del explorador solo si quieres trabajar con archivos internos.",
+      "expertModeActive": "Los controles avanzados ya están disponibles en esta pantalla y en la parte inferior del explorador.",
+      "showSystemFiles": "Mostrar archivos del sistema",
+      "showSystemFilesDesc": "Oculta los archivos internos y evita ruido visual para la mayoría de usuarios.",
+      "showSystemFilesActive": "Activo",
+      "showSystemFilesHidden": "Oculto",
+      "showSystemFilesVisible": "Verás YAML, JSONL, claude.md y otros artefactos avanzados junto a las memorias.",
+      "showSystemFilesHiddenDesc": "Mantiene el explorador centrado en las memorias, aunque el modo experto sigue disponible."
+    },
+    "backup": {
+      "title": "Copia de seguridad",
+      "desc": "Exporta o importa tu espacio de trabajo completo como archivo .zip",
+      "export": "Exportar copia",
+      "exportDesc": "Guarda una copia de seguridad del espacio de trabajo completo",
+      "exportSuccess": "Copia creada correctamente",
+      "exportError": "Error al crear la copia",
+      "restore": "Restaurar copia",
+      "restoreDesc": "Importa un archivo .zip para reemplazar el espacio de trabajo actual",
+      "restoreSuccess": "Espacio de trabajo restaurado correctamente",
+      "restoreError": "Error al restaurar la copia",
+      "restoreConfirm": "¿Restaurar copia? Los archivos actuales serán reemplazados."
+    }
+  },
+  "search": {
+    "placeholder": "Buscar memorias por id, descripción o etiquetas...",
+    "hint": "↑↓ navegar · Enter para abrir · Esc para cerrar",
+    "noResults": "Sin resultados"
+  },
+  "onboarding": {
+    "steps": {
+      "location": "Ubicación",
+      "profile": "Perfil",
+      "template": "Plantilla",
+      "confirm": "Confirmar"
+    },
+    "location": {
+      "title": "Ubicación del espacio de trabajo",
+      "desc": "Se creará una carpeta de trabajo con infraestructura del sistema y directorios de inicio para tu memoria de IA.",
+      "structure": "inbox/ · sources/ · .ai/ (rules, journal, tasks, scratch)"
+    },
+    "profile": {
+      "title": "Tu perfil",
+      "desc": "Se guardará como memoria de contexto para tus IAs.",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "Tu nombre",
+      "roleLabel": "Rol / Profesión",
+      "rolePlaceholder": "Ej. Desarrollador full-stack, CEO de startup...",
+      "languageLabel": "Idioma",
+      "en": "English",
+      "es": "Español"
+    },
+    "template": {
+      "title": "Plantilla",
+      "desc": "Habilidades y reglas prediseñadas. Personalizable después.",
+      "developer": "Desarrollador",
+      "developerDesc": "Revisión de código, depuración, arquitectura. Convenciones y stack.",
+      "creator": "Creador",
+      "creatorDesc": "Escritura, LinkedIn, newsletters, reutilización. Marca y voz.",
+      "entrepreneur": "Emprendedor",
+      "entrepreneurDesc": "Análisis estratégico, actas, priorización. Restricciones.",
+      "custom": "Personalizado",
+      "customDesc": "Espacio de trabajo vacío. Configúralo a tu manera."
+    },
+    "confirm": {
+      "title": "Resumen",
+      "desc": "El espacio de trabajo se creará con memorias iniciales y archivos de integración autogenerados."
+    },
+    "actions": {
+      "back": "Atrás",
+      "next": "Siguiente",
+      "create": "Crear espacio de trabajo",
+      "creating": "Creando..."
+    }
+  },
+  "explorer": {
+    "newNote": "Nueva nota",
+    "newNoteShortcut": "Nueva nota (Cmd+N)",
+    "newFolder": "Nueva carpeta",
+    "regenerateRouter": "Regenerar enrutador",
+    "hideSystemFiles": "Ocultar archivos del sistema",
+    "showSystemFiles": "Mostrar archivos del sistema",
+    "copyPath": "Copiar ruta",
+    "showInFinder": "Mostrar en Finder",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "duplicate": "Duplicar",
+    "moveTo": "Mover archivo a...",
+    "dropToMove": "Soltar para mover",
+    "dragToMove": "Arrastra para mover a otra carpeta",
+    "protected": "Archivo protegido",
+    "unprocessed": "Sin procesar",
+    "processed": "Procesado",
+    "deleteFolder": "¿Seguro que quieres eliminar la carpeta \"{{name}}\"?",
+    "deleteFile": "¿Seguro que quieres eliminar el archivo \"{{name}}\"?",
+    "errorInvalidName": "El nombre no puede contener / ni \\",
+    "errorInvalidMemoryName": "El nombre de la memoria no es válido",
+    "errorReserved": "Esta carpeta está reservada para contenido del sistema o protegido",
+    "errorNoWorkspace": "No hay espacio de trabajo configurado",
+    "errorNoFolder": "No hay carpeta de memoria disponible",
+    "errorCopyPath": "No se pudo copiar la ruta al portapapeles"
+  },
+  "tasks": {
+    "filterAllStatuses": "Todos los estados",
+    "filterAllPriorities": "Todas las prioridades",
+    "newPlaceholder": "Nueva tarea...",
+    "noPriority": "Sin prioridad",
+    "priorityHigh": "A · Alta",
+    "priorityMedium": "B · Media",
+    "priorityLow": "C · Baja",
+    "create": "Crear",
+    "statusLabel": "Estado",
+    "priorityLabel": "Prioridad",
+    "dueLabel": "Fecha límite",
+    "notesLabel": "Notas",
+    "notesPlaceholder": "Añade notas, contexto, bullets...",
+    "notesHint": "Usa bullets (- ), listas o texto libre para ampliar el contexto.",
+    "save": "Guardar",
+    "saving": "Guardando...",
+    "unsaved": "Sin guardar",
+    "close": "Cerrar",
+    "deleteTask": "Eliminar tarea",
+    "emptyAll": "Sin tareas. Crea una nueva arriba.",
+    "emptyFilter": "Sin tareas con este filtro.",
+    "overdue": "Vencida {{n}}d",
+    "today": "Hoy",
+    "tomorrow": "Mañana"
+  },
+  "journal": {
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "linkedReferences": "Referencias enlazadas ({{count}})",
+    "loadMore": "Cargar más días...",
+    "backendError": "Error del sistema"
+  },
+  "graph": {
+    "nodesEdges": "{{nodes}} nodos · {{edges}} aristas",
+    "filterAll": "Todas las ontologías",
+    "colorByOntology": "Color por ontología",
+    "colorByCommunity": "Color por comunidad",
+    "relayout": "Reorganizar",
+    "hideInspector": "Ocultar inspector",
+    "showInspector": "Mostrar inspector",
+    "ontology": "Ontología",
+    "collection": "Colección",
+    "importance": "Importancia",
+    "decay": "Decaimiento",
+    "community": "Comunidad",
+    "openInExplorer": "Abrir en explorador",
+    "clickToInspect": "Haz clic en un nodo para inspeccionar. Doble clic para abrir.",
+    "noNodes": "No hay nodos para el filtro actual.",
+    "calculatingLayout": "Calculando diseño..."
+  },
+  "governance": {
+    "tabs": {
+      "stats": "Estadísticas",
+      "conflicts": "Conflictos {{count}}",
+      "decay": "Decaimiento {{count}}",
+      "consolidation": "Consolidación {{count}}",
+      "scratch": "Scratch TTL {{count}}",
+      "godNodes": "Nodos dios {{count}}"
+    },
+    "total": "Total",
+    "avgImportance": "Importancia media",
+    "conflicts": "Conflictos",
+    "byOntology": "Por ontología",
+    "noConflicts": "No se detectaron conflictos",
+    "archiveAll": "Archivar todos ({{count}})",
+    "archive": "Archivar",
+    "noDecay": "Sin candidatos a decaimiento",
+    "noConsolidation": "Sin sugerencias de consolidación",
+    "godNodesDesc": "Memorias cuya conectividad en el grafo supera significativamente su importancia asignada. Considera aumentar su puntuación.",
+    "noGodNodes": "No se detectaron nodos dios — las puntuaciones de importancia están bien calibradas",
+    "clearAll": "Limpiar todos ({{count}})",
+    "noScratch": "Sin archivos scratch caducados"
+  },
+  "observability": {
+    "tabs": {
+      "live": "En vivo",
+      "intelligence": "Inteligencia",
+      "optimizations": "Optimizaciones"
+    },
+    "lastRequest": "Última solicitud",
+    "source": "Fuente: {{value}}",
+    "type": "Tipo: {{value}}",
+    "tokenBudget": "{{tokens}} / {{budget}} tokens ({{memories}} memorias cargadas)",
+    "noRequests": "Sin solicitudes de contexto aún. Conecta una herramienta de IA para comenzar.",
+    "requestHistory": "Historial de solicitudes",
+    "noHistory": "Sin historial",
+    "requestsPerWeek": "Solicitudes/semana",
+    "tokensServed": "Tokens servidos",
+    "activeMemories": "Memorias activas",
+    "efficiency": "Eficiencia",
+    "vsLastWeek": "{{value}} vs semana anterior",
+    "topMemories": "Memorias principales (30 días)",
+    "insufficientData": "Datos insuficientes",
+    "unusedMemories": "Memorias sin uso ({{count}})",
+    "pendingOptimizations": "{{count}} optimizaciones pendientes",
+    "analyze": "Analizar",
+    "analyzing": "Analizando...",
+    "highImpact": "Alto impacto",
+    "mediumImpact": "Impacto medio",
+    "lowImpact": "Bajo impacto",
+    "apply": "Aplicar",
+    "dismiss": "Descartar",
+    "noOptimizations": "Sin optimizaciones pendientes. Ejecuta un análisis para encontrar oportunidades."
+  },
+  "common": {
+    "toggleExplorer": "Alternar explorador",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "close": "Cerrar"
+  },
+  "ontologies": {
+    "source": "Fuente",
+    "entity": "Entidad",
+    "concept": "Concepto",
+    "synthesis": "Síntesis"
+  },
+  "systemRoles": {
+    "rule": "Regla",
+    "skill": "Habilidad"
+  },
+  "taskStates": {
+    "todo": "Pendiente",
+    "inProgress": "En progreso",
+    "done": "Hecho",
+    "cancelled": "Cancelado"
+  }
+}

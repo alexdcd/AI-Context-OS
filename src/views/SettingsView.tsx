@@ -5,8 +5,13 @@ import { clsx } from "clsx";
 import { backupWorkspace, restoreWorkspace } from "../lib/tauri";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "../lib/store";
+import { useTranslation } from "react-i18next";
+import { type Language } from "../lib/settingsStore";
 
 export function SettingsView() {
+  const { t } = useTranslation();
+  const language = useSettingsStore((s) => s.language);
+  const setLanguage = useSettingsStore((s) => s.setLanguage);
   const theme = useSettingsStore((s) => s.theme);
   const expertModeEnabled = useSettingsStore((s) => s.expertModeEnabled);
   const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
@@ -41,9 +46,7 @@ export function SettingsView() {
       multiple: false,
     });
     if (!result) return;
-    const ok = window.confirm(
-      "Restore backup? Current files will be overwritten."
-    );
+    const ok = window.confirm(t("settings.backup.restoreConfirm"));
     if (!ok) return;
     setRestoreStatus("loading");
     try {
@@ -55,22 +58,22 @@ export function SettingsView() {
       setRestoreStatus("error");
       setTimeout(() => setRestoreStatus("idle"), 3000);
     }
-  }, [initialize]);
+  }, [initialize, t]);
 
   const themeOptions: { value: Theme; label: string; icon: typeof Monitor; describe: string }[] = [
-    { value: "system", label: "System", icon: Monitor, describe: "Follows your operating system's appearance" },
-    { value: "light", label: "Light", icon: Sun, describe: "Always use light theme" },
-    { value: "dark", label: "Dark", icon: Moon, describe: "Always use dark theme" },
+    { value: "system", label: t("settings.theme.system"), icon: Monitor, describe: t("settings.theme.systemDesc") },
+    { value: "light",  label: t("settings.theme.light"),  icon: Sun,     describe: t("settings.theme.lightDesc") },
+    { value: "dark",   label: t("settings.theme.dark"),   icon: Moon,    describe: t("settings.theme.darkDesc") },
   ];
 
   return (
     <div className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="mb-8 text-2xl font-semibold text-[color:var(--text-0)]">Settings</h1>
+        <h1 className="mb-8 text-2xl font-semibold text-[color:var(--text-0)]">{t("settings.title")}</h1>
 
         {/* Appearance */}
         <section className="obs-panel border border-[color:var(--border)] p-6">
-          <h2 className="mb-4 text-lg font-medium text-[color:var(--text-0)]">Appearance</h2>
+          <h2 className="mb-4 text-lg font-medium text-[color:var(--text-0)]">{t("settings.appearance")}</h2>
 
           <div className="flex flex-col gap-3">
             {themeOptions.map((option) => {
@@ -114,10 +117,33 @@ export function SettingsView() {
           </div>
         </section>
 
+        {/* Language */}
         <section className="obs-panel border border-[color:var(--border)] p-6">
-          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">Explorer</h2>
+          <h2 className="mb-4 text-lg font-medium text-[color:var(--text-0)]">
+            {t("settings.language.label")}
+          </h2>
+          <div className="flex gap-2">
+            {(["en", "es"] as Language[]).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={clsx(
+                  "rounded-md border px-4 py-1.5 text-sm font-medium transition-colors",
+                  language === lang
+                    ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
+                    : "border-[var(--border)] bg-[color:var(--bg-2)] text-[color:var(--text-1)] hover:border-[var(--border-active)]",
+                )}
+              >
+                {t(`settings.language.${lang}` as const)}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="obs-panel border border-[color:var(--border)] p-6">
+          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">{t("settings.explorer.label")}</h2>
           <p className="mb-4 text-sm text-[color:var(--text-2)]">
-            Enable advanced explorer controls only if you want to work with internal files.
+            {t("settings.explorer.expertModeDesc")}
           </p>
 
           <button
@@ -132,11 +158,11 @@ export function SettingsView() {
             <div className="flex-1">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="font-medium text-[color:var(--text-0)]">Expert mode</div>
+                  <div className="font-medium text-[color:var(--text-0)]">{t("settings.explorer.expertMode")}</div>
                   <p className="mt-2 text-sm text-[color:var(--text-2)]">
                     {expertModeEnabled
-                      ? "Advanced controls are now available on this screen and at the bottom of the explorer."
-                      : "Hides internal files and prevents visual noise for most users."}
+                      ? t("settings.explorer.expertModeActive")
+                      : t("settings.explorer.showSystemFilesDesc")}
                   </p>
                 </div>
                 <span
@@ -175,7 +201,7 @@ export function SettingsView() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-[color:var(--text-0)]">Show system files</span>
+                  <span className="font-medium text-[color:var(--text-0)]">{t("settings.explorer.showSystemFiles")}</span>
                   <span
                     className={clsx(
                       "rounded-full px-2 py-0.5 text-[11px] font-medium",
@@ -184,13 +210,13 @@ export function SettingsView() {
                         : "bg-[color:var(--bg-2)] text-[color:var(--text-2)]"
                     )}
                   >
-                    {showSystemFiles ? "Active" : "Hidden"}
+                    {showSystemFiles ? t("settings.explorer.showSystemFilesActive") : t("settings.explorer.showSystemFilesHidden")}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-[color:var(--text-2)]">
                   {showSystemFiles
-                    ? "You will see YAML, JSONL, claude.md and other advanced artifacts alongside memories."
-                    : "Keeps the explorer focused on memories, although expert mode remains available."}
+                    ? t("settings.explorer.showSystemFilesVisible")
+                    : t("settings.explorer.showSystemFilesHiddenDesc")}
                 </p>
               </div>
             </button>
@@ -199,9 +225,9 @@ export function SettingsView() {
 
         {/* Backup / Restore */}
         <section className="obs-panel border border-[color:var(--border)] p-6">
-          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">Backup & Restore</h2>
+          <h2 className="mb-1 text-lg font-medium text-[color:var(--text-0)]">{t("settings.backup.title")}</h2>
           <p className="mb-4 text-sm text-[color:var(--text-2)]">
-            Export or import your entire workspace as a .zip file
+            {t("settings.backup.desc")}
           </p>
 
           <div className="flex flex-col gap-3">
@@ -218,13 +244,13 @@ export function SettingsView() {
                 <Download className="h-5 w-5 text-[color:var(--text-1)]" />
               )}
               <div>
-                <span className="font-medium text-[color:var(--text-1)]">Export backup</span>
+                <span className="font-medium text-[color:var(--text-1)]">{t("settings.backup.export")}</span>
                 <p className="mt-0.5 text-sm text-[color:var(--text-2)]">
                   {backupStatus === "done"
-                    ? "Backup created successfully"
+                    ? t("settings.backup.exportSuccess")
                     : backupStatus === "error"
-                      ? "Error creating backup"
-                      : "Save a backup of the entire workspace"}
+                      ? t("settings.backup.exportError")
+                      : t("settings.backup.exportDesc")}
                 </p>
               </div>
             </button>
@@ -242,13 +268,13 @@ export function SettingsView() {
                 <Upload className="h-5 w-5 text-[color:var(--text-1)]" />
               )}
               <div>
-                <span className="font-medium text-[color:var(--text-1)]">Restore backup</span>
+                <span className="font-medium text-[color:var(--text-1)]">{t("settings.backup.restore")}</span>
                 <p className="mt-0.5 text-sm text-[color:var(--text-2)]">
                   {restoreStatus === "done"
-                    ? "Workspace restored successfully"
+                    ? t("settings.backup.restoreSuccess")
                     : restoreStatus === "error"
-                      ? "Error restoring backup"
-                      : "Import a .zip file to replace the current workspace"}
+                      ? t("settings.backup.restoreError")
+                      : t("settings.backup.restoreDesc")}
                 </p>
               </div>
             </button>
