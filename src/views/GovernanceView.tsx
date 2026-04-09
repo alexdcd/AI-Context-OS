@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -6,6 +6,7 @@ import {
   BarChart3,
   Trash2,
   Star,
+  Zap,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -15,12 +16,49 @@ import {
   getScratchCandidates,
   getGodNodes,
   deleteMemory,
+  getMemory,
+  saveMemory,
 } from "../lib/tauri";
 import { useAppStore } from "../lib/store";
 import type { Conflict, ConsolidationSuggestion, GodNode, MemoryMeta } from "../lib/types";
 import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
 
 type Tab = "stats" | "conflicts" | "decay" | "consolidation" | "scratch" | "god_nodes";
+
+interface ConfirmDialogProps {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDialog({ title, description, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-80 rounded-lg border border-[var(--border)] bg-[color:var(--bg-1)] p-5 shadow-xl">
+        <h3 className="mb-1 text-sm font-semibold text-[color:var(--text-0)]">{title}</h3>
+        <p className="mb-4 text-xs text-[color:var(--text-2)]">{description}</p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function GovernanceView() {
   const [activeTab, setActiveTab] = useState<Tab>("stats");
@@ -29,15 +67,83 @@ export function GovernanceView() {
   const [consolidation, setConsolidation] = useState<ConsolidationSuggestion[]>([]);
   const [scratchFiles, setScratchFiles] = useState<string[]>([]);
   const [godNodes, setGodNodes] = useState<GodNode[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogProps | null>(null);
+  const [boostingId, setBoostingId] = useState<string | null>(null);
   const { memories } = useAppStore();
 
-  useEffect(() => {
+  const loadAll = useCallback(() => {
     getConflicts().then(setConflicts).catch(console.error);
     getDecayCandidates().then(setDecayCandidates).catch(console.error);
     getConsolidationSuggestions().then(setConsolidation).catch(console.error);
     getScratchCandidates().then(setScratchFiles).catch(console.error);
     getGodNodes().then(setGodNodes).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    loadAll();
+    const interval = setInterval(loadAll, REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [loadAll]);
+
+  const confirmArchiveAll = () => {
+    setConfirmDialog({
+      title: `Archive ${decayCandidates.length} memories?`,
+      description: "These memories haven't been accessed in a long time and will be permanently deleted.",
+      confirmLabel: `Archive ${decayCandidates.length}`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        for (const m of decayCandidates) {
+          try { await deleteMemory(m.id); } catch { /* skip */ }
+        }
+        setDecayCandidates([]);
+      },
+      onCancel: () => setConfirmDialog(null),
+    });
+  };
+
+  const confirmClearAll = () => {
+    setConfirmDialog({
+      title: `Delete ${scratchFiles.length} scratch files?`,
+      description: "These temporary files have exceeded their TTL and will be permanently deleted.",
+      confirmLabel: `Delete ${scratchFiles.length}`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        for (const file of scratchFiles) {
+          const id = file.split("/").pop()?.replace(".md", "");
+          if (id) {
+            try { await deleteMemory(id); } catch { /* skip */ }
+          }
+        }
+        setScratchFiles([]);
+      },
+      onCancel: () => setConfirmDialog(null),
+    });
+  };
+
+  const handleBoostImportance = async (godNode: GodNode) => {
+    setBoostingId(godNode.memory_id);
+    try {
+      const memory = await getMemory(godNode.memory_id);
+      const newImportance = Math.min(1.0, memory.meta.importance + 0.2);
+      await saveMemory({
+        id: memory.meta.id,
+        meta: { ...memory.meta, importance: newImportance },
+        l1_content: memory.l1_content,
+        l2_content: memory.l2_content,
+      });
+      setGodNodes((prev) =>
+        prev.map((gn) =>
+          gn.memory_id === godNode.memory_id
+            ? { ...gn, importance: newImportance, mismatch_score: gn.mismatch_score - 0.2 }
+            : gn,
+        ),
+      );
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBoostingId(null);
+    }
+  };
 
   const tabs: { id: Tab; icon: typeof BarChart3; label: string }[] = [
     { id: "stats", icon: BarChart3, label: "Stats" },
@@ -63,6 +169,8 @@ export function GovernanceView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {confirmDialog && <ConfirmDialog {...confirmDialog} />}
+
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
         {tabs.map((tab) => (
@@ -93,7 +201,7 @@ export function GovernanceView() {
             </div>
             <div>
               <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
-                Por ontologia
+                By ontology
               </h3>
               <div className="space-y-1.5">
                 {Object.entries(typeGroups).map(([type, count]) => (
@@ -148,12 +256,7 @@ export function GovernanceView() {
           <div className="space-y-1.5">
             {decayCandidates.length > 1 && (
               <button
-                onClick={async () => {
-                  for (const m of decayCandidates) {
-                    try { await deleteMemory(m.id); } catch { /* skip */ }
-                  }
-                  setDecayCandidates([]);
-                }}
+                onClick={confirmArchiveAll}
                 className="mb-2 rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
               >
                 Archive all ({decayCandidates.length})
@@ -168,12 +271,21 @@ export function GovernanceView() {
                   {new Date(m.last_access).toLocaleDateString()}
                 </span>
                 <button
-                  onClick={async () => {
-                    try {
-                      await deleteMemory(m.id);
-                      setDecayCandidates((prev) => prev.filter((c) => c.id !== m.id));
-                    } catch (e) { console.error(e); }
-                  }}
+                  onClick={() =>
+                    setConfirmDialog({
+                      title: `Archive "${m.id}"?`,
+                      description: "This memory will be permanently deleted.",
+                      confirmLabel: "Archive",
+                      onConfirm: async () => {
+                        setConfirmDialog(null);
+                        try {
+                          await deleteMemory(m.id);
+                          setDecayCandidates((prev) => prev.filter((c) => c.id !== m.id));
+                        } catch (e) { console.error(e); }
+                      },
+                      onCancel: () => setConfirmDialog(null),
+                    })
+                  }
                   className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
                 >
                   Archive
@@ -202,16 +314,23 @@ export function GovernanceView() {
         {activeTab === "god_nodes" && (
           <div className="space-y-2">
             <p className="mb-3 text-[11px] text-[color:var(--text-2)]">
-              Memories whose graph connectivity (degree) significantly exceeds their
-              assigned importance. Consider increasing their importance score.
+              These memories are highly connected in your knowledge graph but have a low importance score.
+              Boosting them helps the context router surface them more often.
             </p>
             {godNodes.map((gn) => {
               const mismatch = gn.mismatch_score;
               const color = MEMORY_ONTOLOGY_COLORS[gn.ontology];
+              const isCritical = mismatch > 0.4;
+              const label = isCritical ? "Undervalued — boost it" : "Slightly undervalued";
               return (
                 <div
                   key={gn.memory_id}
-                  className="rounded-md border border-[var(--border)] bg-[color:var(--bg-0)] px-3 py-2.5"
+                  className={clsx(
+                    "rounded-md border px-3 py-2.5",
+                    isCritical
+                      ? "border-[color:var(--accent)]/30 bg-[color:var(--accent)]/5"
+                      : "border-[var(--border)] bg-[color:var(--bg-0)]",
+                  )}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span
@@ -221,26 +340,36 @@ export function GovernanceView() {
                     <span className="text-xs font-medium text-[color:var(--text-0)]">
                       {gn.memory_id}
                     </span>
-                    <span className="ml-auto flex items-center gap-2 text-[10px] font-mono">
-                      <span className="text-[color:var(--text-2)]">
-                        degree {gn.degree}
-                      </span>
-                      <span className="text-[color:var(--text-2)]">
-                        imp {gn.importance.toFixed(2)}
-                      </span>
-                      <span
-                        className={clsx(
-                          "rounded px-1.5 py-0.5 font-medium",
-                          mismatch > 0.4
-                            ? "bg-[color:var(--accent)]/15 text-[color:var(--accent)]"
-                            : "bg-[color:var(--bg-3)] text-[color:var(--text-2)]",
-                        )}
-                      >
-                        {mismatch > 0 ? "+" : ""}{mismatch.toFixed(2)}
-                      </span>
+                    <span className="ml-auto flex items-center gap-2 text-[10px] font-mono text-[color:var(--text-2)]">
+                      <span>{gn.degree} connections</span>
+                      <span>imp {gn.importance.toFixed(2)}</span>
                     </span>
                   </div>
-                  <p className="truncate text-[11px] text-[color:var(--text-2)]">{gn.l0}</p>
+                  <p className="truncate text-[11px] text-[color:var(--text-2)] mb-2">{gn.l0}</p>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={clsx(
+                        "text-[10px] font-medium",
+                        isCritical ? "text-[color:var(--accent)]" : "text-[color:var(--text-2)]",
+                      )}
+                    >
+                      {label}
+                    </span>
+                    <button
+                      onClick={() => handleBoostImportance(gn)}
+                      disabled={boostingId === gn.memory_id}
+                      className={clsx(
+                        "flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
+                        isCritical
+                          ? "bg-[color:var(--accent)]/15 text-[color:var(--accent)] hover:bg-[color:var(--accent)]/25"
+                          : "bg-[color:var(--bg-3)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
+                        boostingId === gn.memory_id && "opacity-50 cursor-not-allowed",
+                      )}
+                    >
+                      <Zap className="h-2.5 w-2.5" />
+                      {boostingId === gn.memory_id ? "Boosting…" : "Boost importance"}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -254,15 +383,7 @@ export function GovernanceView() {
           <div className="space-y-1.5">
             {scratchFiles.length > 1 && (
               <button
-                onClick={async () => {
-                  for (const file of scratchFiles) {
-                    const id = file.split("/").pop()?.replace(".md", "");
-                    if (id) {
-                      try { await deleteMemory(id); } catch { /* skip */ }
-                    }
-                  }
-                  setScratchFiles([]);
-                }}
+                onClick={confirmClearAll}
                 className="mb-2 rounded-md bg-[color:var(--warning)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20"
               >
                 Clear all ({scratchFiles.length})
@@ -277,12 +398,21 @@ export function GovernanceView() {
                   <span className="text-xs font-medium text-[color:var(--text-1)]">{name}</span>
                   <span className="flex-1 truncate font-mono text-[10px] text-[color:var(--text-2)]">{file}</span>
                   <button
-                    onClick={async () => {
-                      try {
-                        await deleteMemory(id);
-                        setScratchFiles((prev) => prev.filter((f) => f !== file));
-                      } catch (e) { console.error(e); }
-                    }}
+                    onClick={() =>
+                      setConfirmDialog({
+                        title: `Delete "${name}"?`,
+                        description: "This scratch file will be permanently deleted.",
+                        confirmLabel: "Delete",
+                        onConfirm: async () => {
+                          setConfirmDialog(null);
+                          try {
+                            await deleteMemory(id);
+                            setScratchFiles((prev) => prev.filter((f) => f !== file));
+                          } catch (e) { console.error(e); }
+                        },
+                        onCancel: () => setConfirmDialog(null),
+                      })
+                    }
                     className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20"
                   >
                     Delete
