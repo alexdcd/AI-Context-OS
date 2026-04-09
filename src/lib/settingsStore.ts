@@ -3,16 +3,19 @@ import { persist } from "zustand/middleware";
 import { useEffect } from "react";
 
 export type Theme = "dark" | "light" | "system";
+export type Language = "en" | "es";
 
 export interface SettingsStore {
   theme: Theme;
   expertModeEnabled: boolean;
   showSystemFiles: boolean;
+  language: Language;
   setTheme: (theme: Theme) => void;
   setExpertModeEnabled: (enabled: boolean) => void;
   toggleExpertModeEnabled: () => void;
   setShowSystemFiles: (show: boolean) => void;
   toggleShowSystemFiles: () => void;
+  setLanguage: (lang: Language) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -21,6 +24,7 @@ export const useSettingsStore = create<SettingsStore>()(
       theme: "system",
       expertModeEnabled: false,
       showSystemFiles: false,
+      language: "en",
       setTheme: (theme) => set({ theme }),
       setExpertModeEnabled: (expertModeEnabled) =>
         set((state) => ({
@@ -38,6 +42,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setShowSystemFiles: (showSystemFiles) => set({ showSystemFiles }),
       toggleShowSystemFiles: () =>
         set((state) => ({ showSystemFiles: !state.showSystemFiles })),
+      setLanguage: (language) => set({ language }),
     }),
     {
       name: "obs-settings",
