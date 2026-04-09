@@ -154,7 +154,8 @@
     "emptyFilter": "Sin tareas con este filtro.",
     "overdue": "Vencida {{n}}d",
     "today": "Hoy",
-    "tomorrow": "Mañana"
+    "tomorrow": "Mañana",
+    "yesterday": "Ayer"
   },
   "journal": {
     "today": "Hoy",
@@ -259,5 +260,10 @@
     "inProgress": "En progreso",
     "done": "Hecho",
     "cancelled": "Cancelado"
+  },
+  "taskPriorities": {
+    "a": "A · Alta",
+    "b": "B · Media",
+    "c": "C · Baja"
   }
 }

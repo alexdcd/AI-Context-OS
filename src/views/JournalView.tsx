@@ -24,7 +24,11 @@ import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
 
 // ─── Helpers ───
 
-function formatDateLabel(dateStr: string, t: (key: string) => string): string {
+function getDateLocale(language: string): string {
+  return language.startsWith("es") ? "es-ES" : "en-US";
+}
+
+function formatDateLabel(dateStr: string, locale: string, t: (key: string) => string): string {
   const d = new Date(dateStr + "T12:00:00");
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
@@ -35,7 +39,7 @@ function formatDateLabel(dateStr: string, t: (key: string) => string): string {
   if (dateStr === todayStr) return t("journal.today");
   if (dateStr === yesterdayStr) return t("journal.yesterday");
 
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale, {
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -43,9 +47,9 @@ function formatDateLabel(dateStr: string, t: (key: string) => string): string {
   });
 }
 
-function formatDateShort(dateStr: string): string {
+function formatDateShort(dateStr: string, locale: string): string {
   const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -328,7 +332,7 @@ function DayPage({ date, isToday }: DayPageProps) {
     return (
       <div className="mb-8">
         <div className="mb-3 flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-[color:var(--text-0)]">{formatDateLabel(date, t)}</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-0)]">{formatDateLabel(date, locale, t)}</h2>
           <Loader2 className="h-3.5 w-3.5 animate-spin text-[color:var(--text-2)]" />
         </div>
       </div>
@@ -345,7 +349,7 @@ function DayPage({ date, isToday }: DayPageProps) {
             isToday ? "text-[color:var(--accent)]" : "text-[color:var(--text-0)]",
           )}
         >
-          {formatDateLabel(date, t)}
+          {formatDateLabel(date, locale, t)}
         </h2>
         <span className="font-mono text-[11px] text-[color:var(--text-2)]">
           {date}
@@ -424,6 +428,8 @@ function LinkedReferences({ date, memories }: { date: string; memories: MemoryMe
 // ─── Main view ───
 
 export function JournalView() {
+  const { t, i18n } = useTranslation();
+  const locale = getDateLocale(i18n.resolvedLanguage ?? i18n.language);
   const [dates, setDates] = useState<string[]>([]);
   const [allDates, setAllDates] = useState<JournalDateInfo[]>([]);
   const [loadCount, setLoadCount] = useState(7);
@@ -483,7 +489,7 @@ export function JournalView() {
           onClick={goToToday}
           className="rounded-md bg-[color:var(--accent-muted)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--accent)] hover:bg-[color:var(--accent)]/20"
         >
-          Today
+          {t("journal.today")}
         </button>
 
         <div className="flex items-center gap-0.5">
@@ -504,7 +510,7 @@ export function JournalView() {
         </div>
 
         <span className="text-[11px] text-[color:var(--text-2)]">
-          {formatDateShort(dates[0] || today)}
+          {formatDateShort(dates[0] || today, locale)}
         </span>
 
         <div className="ml-auto flex items-center gap-2">

@@ -154,7 +154,8 @@
     "emptyFilter": "No tasks with this filter.",
     "overdue": "Overdue {{n}}d",
     "today": "Today",
-    "tomorrow": "Tomorrow"
+    "tomorrow": "Tomorrow",
+    "yesterday": "Yesterday"
   },
   "journal": {
     "today": "Today",
@@ -259,5 +260,10 @@
     "inProgress": "In Progress",
     "done": "Done",
     "cancelled": "Cancelled"
+  },
+  "taskPriorities": {
+    "a": "A · High",
+    "b": "B · Medium",
+    "c": "C · Low"
   }
 }

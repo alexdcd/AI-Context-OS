@@ -58,15 +58,19 @@ function PriorityDot({ priority }: { priority: TaskPriority | null }) {
   );
 }
 
-function relativeDate(dateStr: string, t: (key: string, opts?: object) => string): string {
+function relativeDate(
+  dateStr: string,
+  locale: string,
+  t: (key: string, opts?: object) => string,
+): string {
   const d = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return t("tasks.today");
-  if (days === 1) return t("tasks.tomorrow");
+  if (days === 1) return t("tasks.yesterday");
   if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 // ─── New task form ───
@@ -149,7 +153,8 @@ function TaskCard({
   onDelete: () => void;
   onUpdate: (updated: TaskItem) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage?.startsWith("es") ? "es-ES" : "en-US";
   const [expanded, setExpanded] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editPriority, setEditPriority] = useState<TaskPriority | "">(task.priority ?? "");
@@ -322,7 +327,7 @@ function TaskCard({
               )}
 
               <span className="ml-auto text-[10px] text-[color:var(--text-2)]">
-                {relativeDate(task.modified, t)}
+                {relativeDate(task.modified, locale, t)}
               </span>
             </div>
           )}
@@ -397,7 +402,7 @@ function TaskCard({
             )}
 
             <span className="ml-auto text-[10px] text-[color:var(--text-2)]">
-              {relativeDate(task.modified, t)}
+              {relativeDate(task.modified, locale, t)}
             </span>
           </div>
 
@@ -529,7 +534,7 @@ export function TaskView() {
           >
             <option value="all">{t("tasks.filterAllStatuses")}</option>
             {(["todo", "in_progress", "done", "cancelled"] as TaskState[]).map((s) => (
-              <option key={s} value={s}>{TASK_STATE_LABELS[s]}</option>
+              <option key={s} value={s}>{t(`taskStates.${s}` as const)}</option>
             ))}
           </select>
 
@@ -541,7 +546,7 @@ export function TaskView() {
           >
             <option value="all">{t("tasks.filterAllPriorities")}</option>
             {(["a", "b", "c"] as TaskPriority[]).map((p) => (
-              <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>
+              <option key={p} value={p}>{t(`taskPriorities.${p}` as const)}</option>
             ))}
           </select>
         </div>
