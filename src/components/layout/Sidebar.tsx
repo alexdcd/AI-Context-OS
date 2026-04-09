@@ -1,3 +1,4 @@
+import React from "react";
 import { NavLink } from "react-router-dom";
 import {
   FolderTree,
@@ -12,19 +13,23 @@ import {
   Settings,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
-const navItems = [
-  { to: "/", icon: FolderTree, label: "Explorer" },
-  { to: "/journal", icon: BookOpen, label: "Journal" },
-  { to: "/tasks", icon: ListTodo, label: "Tasks" },
-  { to: "/graph", icon: Network, label: "Graph" },
-  { to: "/simulation", icon: FlaskConical, label: "Simulation" },
-  { to: "/governance", icon: Shield, label: "Governance" },
-  { to: "/observability", icon: Activity, label: "Observability" },
-  { to: "/connectors", icon: Plug, label: "Connectors" },
+type SidebarKey = "explorer" | "journal" | "tasks" | "graph" | "simulation" | "governance" | "observability" | "connectors";
+
+const navItems: { to: string; icon: React.ElementType; key: SidebarKey }[] = [
+  { to: "/", icon: FolderTree, key: "explorer" },
+  { to: "/journal", icon: BookOpen, key: "journal" },
+  { to: "/tasks", icon: ListTodo, key: "tasks" },
+  { to: "/graph", icon: Network, key: "graph" },
+  { to: "/simulation", icon: FlaskConical, key: "simulation" },
+  { to: "/governance", icon: Shield, key: "governance" },
+  { to: "/observability", icon: Activity, key: "observability" },
+  { to: "/connectors", icon: Plug, key: "connectors" },
 ];
 
 export function Sidebar() {
+  const { t } = useTranslation();
   return (
     <aside className="flex w-12 flex-col items-center border-r border-[var(--border)] bg-[color:var(--bg-0)] py-3">
       <div className="mb-4">
@@ -49,7 +54,7 @@ export function Sidebar() {
               <item.icon className="h-[18px] w-[18px]" />
             </NavLink>
             <div className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-50 -translate-y-1/2 scale-95 whitespace-nowrap rounded-md border border-[color:var(--border)] bg-[color:var(--bg-1)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-0)] opacity-0 shadow-sm transition-all duration-100 group-hover:scale-100 group-hover:opacity-100">
-              {item.label}
+              {t(`sidebar.${item.key}`)}
             </div>
           </div>
         ))}
@@ -70,7 +75,7 @@ export function Sidebar() {
           <Settings className="h-[18px] w-[18px]" />
         </NavLink>
         <div className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-50 -translate-y-1/2 scale-95 whitespace-nowrap rounded-md border border-[color:var(--border)] bg-[color:var(--bg-1)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-0)] opacity-0 shadow-sm transition-all duration-100 group-hover:scale-100 group-hover:opacity-100">
-          Settings
+          {t("sidebar.settings")}
         </div>
       </div>
     </aside>
