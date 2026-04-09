@@ -58,7 +58,8 @@ function PriorityDot({ priority }: { priority: TaskPriority | null }) {
   );
 }
 
-function relativeDate(dateStr: string, t: (key: string, opts?: object) => string): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function relativeDate(dateStr: string, t: (key: any, opts?: any) => string): string {
   const d = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - d.getTime();

@@ -24,7 +24,8 @@ import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
 
 // ─── Helpers ───
 
-function formatDateLabel(dateStr: string, t: (key: string) => string): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatDateLabel(dateStr: string, t: (key: any) => string): string {
   const d = new Date(dateStr + "T12:00:00");
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
