@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "../lib/store";
 import { saveMemory, getMemory } from "../lib/tauri";
 import {
@@ -69,6 +70,7 @@ function MemoryNodeComponent({
 }: {
   data: { node: GNode; colorByCommunity: boolean };
 }) {
+  const { t } = useTranslation();
   const gn = data.node;
   const color = data.colorByCommunity
     ? communityColor(gn.community)
@@ -87,7 +89,7 @@ function MemoryNodeComponent({
       </div>
       <div className="mt-1.5 flex items-center gap-1.5">
         <span className="text-[10px] text-[color:var(--text-2)]">
-          {MEMORY_ONTOLOGY_LABELS[gn.ontology]}
+          {t(`ontologies.${gn.ontology}` as const)}
         </span>
         <span className="ml-auto font-mono text-[10px] text-[color:var(--text-2)]">
           {gn.importance.toFixed(1)}
@@ -142,6 +144,7 @@ function edgeColor(type: string): string {
 }
 
 export function GraphViewPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { graphData, loadGraph, selectFile, setError } = useAppStore();
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
@@ -310,7 +313,7 @@ export function GraphViewPage() {
     <div className="relative flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
         <span className="text-[11px] text-[color:var(--text-2)]">
-          {filteredData.nodes.length} nodes · {filteredData.edges.length} edges
+          {t("graph.nodesEdges", { nodes: filteredData.nodes.length, edges: filteredData.edges.length })}
         </span>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -319,7 +322,7 @@ export function GraphViewPage() {
             onChange={(e) => setOntologyFilter(e.target.value as MemoryOntology | "all")}
             className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
           >
-            <option value="all">Todas las ontologias</option>
+            <option value="all">{t("graph.filterAll")}</option>
             {(Object.keys(MEMORY_ONTOLOGY_LABELS) as MemoryOntology[]).map((ontology) => (
               <option key={ontology} value={ontology}>
                 {MEMORY_ONTOLOGY_LABELS[ontology]}
@@ -364,7 +367,7 @@ export function GraphViewPage() {
                 ? "text-[color:var(--accent)] bg-[color:var(--accent)]/10"
                 : "text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
             )}
-            title={colorByCommunity ? "Color by ontologia" : "Color by comunidad"}
+            title={colorByCommunity ? t("graph.colorByOntology") : t("graph.colorByCommunity")}
           >
             <Layers className="h-3.5 w-3.5" />
           </button>
@@ -372,7 +375,7 @@ export function GraphViewPage() {
             type="button"
             onClick={() => setLayoutSeed((prev) => prev + 1)}
             className="rounded p-1 text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
-            title="Re-layout"
+            title={t("graph.relayout")}
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -380,7 +383,7 @@ export function GraphViewPage() {
             type="button"
             onClick={() => setShowInspector((prev) => !prev)}
             className="rounded p-1 text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
-            title={showInspector ? "Hide inspector" : "Show inspector"}
+            title={showInspector ? t("graph.hideInspector") : t("graph.showInspector")}
           >
             {showInspector ? (
               <PanelRightClose className="h-3.5 w-3.5" />
@@ -421,7 +424,7 @@ export function GraphViewPage() {
           ) : (
             <div className="flex h-full flex-col items-center justify-center text-[color:var(--text-2)]">
               <Network className="mb-3 h-8 w-8" />
-              <p className="text-xs">No nodes for current filter.</p>
+              <p className="text-xs">{t("graph.noNodes")}</p>
             </div>
           )}
         </div>
@@ -441,12 +444,12 @@ export function GraphViewPage() {
                     <p className="mt-0.5 text-[11px] text-[color:var(--text-2)]">{selectedNode.label}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    <NodeMetric label="Ontologia" value={MEMORY_ONTOLOGY_LABELS[selectedNode.ontology]} />
-                    <NodeMetric label="Coleccion" value={selectedNode.folder_category ?? "—"} />
-                    <NodeMetric label="Importance" value={selectedNode.importance.toFixed(2)} />
-                    <NodeMetric label="Decay" value={selectedNode.decay_score.toFixed(2)} />
+                    <NodeMetric label={t("graph.ontology")} value={t(`ontologies.${selectedNode.ontology}` as const)} />
+                    <NodeMetric label={t("graph.collection")} value={selectedNode.folder_category ?? "—"} />
+                    <NodeMetric label={t("graph.importance")} value={selectedNode.importance.toFixed(2)} />
+                    <NodeMetric label={t("graph.decay")} value={selectedNode.decay_score.toFixed(2)} />
                     <NodeMetric
-                      label="Community"
+                      label={t("graph.community")}
                       value={selectedNode.community !== null ? `#${selectedNode.community}` : "—"}
                       swatchColor={selectedNode.community !== null ? communityColor(selectedNode.community) : undefined}
                     />
@@ -457,12 +460,12 @@ export function GraphViewPage() {
                     className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
-                    Open in Explorer
+                    {t("graph.openInExplorer")}
                   </button>
                 </div>
               ) : (
                 <p className="text-xs text-[color:var(--text-2)]">
-                  Click a node to inspect. Double-click to open.
+                  {t("graph.clickToInspect")}
                 </p>
               )}
             </div>
@@ -472,7 +475,7 @@ export function GraphViewPage() {
 
       {layouting && (
         <div className="pointer-events-none absolute right-8 top-20 rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1 text-xs text-[color:var(--text-1)]">
-          Calculating layout...
+          {t("graph.calculatingLayout")}
         </div>
       )}
     </div>

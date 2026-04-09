@@ -8,6 +8,7 @@ import {
   Star,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 import {
   getConflicts,
   getDecayCandidates,
@@ -18,11 +19,12 @@ import {
 } from "../lib/tauri";
 import { useAppStore } from "../lib/store";
 import type { Conflict, ConsolidationSuggestion, GodNode, MemoryMeta } from "../lib/types";
-import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
+import { MEMORY_ONTOLOGY_COLORS, type MemoryOntology } from "../lib/types";
 
 type Tab = "stats" | "conflicts" | "decay" | "consolidation" | "scratch" | "god_nodes";
 
 export function GovernanceView() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("stats");
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [decayCandidates, setDecayCandidates] = useState<MemoryMeta[]>([]);
@@ -40,12 +42,12 @@ export function GovernanceView() {
   }, []);
 
   const tabs: { id: Tab; icon: typeof BarChart3; label: string }[] = [
-    { id: "stats", icon: BarChart3, label: "Stats" },
-    { id: "conflicts", icon: AlertTriangle, label: `Conflicts ${conflicts.length}` },
-    { id: "decay", icon: Clock, label: `Decay ${decayCandidates.length}` },
-    { id: "consolidation", icon: ArrowUpFromLine, label: `Consolidation ${consolidation.length}` },
-    { id: "scratch", icon: Trash2, label: `Scratch TTL ${scratchFiles.length}` },
-    { id: "god_nodes", icon: Star, label: `God Nodes ${godNodes.length}` },
+    { id: "stats", icon: BarChart3, label: t("governance.tabs.stats") },
+    { id: "conflicts", icon: AlertTriangle, label: t("governance.tabs.conflicts", { count: conflicts.length }) },
+    { id: "decay", icon: Clock, label: t("governance.tabs.decay", { count: decayCandidates.length }) },
+    { id: "consolidation", icon: ArrowUpFromLine, label: t("governance.tabs.consolidation", { count: consolidation.length }) },
+    { id: "scratch", icon: Trash2, label: t("governance.tabs.scratch", { count: scratchFiles.length }) },
+    { id: "god_nodes", icon: Star, label: t("governance.tabs.godNodes", { count: godNodes.length }) },
   ];
 
   const typeGroups = memories.reduce(
@@ -87,13 +89,13 @@ export function GovernanceView() {
         {activeTab === "stats" && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-3">
-              <StatCard label="Total" value={memories.length.toString()} />
-              <StatCard label="Avg Importance" value={avgImportance.toFixed(2)} />
-              <StatCard label="Conflicts" value={conflicts.length.toString()} />
+              <StatCard label={t("governance.total")} value={memories.length.toString()} />
+              <StatCard label={t("governance.avgImportance")} value={avgImportance.toFixed(2)} />
+              <StatCard label={t("governance.conflicts")} value={conflicts.length.toString()} />
             </div>
             <div>
               <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
-                Por ontologia
+                {t("governance.byOntology")}
               </h3>
               <div className="space-y-1.5">
                 {Object.entries(typeGroups).map(([type, count]) => (
@@ -103,7 +105,7 @@ export function GovernanceView() {
                       style={{ backgroundColor: MEMORY_ONTOLOGY_COLORS[type as keyof typeof MEMORY_ONTOLOGY_COLORS] }}
                     />
                     <span className="w-20 text-xs text-[color:var(--text-1)]">
-                      {MEMORY_ONTOLOGY_LABELS[type as keyof typeof MEMORY_ONTOLOGY_LABELS]}
+                      {t(`ontologies.${type as MemoryOntology}` as const)}
                     </span>
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-[color:var(--bg-3)]">
                       <div
@@ -139,7 +141,7 @@ export function GovernanceView() {
               </div>
             ))}
             {conflicts.length === 0 && (
-              <Empty text="No conflicts detected" />
+              <Empty text={t("governance.noConflicts")} />
             )}
           </div>
         )}
@@ -156,7 +158,7 @@ export function GovernanceView() {
                 }}
                 className="mb-2 rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
               >
-                Archive all ({decayCandidates.length})
+                {t("governance.archiveAll", { count: decayCandidates.length })}
               </button>
             )}
             {decayCandidates.map((m) => (
@@ -176,12 +178,12 @@ export function GovernanceView() {
                   }}
                   className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
                 >
-                  Archive
+                  {t("governance.archive")}
                 </button>
               </div>
             ))}
             {decayCandidates.length === 0 && (
-              <Empty text="No decay candidates" />
+              <Empty text={t("governance.noDecay")} />
             )}
           </div>
         )}
@@ -194,7 +196,7 @@ export function GovernanceView() {
               </div>
             ))}
             {consolidation.length === 0 && (
-              <Empty text="No consolidation suggestions" />
+              <Empty text={t("governance.noConsolidation")} />
             )}
           </div>
         )}
@@ -202,8 +204,7 @@ export function GovernanceView() {
         {activeTab === "god_nodes" && (
           <div className="space-y-2">
             <p className="mb-3 text-[11px] text-[color:var(--text-2)]">
-              Memories whose graph connectivity (degree) significantly exceeds their
-              assigned importance. Consider increasing their importance score.
+              {t("governance.godNodesDesc")}
             </p>
             {godNodes.map((gn) => {
               const mismatch = gn.mismatch_score;
@@ -245,7 +246,7 @@ export function GovernanceView() {
               );
             })}
             {godNodes.length === 0 && (
-              <Empty text="No god nodes detected — importance scores are well-calibrated" />
+              <Empty text={t("governance.noGodNodes")} />
             )}
           </div>
         )}
@@ -265,7 +266,7 @@ export function GovernanceView() {
                 }}
                 className="mb-2 rounded-md bg-[color:var(--warning)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20"
               >
-                Clear all ({scratchFiles.length})
+                {t("governance.clearAll", { count: scratchFiles.length })}
               </button>
             )}
             {scratchFiles.map((file) => {
@@ -285,13 +286,13 @@ export function GovernanceView() {
                     }}
                     className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20"
                   >
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </div>
               );
             })}
             {scratchFiles.length === 0 && (
-              <Empty text="No expired scratch files" />
+              <Empty text={t("governance.noScratch")} />
             )}
           </div>
         )}
