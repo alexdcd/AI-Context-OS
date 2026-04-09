@@ -9,6 +9,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  ArrowRight,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -37,7 +38,23 @@ type Tab = "live" | "intelligence" | "optimizations";
 
 // ─── Health Banner ───
 
-function HealthBanner({ health, history }: { health: HealthScore | null; history: HealthScoreSnapshot[] }) {
+const DIMENSION_INFO: Record<string, { label: string; description: string; needsUsage: boolean }> = {
+  coverage:    { label: "Coverage",    description: "% of memories ever surfaced by the router",        needsUsage: true },
+  efficiency:  { label: "Efficiency",  description: "How well loaded memories match actual queries",    needsUsage: true },
+  freshness:   { label: "Freshness",   description: "Recency of memory access patterns",                needsUsage: false },
+  balance:     { label: "Balance",     description: "Distribution across ontology types",               needsUsage: true },
+  cleanliness: { label: "Cleanliness", description: "Absence of expired scratch / decay candidates",    needsUsage: false },
+};
+
+interface HealthBannerProps {
+  health: HealthScore | null;
+  history: HealthScoreSnapshot[];
+  hasUsageData: boolean;
+  highImpactCount: number;
+  onNavigateToOptimizations: () => void;
+}
+
+function HealthBanner({ health, history, hasUsageData, highImpactCount, onNavigateToOptimizations }: HealthBannerProps) {
   if (!health) return null;
 
   const score = Math.round(health.score);
@@ -52,19 +69,8 @@ function HealthBanner({ health, history }: { health: HealthScore | null; history
 
   const label = isHealthy ? "Healthy" : isWarning ? "Needs attention" : "Action required";
 
-  // Trend: compare last two snapshots
   const trend =
-    history.length >= 2
-      ? history[0].score - history[1].score
-      : null;
-
-  const breakdownItems: { key: keyof typeof health.breakdown; label: string }[] = [
-    { key: "coverage", label: "Coverage" },
-    { key: "efficiency", label: "Efficiency" },
-    { key: "freshness", label: "Freshness" },
-    { key: "balance", label: "Balance" },
-    { key: "cleanliness", label: "Cleanliness" },
-  ];
+    history.length >= 2 ? history[0].score - history[1].score : null;
 
   return (
     <div
@@ -75,11 +81,11 @@ function HealthBanner({ health, history }: { health: HealthScore | null; history
         borderLeft: `3px solid ${color}`,
         display: "flex",
         flexDirection: "column",
-        gap: 10,
+        gap: 12,
       }}
     >
+      {/* Top row: score + label + CTA */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* Score circle */}
         <div
           style={{
             width: 48,
@@ -95,7 +101,6 @@ function HealthBanner({ health, history }: { health: HealthScore | null; history
           <span style={{ fontSize: 16, fontWeight: 700, color }}>{score}</span>
         </div>
 
-        {/* Label + summary */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color }}>{label}</span>
@@ -114,32 +119,73 @@ function HealthBanner({ health, history }: { health: HealthScore | null; history
               </span>
             )}
           </div>
-          <p style={{ fontSize: 11, color: "var(--text-2)", margin: 0 }}>{health.summary}</p>
+          <p style={{ fontSize: 11, color: "var(--text-2)", margin: 0 }}>
+            {!hasUsageData
+              ? "Some scores need usage data — connect an AI tool and send a few requests to calibrate."
+              : health.summary}
+          </p>
         </div>
+
+        {/* CTA: only show when there are high-impact optimizations pending */}
+        {highImpactCount > 0 && (
+          <button
+            onClick={onNavigateToOptimizations}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              background: "var(--danger, #ef4444)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Fix {highImpactCount} issue{highImpactCount > 1 ? "s" : ""}
+            <ArrowRight size={12} />
+          </button>
+        )}
       </div>
 
       {/* Breakdown bars */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-        {breakdownItems.map(({ key, label }) => {
-          const val = Math.round(health.breakdown[key]);
+        {Object.entries(DIMENSION_INFO).map(([key, { label, description, needsUsage }]) => {
+          const noData = needsUsage && !hasUsageData;
+          const val = Math.round(health.breakdown[key as keyof typeof health.breakdown]);
           const barColor = val >= 80 ? "#10b981" : val >= 60 ? "#f59e0b" : "#ef4444";
+
           return (
-            <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div key={key} title={description} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-2)" }}>
                 <span>{label}</span>
-                <span style={{ color: barColor, fontWeight: 600 }}>{val}</span>
+                <span style={{ color: noData ? "var(--text-2)" : barColor, fontWeight: 600 }}>
+                  {noData ? "—" : val}
+                </span>
               </div>
               <div style={{ height: 4, borderRadius: 2, background: "var(--bg-3)", overflow: "hidden" }}>
-                <div
-                  style={{
-                    width: `${val}%`,
-                    height: "100%",
-                    borderRadius: 2,
-                    background: barColor,
-                    transition: "width 0.5s ease",
-                  }}
-                />
+                {noData ? (
+                  /* striped pattern for no-data state */
+                  <div style={{ height: "100%", background: "repeating-linear-gradient(90deg, var(--bg-3) 0px, var(--bg-3) 4px, var(--border) 4px, var(--border) 8px)" }} />
+                ) : (
+                  <div
+                    style={{
+                      width: `${val}%`,
+                      height: "100%",
+                      borderRadius: 2,
+                      background: barColor,
+                      transition: "width 0.5s ease",
+                    }}
+                  />
+                )}
               </div>
+              <span style={{ fontSize: 9, color: "var(--text-2)", lineHeight: 1.3 }}>
+                {noData ? "needs usage data" : description}
+              </span>
             </div>
           );
         })}
@@ -154,10 +200,21 @@ export function ObservabilityView() {
   const [activeTab, setActiveTab] = useState<Tab>("live");
   const [health, setHealth] = useState<HealthScore | null>(null);
   const [history, setHistory] = useState<HealthScoreSnapshot[]>([]);
+  const [hasUsageData, setHasUsageData] = useState(true);
+  const [highImpactCount, setHighImpactCount] = useState(0);
 
   useEffect(() => {
-    getHealthScore().then(setHealth).catch(console.error);
-    getHealthHistory(7).then(setHistory).catch(console.error);
+    Promise.all([
+      getHealthScore(),
+      getHealthHistory(7),
+      getObservabilityStats(7),
+      getPendingOptimizations(),
+    ]).then(([h, hist, stats, opts]) => {
+      setHealth(h);
+      setHistory(hist);
+      setHasUsageData((stats.requests_this_week + stats.requests_prev_week) > 0);
+      setHighImpactCount(opts.filter((o) => o.impact === "high").length);
+    }).catch(console.error);
   }, []);
 
   const tabs: { id: Tab; icon: typeof Activity; label: string }[] = [
@@ -182,7 +239,13 @@ export function ObservabilityView() {
         Observability
       </h2>
 
-      <HealthBanner health={health} history={history} />
+      <HealthBanner
+        health={health}
+        history={history}
+        hasUsageData={hasUsageData}
+        highImpactCount={highImpactCount}
+        onNavigateToOptimizations={() => setActiveTab("optimizations")}
+      />
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)" }}>
