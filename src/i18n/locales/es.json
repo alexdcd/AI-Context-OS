@@ -258,7 +258,19 @@
   },
   "graph": {
     "nodesEdges": "{{nodes}} nodos · {{edges}} aristas",
-    "filterAll": "Todas las ontologías",
+    "filterAll": "Todos los tipos",
+    "viewCards": "Tarjetas",
+    "viewCosmos": "Cosmos",
+    "viewCardsTooltip": "Vista de tarjetas",
+    "viewCosmosTooltip": "Vista de cosmos (estilo Obsidian)",
+    "edgeRelated": "relacionado",
+    "edgeRequires": "requiere",
+    "edgeOptional": "opcional",
+    "highlightGodNodes": "Resaltar nodos dios",
+    "links": "{{count}} enlace",
+    "links_plural": "{{count}} enlaces",
+    "linkedFrom": "Enlazado desde ({{count}})",
+    "connections": "Conexiones",
     "colorByOntology": "Color por ontología",
     "colorByCommunity": "Color por comunidad",
     "relayout": "Reorganizar",
@@ -273,7 +285,7 @@
     "clickToInspect": "Haz clic en un nodo para inspeccionar. Doble clic para abrir.",
     "noNodes": "No hay nodos para el filtro actual.",
     "calculatingLayout": "Calculando diseño..."
-  },
+    },
   "governance": {
     "tabs": {
       "stats": "Estadísticas",
