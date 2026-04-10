@@ -357,5 +357,126 @@
     "a": "A · High",
     "b": "B · Medium",
     "c": "C · Low"
+  },
+  "connectors": {
+    "title": "Connectors",
+    "description": "Integrate AI Context OS with your AI tools.",
+    "status": {
+      "mcpHttp": "MCP HTTP: {{status}} at {{url}}",
+      "active": "active",
+      "inactive": "inactive"
+    },
+    "tiers": {
+      "localNative": "Local Native",
+      "bridge": "Manual Bridge"
+    },
+    "list": {
+      "claudeDesktop": {
+        "name": "Claude Desktop",
+        "description": "Native app (recommended). Cowork session with automatic access to context and MCP.",
+        "cap1": "Cowork: the optimal way to work with your files",
+        "cap2": "Automatic stdio MCP (get_context, save_memory, get_skill, log_session)",
+        "cap3": "Automatic reading of claude.md"
+      },
+      "claudeCode": {
+        "name": "Claude Code",
+        "description": "CLI integration: Native MCP with 4 tools + automatic context.",
+        "cap1": "stdio MCP in the terminal",
+        "cap2": "Automatic reading of claude.md when opening the workspace"
+      },
+      "cursor": {
+        "name": "Cursor",
+        "description": "HTTP MCP (requires open app) + static .cursorrules always available.",
+        "cap1": "HTTP MCP on port 3847 (same 4 tools, requires app running)",
+        "cap2": "Auto-generated .cursorrules with rules and base context"
+      },
+      "windsurf": {
+        "name": "Windsurf",
+        "description": "HTTP MCP (requires open app) + static .windsurfrules always available.",
+        "cap1": "HTTP MCP on port 3847 (requires app running)",
+        "cap2": "Auto-generated .windsurfrules with rules and base context"
+      },
+      "chatgpt": {
+        "name": "ChatGPT / Codex",
+        "description": "Full integration via Codex CLI with native MCP support. Also manual handoff for ChatGPT web.",
+        "cap1": "stdio MCP via Codex CLI (get_context, save_memory, get_skill, log_session)",
+        "cap2": "Codex works directly in the root folder with file access",
+        "cap3": "Manual handoff for ChatGPT web (copy/paste context)"
+      },
+      "geminiCli": {
+        "name": "Gemini CLI",
+        "description": "Native MCP via Gemini CLI. Same 4 tools as Claude Code.",
+        "cap1": "stdio MCP via Gemini CLI (get_context, save_memory, get_skill, log_session)",
+        "cap2": "Automatic reading of context from workspace root"
+      },
+      "geminiWeb": {
+        "name": "Gemini Web",
+        "description": "No native integration. Manual transfer of optimal context.",
+        "cap1": "Copy optimized context to clipboard",
+        "cap2": "Generate handoff.md with structured summary"
+      },
+      "copilot": {
+        "name": "GitHub Copilot",
+        "description": "No native MCP. Uses .cursorrules as static context if the editor supports it.",
+        "cap1": "Static context via .cursorrules (in compatible editors)",
+        "cap2": "Copy optimized context to clipboard"
+      }
+    },
+    "sections": {
+      "capabilities": "Capabilities",
+      "coworkRecommended": "⭐ Option 1 — Cowork (recommended)",
+      "coworkDesc": "It's the optimal and easiest way to use our system. Just open the project with the Claude desktop app and use the <bold>Cowork</bold> tab. Claude will natively access all context and local files.",
+      "mcpStdio": "Option 2 — MCP server (stdio)",
+      "mcpStdioDesc": "To access your knowledge base from any conversation, add AI Context OS to <code accent>claude_desktop_config.json</code>:",
+      "coworkMcpInfo": "<bold>Cowork + MCP:</bold> We recommend using Cowork as the base. If you add MCP configuration, you will have advanced tools like global searches or graphs at your disposal.",
+      "mcpRegister": "⭐ Option 1 — Register MCP server (recommended)",
+      "mcpRegisterDesc": "Register AI Context OS as a permanent MCP server. This gives Claude Code access to all 4 tools (<code accent>get_context</code>, <code accent>save_memory</code>, <code accent>get_skill</code>, <code accent>log_session</code>).",
+      "openWorkspace": "Option 2 — Open workspace (claude.md only)",
+      "openWorkspaceDesc": "Opens Claude Code in your workspace. The <code accent>claude.md</code> is auto-loaded as context, but MCP tools are <bold>not</bold> available without Option 1.",
+      "terminalTip": "<bold>Tip:</bold> Use both options together — register the MCP server once, then open the workspace with Option 2 for full context + tools.",
+      "mcpHttp": "Option 1 — HTTP MCP (dynamic, requires open app)",
+      "mcpHttpDescCursor": "Add to <code accent>.cursor/mcp.json</code> in your project:",
+      "mcpHttpDescWindsurf": "Configure in Windsurf's MCP settings:",
+      "cursorrulesStatic": "Option 2 — .cursorrules (static, always available)",
+      "cursorrulesStaticDesc": "The <code accent>.cursorrules</code> file is auto-generated at the root of the workspace with rules and base context. Cursor reads it automatically without configuration.",
+      "windsurfrulesStatic": "Option 2 — .windsurfrules (static, always available)",
+      "windsurfrulesStaticDesc": "The <code accent>.windsurfrules</code> file is auto-generated at the root of the workspace. Windsurf reads it without additional configuration.",
+      "mcpVsRules": "<bold>MCP vs .cursorrules:</bold> MCP gives dynamic access to scoring, memories, and tools. .cursorrules is static but does not require the app to be running.",
+      "codexCli": "Option 1 — Codex CLI (recommended)",
+      "codexCliDesc": "<linkCodex>Codex CLI</linkCodex> supports native MCP servers. Configure in <code accent>~/.codex/config.yaml</code>:",
+      "codexInfo": "<bold>Codex CLI</bold> runs OpenAI models with direct MCP access. It's the best way to use AI Context OS with the ChatGPT/OpenAI ecosystem.",
+      "chatgptWeb": "Option 2 — ChatGPT web (manual handoff)",
+      "chatgptWebDesc": "For ChatGPT web without Codex, generate a context snapshot and paste it at the <bold>beginning of a new conversation</bold> before your first message.",
+      "geminiMcpDesc": "Install <linkGemini>Gemini CLI</linkGemini> and register AI Context OS as a permanent MCP server:",
+      "geminiSettings": "Option 2 — settings.json (manual)",
+      "geminiSettingsDesc": "Or add manually to <code accent>~/.gemini/settings.json</code>:",
+      "geminiInfo": "Gemini CLI supports MCP natively. Once registered, all 4 tools are available in every Gemini CLI session."
+    },
+    "bridge": {
+      "manualTransfer": "<bold>Manual Transfer</bold> — Prepares the context to copy it or save it as a file when there is no native integration.",
+      "copilotNote": "<bold>Note:</bold> <code accent>.cursorrules</code> is read by <bold>Cursor</bold> even with Copilot enabled. It is <bold>not</bold> read by GitHub Copilot in VS Code — use the clipboard handoff below instead.",
+      "copyContext": "Copy optimal context",
+      "generateHandoff": "Generate handoff.md",
+      "generating": "Generating...",
+      "handoffSuccess": "File saved to .ai/scratch/handoff.md and copied to clipboard.",
+      "copySuccess": "Context copied to clipboard.",
+      "error": "Could not prepare context transfer.",
+      "preview": "Preview",
+      "handoff": {
+        "title": "# Handoff for {{name}}",
+        "date": "Date: {{date}}",
+        "instructionsTitle": "## Instructions",
+        "instructions": "This document contains the active context of my memory workspace. Use it as a reference to continue the work in {{name}}.",
+        "memoriesTitle": "## Active memories"
+      }
+    },
+    "nullInfo": {
+      "title": "Workspace not detected.",
+      "description": "Configuration snippets require an initialized workspace. Go to <boldSettings>Settings → Workspace</boldSettings> to set up your workspace first."
+    },
+    "actions": {
+      "copy": "Copy",
+      "copied": "Copied"
+    }
   }
 }
