@@ -21,7 +21,8 @@ import type {
   TaskState,
   TaskPriority,
 } from "../lib/types";
-import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
+import { MEMORY_ONTOLOGY_COLORS } from "../lib/types";
+import { useTranslation } from "react-i18next";
 
 // ─── Helpers ───
 
