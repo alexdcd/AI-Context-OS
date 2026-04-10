@@ -163,6 +163,12 @@ pub fn run() {
             // Onboarding
             commands::onboarding::run_onboarding,
             commands::onboarding::is_onboarded,
+            // Vault management
+            commands::vault::list_vaults,
+            commands::vault::add_vault,
+            commands::vault::remove_vault,
+            commands::vault::switch_vault,
+            commands::vault::rename_vault,
             // Backup
             commands::backup::backup_workspace,
             commands::backup::restore_workspace,
