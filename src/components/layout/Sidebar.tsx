@@ -15,6 +15,7 @@ import {
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { useGovernanceBadge } from "../../lib/useGovernanceBadge";
+import { VaultSwitcherFooter } from "../vault/VaultSwitcherFooter";
 
 type SidebarKey = "explorer" | "journal" | "tasks" | "graph" | "simulation" | "governance" | "observability" | "connectors";
 
