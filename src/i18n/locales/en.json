@@ -307,7 +307,25 @@
     "godNodesDesc": "Memories whose graph connectivity (degree) significantly exceeds their assigned importance. Consider increasing their importance score.",
     "noGodNodes": "No god nodes detected — importance scores are well-calibrated",
     "clearAll": "Clear all ({{count}})",
-    "noScratch": "No expired scratch files"
+    "noScratch": "No expired scratch files",
+    "confirm": {
+      "archiveAllTitle": "Archive {{count}} memories?",
+      "archiveAllDesc": "These memories haven't been accessed in a long time and will be permanently deleted.",
+      "archiveTitle": "Archive \"{{id}}\"?",
+      "archiveDesc": "This memory will be permanently deleted.",
+      "clearAllTitle": "Delete {{count}} scratch files?",
+      "clearAllDesc": "These temporary files have exceeded their TTL and will be permanently deleted.",
+      "deleteTitle": "Delete \"{{name}}\"?",
+      "deleteDesc": "This scratch file will be permanently deleted."
+    },
+    "godNodes": {
+      "critical": "Undervalued — boost it",
+      "slight": "Slightly undervalued",
+      "boosting": "Boosting…",
+      "boost": "Boost importance",
+      "connections": "{{count}} connections",
+      "imp": "imp {{value}}"
+    }
   },
   "observability": {
     "tabs": {

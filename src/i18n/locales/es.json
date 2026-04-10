@@ -306,9 +306,27 @@
     "noConsolidation": "Sin sugerencias de consolidación",
     "godNodesDesc": "Memorias cuya conectividad en el grafo supera significativamente su importancia asignada. Considera aumentar su puntuación.",
     "noGodNodes": "No se detectaron nodos dios — las puntuaciones de importancia están bien calibradas",
-    "clearAll": "Limpiar todos ({{count}})",
-    "noScratch": "Sin archivos scratch caducados"
-  },
+    "clearAll": "Limpiar todo ({{count}})",
+    "noScratch": "Sin archivos scratch caducados",
+    "confirm": {
+      "archiveAllTitle": "¿Archivar {{count}} memorias?",
+      "archiveAllDesc": "Estas memorias no se han utilizado en mucho tiempo y se eliminarán permanentemente.",
+      "archiveTitle": "¿Archivar \"{{id}}\"?",
+      "archiveDesc": "Esta memoria se eliminará permanentemente.",
+      "clearAllTitle": "¿Eliminar {{count}} archivos scratch?",
+      "clearAllDesc": "Estos archivos temporales han superado su TTL y se eliminarán permanentemente.",
+      "deleteTitle": "¿Eliminar \"{{name}}\"?",
+      "deleteDesc": "Este archivo scratch se eliminará permanentemente."
+    },
+    "godNodes": {
+      "critical": "Infravalorado — potenciar",
+      "slight": "Ligeramente infravalorado",
+      "boosting": "Potenciando…",
+      "boost": "Potenciar importancia",
+      "connections": "{{count}} conexiones",
+      "imp": "imp {{value}}"
+    }
+    },
   "observability": {
     "tabs": {
       "live": "En vivo",

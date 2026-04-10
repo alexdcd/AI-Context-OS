@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -9,6 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 import {
   getConflicts,
   getDecayCandidates,
@@ -21,7 +22,7 @@ import {
 } from "../lib/tauri";
 import { useAppStore } from "../lib/store";
 import type { Conflict, ConsolidationSuggestion, GodNode, MemoryMeta } from "../lib/types";
-import { MEMORY_ONTOLOGY_COLORS, MEMORY_ONTOLOGY_LABELS } from "../lib/types";
+import { MEMORY_ONTOLOGY_COLORS } from "../lib/types";
 
 type Tab = "stats" | "conflicts" | "decay" | "consolidation" | "scratch" | "god_nodes";
 
@@ -34,6 +35,7 @@ interface ConfirmDialogProps {
 }
 
 function ConfirmDialog({ title, description, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-80 rounded-lg border border-[var(--border)] bg-[color:var(--bg-1)] p-5 shadow-xl">
@@ -44,7 +46,7 @@ function ConfirmDialog({ title, description, confirmLabel, onConfirm, onCancel }
             onClick={onCancel}
             className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={onConfirm}
@@ -61,6 +63,7 @@ function ConfirmDialog({ title, description, confirmLabel, onConfirm, onCancel }
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function GovernanceView() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("stats");
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [decayCandidates, setDecayCandidates] = useState<MemoryMeta[]>([]);
@@ -87,9 +90,9 @@ export function GovernanceView() {
 
   const confirmArchiveAll = () => {
     setConfirmDialog({
-      title: `Archive ${decayCandidates.length} memories?`,
-      description: "These memories haven't been accessed in a long time and will be permanently deleted.",
-      confirmLabel: `Archive ${decayCandidates.length}`,
+      title: t("governance.confirm.archiveAllTitle", { count: decayCandidates.length }),
+      description: t("governance.confirm.archiveAllDesc"),
+      confirmLabel: t("governance.archive"),
       onConfirm: async () => {
         setConfirmDialog(null);
         for (const m of decayCandidates) {
@@ -103,9 +106,9 @@ export function GovernanceView() {
 
   const confirmClearAll = () => {
     setConfirmDialog({
-      title: `Delete ${scratchFiles.length} scratch files?`,
-      description: "These temporary files have exceeded their TTL and will be permanently deleted.",
-      confirmLabel: `Delete ${scratchFiles.length}`,
+      title: t("governance.confirm.clearAllTitle", { count: scratchFiles.length }),
+      description: t("governance.confirm.clearAllDesc"),
+      confirmLabel: t("common.delete"),
       onConfirm: async () => {
         setConfirmDialog(null);
         for (const file of scratchFiles) {
@@ -145,14 +148,14 @@ export function GovernanceView() {
     }
   };
 
-  const tabs: { id: Tab; icon: typeof BarChart3; label: string }[] = [
-    { id: "stats", icon: BarChart3, label: "Stats" },
-    { id: "conflicts", icon: AlertTriangle, label: `Conflicts ${conflicts.length}` },
-    { id: "decay", icon: Clock, label: `Decay ${decayCandidates.length}` },
-    { id: "consolidation", icon: ArrowUpFromLine, label: `Consolidation ${consolidation.length}` },
-    { id: "scratch", icon: Trash2, label: `Scratch TTL ${scratchFiles.length}` },
-    { id: "god_nodes", icon: Star, label: `God Nodes ${godNodes.length}` },
-  ];
+  const tabs: { id: Tab; icon: typeof BarChart3; label: string }[] = useMemo(() => [
+    { id: "stats", icon: BarChart3, label: t("governance.tabs.stats") },
+    { id: "conflicts", icon: AlertTriangle, label: t("governance.tabs.conflicts", { count: conflicts.length }) },
+    { id: "decay", icon: Clock, label: t("governance.tabs.decay", { count: decayCandidates.length }) },
+    { id: "consolidation", icon: ArrowUpFromLine, label: t("governance.tabs.consolidation", { count: consolidation.length }) },
+    { id: "scratch", icon: Trash2, label: t("governance.tabs.scratch", { count: scratchFiles.length }) },
+    { id: "god_nodes", icon: Star, label: t("governance.tabs.godNodes", { count: godNodes.length }) },
+  ], [t, conflicts.length, decayCandidates.length, consolidation.length, scratchFiles.length, godNodes.length]);
 
   const typeGroups = memories.reduce(
     (acc, m) => {
@@ -195,13 +198,13 @@ export function GovernanceView() {
         {activeTab === "stats" && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-3">
-              <StatCard label="Total" value={memories.length.toString()} />
-              <StatCard label="Avg Importance" value={avgImportance.toFixed(2)} />
-              <StatCard label="Conflicts" value={conflicts.length.toString()} />
+              <StatCard label={t("governance.total")} value={memories.length.toString()} />
+              <StatCard label={t("governance.avgImportance")} value={avgImportance.toFixed(2)} />
+              <StatCard label={t("governance.conflicts")} value={conflicts.length.toString()} />
             </div>
             <div>
               <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-2)]">
-                By ontology
+                {t("governance.byOntology")}
               </h3>
               <div className="space-y-1.5">
                 {Object.entries(typeGroups).map(([type, count]) => (
@@ -211,7 +214,7 @@ export function GovernanceView() {
                       style={{ backgroundColor: MEMORY_ONTOLOGY_COLORS[type as keyof typeof MEMORY_ONTOLOGY_COLORS] }}
                     />
                     <span className="w-20 text-xs text-[color:var(--text-1)]">
-                      {MEMORY_ONTOLOGY_LABELS[type as keyof typeof MEMORY_ONTOLOGY_LABELS]}
+                      {t(`ontologies.${type}`)}
                     </span>
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-[color:var(--bg-3)]">
                       <div
@@ -247,7 +250,7 @@ export function GovernanceView() {
               </div>
             ))}
             {conflicts.length === 0 && (
-              <Empty text="No conflicts detected" />
+              <Empty text={t("governance.noConflicts")} />
             )}
           </div>
         )}
@@ -259,7 +262,7 @@ export function GovernanceView() {
                 onClick={confirmArchiveAll}
                 className="mb-2 rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
               >
-                Archive all ({decayCandidates.length})
+                {t("governance.archiveAll", { count: decayCandidates.length })}
               </button>
             )}
             {decayCandidates.map((m) => (
@@ -273,9 +276,9 @@ export function GovernanceView() {
                 <button
                   onClick={() =>
                     setConfirmDialog({
-                      title: `Archive "${m.id}"?`,
-                      description: "This memory will be permanently deleted.",
-                      confirmLabel: "Archive",
+                      title: t("governance.confirm.archiveTitle", { id: m.id }),
+                      description: t("governance.confirm.archiveDesc"),
+                      confirmLabel: t("governance.archive"),
                       onConfirm: async () => {
                         setConfirmDialog(null);
                         try {
@@ -288,12 +291,12 @@ export function GovernanceView() {
                   }
                   className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-[color:var(--danger)] hover:bg-[color:var(--danger)]/20"
                 >
-                  Archive
+                  {t("governance.archive")}
                 </button>
               </div>
             ))}
             {decayCandidates.length === 0 && (
-              <Empty text="No decay candidates" />
+              <Empty text={t("governance.noDecay")} />
             )}
           </div>
         )}
@@ -306,7 +309,7 @@ export function GovernanceView() {
               </div>
             ))}
             {consolidation.length === 0 && (
-              <Empty text="No consolidation suggestions" />
+              <Empty text={t("governance.noConsolidation")} />
             )}
           </div>
         )}
@@ -314,14 +317,13 @@ export function GovernanceView() {
         {activeTab === "god_nodes" && (
           <div className="space-y-2">
             <p className="mb-3 text-[11px] text-[color:var(--text-2)]">
-              These memories are highly connected in your knowledge graph but have a low importance score.
-              Boosting them helps the context router surface them more often.
+              {t("governance.godNodesDesc")}
             </p>
             {godNodes.map((gn) => {
               const mismatch = gn.mismatch_score;
               const color = MEMORY_ONTOLOGY_COLORS[gn.ontology];
               const isCritical = mismatch > 0.4;
-              const label = isCritical ? "Undervalued — boost it" : "Slightly undervalued";
+              const label = isCritical ? t("governance.godNodes.critical") : t("governance.godNodes.slight");
               return (
                 <div
                   key={gn.memory_id}
@@ -341,8 +343,8 @@ export function GovernanceView() {
                       {gn.memory_id}
                     </span>
                     <span className="ml-auto flex items-center gap-2 text-[10px] font-mono text-[color:var(--text-2)]">
-                      <span>{gn.degree} connections</span>
-                      <span>imp {gn.importance.toFixed(2)}</span>
+                      <span>{t("governance.godNodes.connections", { count: gn.degree })}</span>
+                      <span>{t("governance.godNodes.imp", { value: gn.importance.toFixed(2) })}</span>
                     </span>
                   </div>
                   <p className="truncate text-[11px] text-[color:var(--text-2)] mb-2">{gn.l0}</p>
@@ -367,14 +369,14 @@ export function GovernanceView() {
                       )}
                     >
                       <Zap className="h-2.5 w-2.5" />
-                      {boostingId === gn.memory_id ? "Boosting…" : "Boost importance"}
+                      {boostingId === gn.memory_id ? t("governance.godNodes.boosting") : t("governance.godNodes.boost")}
                     </button>
                   </div>
                 </div>
               );
             })}
             {godNodes.length === 0 && (
-              <Empty text="No god nodes detected — importance scores are well-calibrated" />
+              <Empty text={t("governance.noGodNodes")} />
             )}
           </div>
         )}
@@ -386,7 +388,7 @@ export function GovernanceView() {
                 onClick={confirmClearAll}
                 className="mb-2 rounded-md bg-[color:var(--warning)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20"
               >
-                Clear all ({scratchFiles.length})
+                {t("governance.clearAll", { count: scratchFiles.length })}
               </button>
             )}
             {scratchFiles.map((file) => {
@@ -400,9 +402,9 @@ export function GovernanceView() {
                   <button
                     onClick={() =>
                       setConfirmDialog({
-                        title: `Delete "${name}"?`,
-                        description: "This scratch file will be permanently deleted.",
-                        confirmLabel: "Delete",
+                        title: t("governance.confirm.deleteTitle", { name }),
+                        description: t("governance.confirm.deleteDesc"),
+                        confirmLabel: t("common.delete"),
                         onConfirm: async () => {
                           setConfirmDialog(null);
                           try {
@@ -415,13 +417,13 @@ export function GovernanceView() {
                     }
                     className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-[color:var(--warning)] hover:bg-[color:var(--warning)]/20"
                   >
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </div>
               );
             })}
             {scratchFiles.length === 0 && (
-              <Empty text="No expired scratch files" />
+              <Empty text={t("governance.noScratch")} />
             )}
           </div>
         )}
