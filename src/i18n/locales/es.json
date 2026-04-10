@@ -357,5 +357,126 @@
     "a": "A · Alta",
     "b": "B · Media",
     "c": "C · Baja"
+  },
+  "connectors": {
+    "title": "Conectores",
+    "description": "Integra AI Context OS con tus herramientas de IA.",
+    "status": {
+      "mcpHttp": "MCP HTTP: {{status}} en {{url}}",
+      "active": "activo",
+      "inactive": "inactivo"
+    },
+    "tiers": {
+      "localNative": "Nativo Local",
+      "bridge": "Puente Manual"
+    },
+    "list": {
+      "claudeDesktop": {
+        "name": "Claude Desktop",
+        "description": "App nativa (recomendado). Sesión de Cowork con acceso automático a contexto y MCP.",
+        "cap1": "Cowork: la forma óptima de trabajar con tus archivos",
+        "cap2": "stdio MCP automático (get_context, save_memory, get_skill, log_session)",
+        "cap3": "Lectura automática de claude.md"
+      },
+      "claudeCode": {
+        "name": "Claude Code",
+        "description": "Integración CLI: MCP nativo con 4 herramientas + contexto automático.",
+        "cap1": "stdio MCP en la terminal",
+        "cap2": "Lectura automática de claude.md al abrir el espacio de trabajo"
+      },
+      "cursor": {
+        "name": "Cursor",
+        "description": "HTTP MCP (requiere app abierta) + .cursorrules estático siempre disponible.",
+        "cap1": "HTTP MCP en puerto 3847 (mismas 4 herramientas, requiere app abierta)",
+        "cap2": ".cursorrules autogenerado con reglas y contexto base"
+      },
+      "windsurf": {
+        "name": "Windsurf",
+        "description": "HTTP MCP (requiere app abierta) + .windsurfrules estático siempre disponible.",
+        "cap1": "HTTP MCP en puerto 3847 (requiere app abierta)",
+        "cap2": ".windsurfrules autogenerado con reglas y contexto base"
+      },
+      "chatgpt": {
+        "name": "ChatGPT / Codex",
+        "description": "Integración completa vía Codex CLI con soporte MCP nativo. También transferencia manual para ChatGPT web.",
+        "cap1": "stdio MCP vía Codex CLI (get_context, save_memory, get_skill, log_session)",
+        "cap2": "Codex funciona directamente en la carpeta raíz con acceso a archivos",
+        "cap3": "Transferencia manual para ChatGPT web (copiar/pegar contexto)"
+      },
+      "geminiCli": {
+        "name": "Gemini CLI",
+        "description": "MCP nativo vía Gemini CLI. Mismas 4 herramientas que Claude Code.",
+        "cap1": "stdio MCP vía Gemini CLI (get_context, save_memory, get_skill, log_session)",
+        "cap2": "Lectura automática del contexto desde la raíz del espacio de trabajo"
+      },
+      "geminiWeb": {
+        "name": "Gemini Web",
+        "description": "Sin integración nativa. Transferencia manual de contexto óptimo.",
+        "cap1": "Copiar contexto optimizado al portapapeles",
+        "cap2": "Generar handoff.md con resumen estructurado"
+      },
+      "copilot": {
+        "name": "GitHub Copilot",
+        "description": "Sin MCP nativo. Usa .cursorrules como contexto estático si el editor lo soporta.",
+        "cap1": "Contexto estático vía .cursorrules (en editores compatibles)",
+        "cap2": "Copiar contexto optimizado al portapapeles"
+      }
+    },
+    "sections": {
+      "capabilities": "Capacidades",
+      "coworkRecommended": "⭐ Opción 1 — Cowork (recomendado)",
+      "coworkDesc": "Es la forma óptima y más sencilla de usar nuestro sistema. Solo abre el proyecto con la app de Claude desktop y usa la pestaña <bold>Cowork</bold>. Claude accederá de forma nativa a todo el contexto y archivos locales.",
+      "mcpStdio": "Opción 2 — Servidor MCP (stdio)",
+      "mcpStdioDesc": "Para acceder a tu base de conocimientos desde cualquier conversación, añade AI Context OS a <code accent>claude_desktop_config.json</code>:",
+      "coworkMcpInfo": "<bold>Cowork + MCP:</bold> Recomendamos usar Cowork como base. Si añades la configuración MCP, tendrás herramientas avanzadas como búsquedas globales o grafos a tu disposición.",
+      "mcpRegister": "⭐ Opción 1 — Registrar servidor MCP (recomendado)",
+      "mcpRegisterDesc": "Registra AI Context OS como un servidor MCP permanente. Esto da acceso a Claude Code a las 4 herramientas (<code accent>get_context</code>, <code accent>save_memory</code>, <code accent>get_skill</code>, <code accent>log_session</code>).",
+      "openWorkspace": "Opción 2 — Abrir espacio de trabajo (solo claude.md)",
+      "openWorkspaceDesc": "Abre Claude Code en tu espacio de trabajo. El <code accent>claude.md</code> se carga automáticamente como contexto, pero las herramientas MCP <bold>no</bold> están disponibles sin la Opción 1.",
+      "terminalTip": "<bold>Consejo:</bold> Usa ambas opciones juntas — registra el servidor MCP una vez, y luego abre el espacio de trabajo con la Opción 2 para tener contexto completo + herramientas.",
+      "mcpHttp": "Opción 1 — HTTP MCP (dinámico, requiere app abierta)",
+      "mcpHttpDescCursor": "Añade a <code accent>.cursor/mcp.json</code> en tu proyecto:",
+      "mcpHttpDescWindsurf": "Configura en los ajustes MCP de Windsurf:",
+      "cursorrulesStatic": "Opción 2 — .cursorrules (estático, siempre disponible)",
+      "cursorrulesStaticDesc": "El archivo <code accent>.cursorrules</code> se genera automáticamente en la raíz con reglas y contexto base. Cursor lo lee automáticamente sin configuración.",
+      "windsurfrulesStatic": "Opción 2 — .windsurfrules (estático, siempre disponible)",
+      "windsurfrulesStaticDesc": "El archivo <code accent>.windsurfrules</code> se genera automáticamente en la raíz. Windsurf lo lee sin configuración adicional.",
+      "mcpVsRules": "<bold>MCP vs .cursorrules:</bold> MCP da acceso dinámico a puntuación, memorias y herramientas. .cursorrules es estático pero no requiere que la app esté abierta.",
+      "codexCli": "Opción 1 — Codex CLI (recomendado)",
+      "codexCliDesc": "<linkCodex>Codex CLI</linkCodex> soporta servidores MCP nativos. Configura en <code accent>~/.codex/config.yaml</code>:",
+      "codexInfo": "<bold>Codex CLI</bold> ejecuta modelos de OpenAI con acceso directo a MCP. Es la mejor forma de usar AI Context OS con el ecosistema ChatGPT/OpenAI.",
+      "chatgptWeb": "Opción 2 — ChatGPT web (transferencia manual)",
+      "chatgptWebDesc": "Para ChatGPT web sin Codex, genera un snapshot de contexto y pégalo al <bold>principio de una nueva conversación</bold> antes de tu primer mensaje.",
+      "geminiMcpDesc": "Instala <linkGemini>Gemini CLI</linkGemini> y registra AI Context OS como servidor MCP permanente:",
+      "geminiSettings": "Opción 2 — settings.json (manual)",
+      "geminiSettingsDesc": "O añade manualmente a <code accent>~/.gemini/settings.json</code>:",
+      "geminiInfo": "Gemini CLI soporta MCP de forma nativa. Una vez registrado, las 4 herramientas están disponibles en cada sesión de Gemini CLI."
+    },
+    "bridge": {
+      "manualTransfer": "<bold>Transferencia Manual</bold> — Prepara el contexto para copiarlo o guardarlo como archivo cuando no hay integración nativa.",
+      "copilotNote": "<bold>Nota:</bold> <code accent>.cursorrules</code> es leído por <bold>Cursor</bold> incluso con Copilot activado. <bold>No</bold> es leído por GitHub Copilot en VS Code — usa la transferencia por portapapeles de abajo.",
+      "copyContext": "Copiar contexto óptimo",
+      "generateHandoff": "Generar handoff.md",
+      "generating": "Generando...",
+      "handoffSuccess": "Archivo guardado en .ai/scratch/handoff.md y copiado al portapapeles.",
+      "copySuccess": "Contexto copiado al portapapeles.",
+      "error": "No se pudo preparar la transferencia de contexto.",
+      "preview": "Previsualización",
+      "handoff": {
+        "title": "# Handoff para {{name}}",
+        "date": "Fecha: {{date}}",
+        "instructionsTitle": "## Instrucciones",
+        "instructions": "Este documento contiene el contexto activo de mi espacio de memorias. Úsalo como referencia para continuar el trabajo en {{name}}.",
+        "memoriesTitle": "## Memorias activas"
+      }
+    },
+    "nullInfo": {
+      "title": "Espacio de trabajo no detectado.",
+      "description": "Los fragmentos de configuración requieren un espacio de trabajo inicializado. Ve a <boldSettings>Ajustes → Espacio de trabajo</boldSettings> para configurarlo primero."
+    },
+    "actions": {
+      "copy": "Copiar",
+      "copied": "Copiado"
+    }
   }
 }
