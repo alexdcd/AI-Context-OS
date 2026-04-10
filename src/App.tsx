@@ -8,6 +8,9 @@ import { useAppStore } from "./lib/store";
 import { isOnboarded } from "./lib/tauri";
 import { HealthBadge } from "./components/layout/HealthBadge";
 import { useThemeEffect } from "./lib/settingsStore";
+import { useVaultStore } from "./lib/vaultStore";
+import { VaultConfirmDialog } from "./components/vault/VaultConfirmDialog";
+import { VaultSwitchScreen } from "./components/vault/VaultSwitchScreen";
 import { PanelLeft } from "lucide-react";
 
 const ExplorerView = lazy(() =>
@@ -89,7 +92,9 @@ function AppContent() {
   const navigate = useNavigate();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [showOnboardingForVault, setShowOnboardingForVault] = useState(false);
   const titlebarRef = useRef<HTMLDivElement>(null);
+  const { switchPhase, setActiveVaultPath, loadVaults } = useVaultStore();
 
   // Responsive: auto-close explorer on narrow windows
   useEffect(() => {
@@ -135,6 +140,19 @@ function AppContent() {
       .then(setOnboarded)
       .catch(() => setOnboarded(false));
   }, []);
+
+  // Sync active vault path on boot (after app has initialized)
+  useEffect(() => {
+    if (onboarded) {
+      void loadVaults().then(() => {
+        const { vaults } = useVaultStore.getState();
+        // Best-effort: pick the first vault if none persisted yet
+        if (!useVaultStore.getState().activeVaultPath && vaults.length > 0) {
+          setActiveVaultPath(vaults[0].path);
+        }
+      });
+    }
+  }, [onboarded, loadVaults, setActiveVaultPath]);
 
   // Native DOM listener for window dragging — bypasses React's synthetic event system
   // which can interfere with macOS native drag handling
