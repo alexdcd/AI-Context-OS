@@ -134,9 +134,9 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
           disabled={readonly}
           className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-1)]"
         >
-          {(Object.keys(MEMORY_ONTOLOGY_LABELS) as MemoryOntology[]).map((ontology) => (
+          {(["source", "entity", "concept", "synthesis"] as MemoryOntology[]).map((ontology) => (
             <option key={ontology} value={ontology}>
-              {MEMORY_ONTOLOGY_LABELS[ontology]}
+              {t(`ontologies.${ontology}`)}
             </option>
           ))}
         </select>
