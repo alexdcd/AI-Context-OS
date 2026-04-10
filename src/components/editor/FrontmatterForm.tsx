@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MemoryMeta, MemoryOntology } from "../../lib/types";
-import { MEMORY_ONTOLOGY_LABELS } from "../../lib/types";
 
 interface FrontmatterFormProps {
   meta: MemoryMeta;
