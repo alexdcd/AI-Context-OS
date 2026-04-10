@@ -16,6 +16,14 @@ Tauri v2 desktop app. Files ARE the database: ~/AI-Context-OS/ con carpetas, arc
 - **UI text en español** (labels, placeholders, empty states)
 - **CSS variables para todo el theming** (--bg-0..3, --text-0..2, --accent, --border), nunca colores hardcoded
 
+## Solución de Errores (IA & Git Metadata)
+
+- **Chat de Antigravity bloqueado / Botón "Generate" falla**:
+  1. **Desempaquetar Ramas Git**: `git update-ref refs/remotes/origin/NOMBRE_RAMA $(git rev-parse origin/NOMBRE_RAMA)` para que el archivo de la rama exista físicamente en `.git/refs/`.
+  2. **Desactivar Config de Worktree**: `git config --unset extensions.worktreeConfig` (elimina la sección `[extensions]` de `.git/config` si existe).
+  3. **Limpiar Cache de la IA**: Borrar archivos `.db` y `.index` en `.claude/` y reiniciar el IDE.
+  4. **Podar Worktrees obsoletos**: `git worktree prune`.
+
 ## IPC Commands (tauri.ts ↔ lib.rs)
 
 config: init_workspace, get_config, save_config
