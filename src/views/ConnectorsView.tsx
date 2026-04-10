@@ -1,7 +1,8 @@
 // Nota: en una iteración posterior, mover tipos y lista de conectores a src/lib/connectors.ts
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Copy, FileText, Check } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation, Trans } from "react-i18next";
 import { getMcpConnectionInfo, simulateContext, writeFile } from "../lib/tauri";
 import type { McpConnectionInfo } from "../lib/types";
 
@@ -16,105 +17,8 @@ interface ConnectorDef {
   capabilities: string[];
 }
 
-const CONNECTORS: ConnectorDef[] = [
-  {
-    id: "claude-desktop",
-    name: "Claude Desktop",
-    tier: "Local Native",
-    description: "Native app (recommended). Cowork session with automatic access to context and MCP.",
-    icon: "C",
-    capabilities: [
-      "Cowork: the optimal way to work with your files",
-      "Automatic stdio MCP (get_context, save_memory, get_skill, log_session)",
-      "Automatic reading of claude.md"
-    ],
-  },
-  {
-    id: "claude-code",
-    name: "Claude Code",
-    tier: "Local Native",
-    description: "CLI integration: Native MCP with 4 tools + automatic context.",
-    icon: ">_",
-    capabilities: [
-      "stdio MCP in the terminal",
-      "Automatic reading of claude.md when opening the workspace",
-    ],
-  },
-  {
-    id: "cursor",
-    name: "Cursor",
-    tier: "Local Native",
-    description: "HTTP MCP (requires open app) + static .cursorrules always available.",
-    icon: "↗",
-    capabilities: [
-      "HTTP MCP on port 3847 (same 4 tools, requires app running)",
-      "Auto-generated .cursorrules with rules and base context",
-    ],
-  },
-  {
-    id: "windsurf",
-    name: "Windsurf",
-    tier: "Local Native",
-    description: "HTTP MCP (requires open app) + static .windsurfrules always available.",
-    icon: "W",
-    capabilities: [
-      "HTTP MCP on port 3847 (requires app running)",
-      "Auto-generated .windsurfrules with rules and base context",
-    ],
-  },
-  {
-    id: "chatgpt",
-    name: "ChatGPT / Codex",
-    tier: "Local Native",
-    description: "Full integration via Codex CLI with native MCP support. Also manual handoff for ChatGPT web.",
-    icon: "G",
-    capabilities: [
-      "stdio MCP via Codex CLI (get_context, save_memory, get_skill, log_session)",
-      "Codex works directly in the root folder with file access",
-      "Manual handoff for ChatGPT web (copy/paste context)",
-    ],
-  },
-  {
-    id: "gemini-cli",
-    name: "Gemini CLI",
-    tier: "Local Native",
-    description: "Native MCP via Gemini CLI. Same 4 tools as Claude Code.",
-    icon: "♊",
-    capabilities: [
-      "stdio MCP via Gemini CLI (get_context, save_memory, get_skill, log_session)",
-      "Automatic reading of context from workspace root",
-    ],
-  },
-  {
-    id: "gemini",
-    name: "Gemini Web",
-    tier: "Bridge",
-    description: "No native integration. Manual transfer of optimal context.",
-    icon: "✦",
-    capabilities: [
-      "Copy optimized context to clipboard",
-      "Generate handoff.md with structured summary",
-    ],
-  },
-  {
-    id: "copilot",
-    name: "GitHub Copilot",
-    tier: "Bridge",
-    description: "No native MCP. Uses .cursorrules as static context if the editor supports it.",
-    icon: "⊙",
-    capabilities: [
-      "Static context via .cursorrules (in compatible editors)",
-      "Copy optimized context to clipboard",
-    ],
-  },
-];
-
-const TIER_COLORS: Record<IntegrationTier, { bg: string; text: string; label: string }> = {
-  "Local Native": { bg: "var(--bg-2)", text: "var(--success)", label: "Local Native" },
-  "Bridge": { bg: "var(--bg-2)", text: "var(--warning)", label: "Manual Bridge" },
-};
-
 export function ConnectorsView() {
+  const { t } = useTranslation();
   const [info, setInfo] = useState<McpConnectionInfo | null>(null);
   const [activeConnector, setActiveConnector] = useState<string>("claude-desktop");
   const [bridgeStatus, setBridgeStatus] = useState<"idle" | "loading" | "done">("idle");
@@ -122,6 +26,104 @@ export function ConnectorsView() {
   const [bridgeFeedback, setBridgeFeedback] = useState<string>("");
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  const CONNECTORS: ConnectorDef[] = useMemo(() => [
+    {
+      id: "claude-desktop",
+      name: t("connectors.list.claudeDesktop.name"),
+      tier: "Local Native",
+      description: t("connectors.list.claudeDesktop.description"),
+      icon: "C",
+      capabilities: [
+        t("connectors.list.claudeDesktop.cap1"),
+        t("connectors.list.claudeDesktop.cap2"),
+        t("connectors.list.claudeDesktop.cap3"),
+      ],
+    },
+    {
+      id: "claude-code",
+      name: t("connectors.list.claudeCode.name"),
+      tier: "Local Native",
+      description: t("connectors.list.claudeCode.description"),
+      icon: ">_",
+      capabilities: [
+        t("connectors.list.claudeCode.cap1"),
+        t("connectors.list.claudeCode.cap2"),
+      ],
+    },
+    {
+      id: "cursor",
+      name: t("connectors.list.cursor.name"),
+      tier: "Local Native",
+      description: t("connectors.list.cursor.description"),
+      icon: "↗",
+      capabilities: [
+        t("connectors.list.cursor.cap1"),
+        t("connectors.list.cursor.cap2"),
+      ],
+    },
+    {
+      id: "windsurf",
+      name: t("connectors.list.windsurf.name"),
+      tier: "Local Native",
+      description: t("connectors.list.windsurf.description"),
+      icon: "W",
+      capabilities: [
+        t("connectors.list.windsurf.cap1"),
+        t("connectors.list.windsurf.cap2"),
+      ],
+    },
+    {
+      id: "chatgpt",
+      name: t("connectors.list.chatgpt.name"),
+      tier: "Local Native",
+      description: t("connectors.list.chatgpt.description"),
+      icon: "G",
+      capabilities: [
+        t("connectors.list.chatgpt.cap1"),
+        t("connectors.list.chatgpt.cap2"),
+        t("connectors.list.chatgpt.cap3"),
+      ],
+    },
+    {
+      id: "gemini-cli",
+      name: t("connectors.list.geminiCli.name"),
+      tier: "Local Native",
+      description: t("connectors.list.geminiCli.description"),
+      icon: "♊",
+      capabilities: [
+        t("connectors.list.geminiCli.cap1"),
+        t("connectors.list.geminiCli.cap2"),
+      ],
+    },
+    {
+      id: "gemini",
+      name: t("connectors.list.geminiWeb.name"),
+      tier: "Bridge",
+      description: t("connectors.list.geminiWeb.description"),
+      icon: "✦",
+      capabilities: [
+        t("connectors.list.geminiWeb.cap1"),
+        t("connectors.list.geminiWeb.cap2"),
+      ],
+    },
+    {
+      id: "copilot",
+      name: t("connectors.list.copilot.name"),
+      tier: "Bridge",
+      description: t("connectors.list.copilot.description"),
+      icon: "⊙",
+      capabilities: [
+        t("connectors.list.copilot.cap1"),
+        t("connectors.list.copilot.cap2"),
+      ],
+    },
+  ], [t]);
+
+  const TIER_COLORS: Record<IntegrationTier, { bg: string; text: string; label: string }> = {
+    "Local Native": { bg: "var(--bg-2)", text: "var(--success)", label: t("connectors.tiers.localNative") },
+    "Bridge": { bg: "var(--bg-2)", text: "var(--warning)", label: t("connectors.tiers.bridge") },
+  };
 
   useEffect(() => {
     getMcpConnectionInfo().then(setInfo).catch(console.error);
@@ -147,15 +149,14 @@ export function ConnectorsView() {
       let text: string;
       if (action === "handoff") {
         text = [
-          `# Handoff for ${connectorName}`,
+          t("connectors.bridge.handoff.title", { name: connectorName }),
           "",
-          `Date: ${new Date().toLocaleString("en-US")}`,
+          t("connectors.bridge.handoff.date", { date: new Date().toLocaleString() }),
           "",
-          "## Instructions",
-          "This document contains the active context of my memory workspace.",
-          `Use it as a reference to continue the work in ${connectorName}.`,
+          t("connectors.bridge.handoff.instructionsTitle"),
+          t("connectors.bridge.handoff.instructions", { name: connectorName }),
           "",
-          "## Active memories",
+          t("connectors.bridge.handoff.memoriesTitle"),
           "",
           ...memories.map((m) => `### [${m.memory_id}] (${m.ontology})\n${m.l0}`),
         ].join("\n");
@@ -170,14 +171,14 @@ export function ConnectorsView() {
         }
         const handoffPath = `${info.workspace_root}/.ai/scratch/handoff.md`;
         await writeFile(handoffPath, text);
-        setBridgeFeedback(`File saved to .ai/scratch/handoff.md and copied to clipboard.`);
+        setBridgeFeedback(t("connectors.bridge.handoffSuccess"));
       } else {
-        setBridgeFeedback("Context copied to clipboard.");
+        setBridgeFeedback(t("connectors.bridge.copySuccess"));
       }
       setBridgeText(text);
       setBridgeStatus("done");
     } catch {
-      setBridgeError("Could not prepare context transfer.");
+      setBridgeError(t("connectors.bridge.error"));
       setBridgeStatus("idle");
     }
   };
@@ -185,10 +186,10 @@ export function ConnectorsView() {
   return (
     <div className="view-container h-full overflow-y-auto" style={{ padding: 24 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: "var(--text-0)" }}>
-        Connectors
+        {t("connectors.title")}
       </h1>
       <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 20 }}>
-        Integrate AI Context OS with your AI tools.
+        {t("connectors.description")}
       </p>
 
       {/* MCP server status */}
@@ -216,8 +217,10 @@ export function ConnectorsView() {
             }}
           />
           <span style={{ color: "var(--text-1)" }}>
-            MCP HTTP: {info.is_http_running ? "active" : "inactive"} at{" "}
-            <code style={{ color: "var(--accent)" }}>{info.http_url}</code>
+            {t("connectors.status.mcpHttp", {
+              status: info.is_http_running ? t("connectors.status.active") : t("connectors.status.inactive"),
+              url: info.http_url
+            })}
           </span>
         </div>
       )}
@@ -334,7 +337,7 @@ export function ConnectorsView() {
               {/* Capabilities */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Capabilities
+                  {t("connectors.sections.capabilities")}
                 </div>
                 {active.capabilities.map((cap) => (
                   <div key={cap} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--text-1)", marginBottom: 4 }}>
@@ -349,18 +352,22 @@ export function ConnectorsView() {
               {active.id === "claude-desktop" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <SectionLabel>⭐ Option 1 — Cowork (recommended)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.coworkRecommended")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      It's the optimal and easiest way to use our system. Just open
-                      the project with the Claude desktop app and use the <b>Cowork</b> tab.
-                      Claude will natively access all context and local files.
+                      <Trans
+                        i18nKey="connectors.sections.coworkDesc"
+                        components={{ bold: <b /> }}
+                      />
                     </p>
                   </div>
 
                   <div>
-                    <SectionLabel>Option 2 — MCP server (stdio)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.mcpStdio")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      To access your knowledge base from any conversation, add AI Context OS to <code style={{ color: "var(--accent)" }}>claude_desktop_config.json</code>:
+                      <Trans
+                        i18nKey="connectors.sections.mcpStdioDesc"
+                        components={{ code: <code style={{ color: "var(--accent)" }} /> }}
+                      />
                     </p>
                     {(() => {
                       const config = JSON.stringify(
@@ -385,7 +392,10 @@ export function ConnectorsView() {
                     })()}
                   </div>
                   <InfoBox>
-                    <strong>Cowork + MCP:</strong> We recommend using Cowork as the base. If you add MCP configuration, you will have advanced tools like global searches or graphs at your disposal.
+                    <Trans
+                      i18nKey="connectors.sections.coworkMcpInfo"
+                      components={{ bold: <strong /> }}
+                    />
                   </InfoBox>
                 </div>
               )}
@@ -394,9 +404,12 @@ export function ConnectorsView() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {/* Option 1: MCP register */}
                   <div>
-                    <SectionLabel>⭐ Option 1 — Register MCP server (recommended)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.mcpRegister")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Register AI Context OS as a permanent MCP server. This gives Claude Code access to all 4 tools (<code style={{ color: "var(--accent)" }}>get_context</code>, <code style={{ color: "var(--accent)" }}>save_memory</code>, <code style={{ color: "var(--accent)" }}>get_skill</code>, <code style={{ color: "var(--accent)" }}>log_session</code>).
+                      <Trans
+                        i18nKey="connectors.sections.mcpRegisterDesc"
+                        components={{ code: <code style={{ color: "var(--accent)" }} /> }}
+                      />
                     </p>
                     <SnippetCard
                       snippet={`claude mcp add ai-context-os -- "${info.binary_path}" mcp-server --root "${info.workspace_root}"`}
@@ -410,9 +423,15 @@ export function ConnectorsView() {
 
                   {/* Option 2: claude.md only */}
                   <div>
-                    <SectionLabel>Option 2 — Open workspace (claude.md only)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.openWorkspace")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Opens Claude Code in your workspace. The <code style={{ color: "var(--accent)" }}>claude.md</code> is auto-loaded as context, but MCP tools are <strong>not</strong> available without Option 1.
+                      <Trans
+                        i18nKey="connectors.sections.openWorkspaceDesc"
+                        components={{
+                          code: <code style={{ color: "var(--accent)" }} />,
+                          bold: <strong />
+                        }}
+                      />
                     </p>
                     <SnippetCard
                       snippet={`claude "${info.workspace_root}"`}
@@ -422,7 +441,10 @@ export function ConnectorsView() {
                   </div>
 
                   <InfoBox>
-                    <strong>Tip:</strong> Use both options together — register the MCP server once, then open the workspace with Option 2 for full context + tools.
+                    <Trans
+                      i18nKey="connectors.sections.terminalTip"
+                      components={{ bold: <strong /> }}
+                    />
                   </InfoBox>
                 </div>
               )}
@@ -430,9 +452,12 @@ export function ConnectorsView() {
               {active.id === "cursor" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <SectionLabel>Option 1 — HTTP MCP (dynamic, requires open app)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.mcpHttp")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Add to <code style={{ color: "var(--accent)" }}>.cursor/mcp.json</code> in your project:
+                      <Trans
+                        i18nKey="connectors.sections.mcpHttpDescCursor"
+                        components={{ code: <code style={{ color: "var(--accent)" }} /> }}
+                      />
                     </p>
                     {(() => {
                       const config = JSON.stringify(
@@ -450,16 +475,19 @@ export function ConnectorsView() {
                     })()}
                   </div>
                   <div>
-                    <SectionLabel>Option 2 — .cursorrules (static, always available)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.cursorrulesStatic")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      The <code style={{ color: "var(--accent)" }}>.cursorrules</code> file is
-                      auto-generated at the root of the workspace with rules and base context.
-                      Cursor reads it automatically without configuration.
+                      <Trans
+                        i18nKey="connectors.sections.cursorrulesStaticDesc"
+                        components={{ code: <code style={{ color: "var(--accent)" }} /> }}
+                      />
                     </p>
                   </div>
                   <InfoBox>
-                    <strong>MCP vs .cursorrules:</strong> MCP gives dynamic access to scoring, memories, and tools.
-                    .cursorrules is static but does not require the app to be running.
+                    <Trans
+                      i18nKey="connectors.sections.mcpVsRules"
+                      components={{ bold: <strong /> }}
+                    />
                   </InfoBox>
                 </div>
               )}
@@ -467,9 +495,9 @@ export function ConnectorsView() {
               {active.id === "windsurf" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <SectionLabel>Option 1 — HTTP MCP (dynamic, requires open app)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.mcpHttp")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Configure in Windsurf's MCP settings:
+                      {t("connectors.sections.mcpHttpDescWindsurf")}
                     </p>
                     {(() => {
                       const config = JSON.stringify(
@@ -487,10 +515,12 @@ export function ConnectorsView() {
                     })()}
                   </div>
                   <div>
-                    <SectionLabel>Option 2 — .windsurfrules (static, always available)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.windsurfrulesStatic")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)" }}>
-                      The <code style={{ color: "var(--accent)" }}>.windsurfrules</code> file is
-                      auto-generated at the root of the workspace. Windsurf reads it without additional configuration.
+                      <Trans
+                        i18nKey="connectors.sections.windsurfrulesStaticDesc"
+                        components={{ code: <code style={{ color: "var(--accent)" }} /> }}
+                      />
                     </p>
                   </div>
                 </div>
@@ -499,14 +529,15 @@ export function ConnectorsView() {
               {active.id === "chatgpt" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <SectionLabel>Option 1 — Codex CLI (recommended)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.codexCli")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      <a href="https://github.com/openai/codex" target="_blank" rel="noreferrer"
-                        style={{ color: "var(--accent)", textDecoration: "underline" }}>
-                        Codex CLI
-                      </a>{" "}
-                      supports native MCP servers. Configure in{" "}
-                      <code style={{ color: "var(--accent)" }}>~/.codex/config.yaml</code>:
+                      <Trans
+                        i18nKey="connectors.sections.codexCliDesc"
+                        components={{
+                          linkCodex: <a href="https://github.com/openai/codex" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "underline" }} />,
+                          code: <code style={{ color: "var(--accent)" }} />
+                        }}
+                      />
                     </p>
                     {(() => {
                       const config = `mcp_servers:\n  - name: ai-context-os\n    command: "${info.binary_path}"\n    args:\n      - mcp-server\n      - --root\n      - "${info.workspace_root}"`;
@@ -520,14 +551,19 @@ export function ConnectorsView() {
                     })()}
                   </div>
                   <InfoBox>
-                    <strong>Codex CLI</strong> runs OpenAI models with direct MCP access.
-                    It's the best way to use AI Context OS with the ChatGPT/OpenAI ecosystem.
+                    <Trans
+                      i18nKey="connectors.sections.codexInfo"
+                      components={{ bold: <strong /> }}
+                    />
                   </InfoBox>
 
                   <div>
-                    <SectionLabel>Option 2 — ChatGPT web (manual handoff)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.chatgptWeb")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      For ChatGPT web without Codex, generate a context snapshot and paste it at the <strong>beginning of a new conversation</strong> before your first message.
+                      <Trans
+                        i18nKey="connectors.sections.chatgptWebDesc"
+                        components={{ bold: <strong /> }}
+                      />
                     </p>
                   </div>
                   <BridgePanel
@@ -544,14 +580,14 @@ export function ConnectorsView() {
               {active.id === "gemini-cli" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <SectionLabel>⭐ Option 1 — Register MCP server (recommended)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.mcpRegister")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Install{" "}
-                      <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noreferrer"
-                        style={{ color: "var(--accent)", textDecoration: "underline" }}>
-                        Gemini CLI
-                      </a>{" "}
-                      and register AI Context OS as a permanent MCP server:
+                      <Trans
+                        i18nKey="connectors.sections.geminiMcpDesc"
+                        components={{
+                          linkGemini: <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "underline" }} />
+                        }}
+                      />
                     </p>
                     <SnippetCard
                       snippet={`gemini mcp add ai-context-os -- "${info.binary_path}" mcp-server --root "${info.workspace_root}"`}
@@ -564,9 +600,12 @@ export function ConnectorsView() {
                   </div>
 
                   <div>
-                    <SectionLabel>Option 2 — settings.json (manual)</SectionLabel>
+                    <SectionLabel>{t("connectors.sections.geminiSettings")}</SectionLabel>
                     <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      Or add manually to <code style={{ color: "var(--accent)" }}>~/.gemini/settings.json</code>:
+                      <Trans
+                        i18nKey="connectors.sections.geminiSettingsDesc"
+                        components={{ code: <code style={{ color: "var(--accent)" }} /> }}
+                      />
                     </p>
                     {(() => {
                       const config = JSON.stringify(
@@ -592,7 +631,7 @@ export function ConnectorsView() {
                   </div>
 
                   <InfoBox>
-                    Gemini CLI supports MCP natively. Once registered, all 4 tools are available in every Gemini CLI session.
+                    {t("connectors.sections.geminiInfo")}
                   </InfoBox>
                 </div>
               )}
@@ -636,6 +675,7 @@ function BridgePanel({
   error: string | null;
   onAction: (action: "copy" | "handoff") => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div
@@ -648,8 +688,10 @@ function BridgePanel({
           color: "var(--text-2)",
         }}
       >
-        <strong style={{ color: "var(--text-1)" }}>Manual Transfer</strong> — Prepares the
-        context to copy it or save it as a file when there is no native integration.
+        <Trans
+          i18nKey="connectors.bridge.manualTransfer"
+          components={{ bold: <strong style={{ color: "var(--text-1)" }} /> }}
+        />
       </div>
 
       {connectorId === "copilot" && (
@@ -662,22 +704,26 @@ function BridgePanel({
             color: "var(--text-2)",
           }}
         >
-          <strong>Note:</strong> <code style={{ color: "var(--accent)" }}>.cursorrules</code> is
-          read by <strong>Cursor</strong> even with Copilot enabled. It is <strong>not</strong> read
-          by GitHub Copilot in VS Code — use the clipboard handoff below instead.
+          <Trans
+            i18nKey="connectors.bridge.copilotNote"
+            components={{
+              bold: <strong />,
+              code: <code style={{ color: "var(--accent)" }} />
+            }}
+          />
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <ActionButton
           icon={<Copy size={13} />}
-          label="Copy optimal context"
+          label={t("connectors.bridge.copyContext")}
           loading={status === "loading"}
           onClick={() => onAction("copy")}
         />
         <ActionButton
           icon={<FileText size={13} />}
-          label="Generate handoff.md"
+          label={t("connectors.bridge.generateHandoff")}
           loading={status === "loading"}
           onClick={() => onAction("handoff")}
         />
@@ -693,7 +739,7 @@ function BridgePanel({
 
       {status === "done" && resultText && (
         <div>
-          <div style={{ fontSize: 11, color: "var(--accent)", marginBottom: 4 }}>Preview</div>
+          <div style={{ fontSize: 11, color: "var(--accent)", marginBottom: 4 }}>{t("connectors.bridge.preview")}</div>
           <pre
             style={{
               padding: 10,
@@ -753,6 +799,7 @@ function SnippetCard({
   onCopy: () => void;
   copied: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div style={{ position: "relative" }}>
       <button
@@ -774,7 +821,7 @@ function SnippetCard({
           zIndex: 1,
         }}
       >
-        {copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+        {copied ? <><Check size={11} /> {t("connectors.actions.copied")}</> : <><Copy size={11} /> {t("connectors.actions.copy")}</>}
       </button>
       <pre
         style={{
@@ -797,6 +844,7 @@ function SnippetCard({
 }
 
 function NullInfoBanner() {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -809,9 +857,13 @@ function NullInfoBanner() {
         lineHeight: 1.6,
       }}
     >
-      <strong style={{ color: "var(--danger)" }}>Workspace not detected.</strong>{" "}
-      Configuration snippets require an initialized workspace. Go to{" "}
-      <strong style={{ color: "var(--text-1)" }}>Settings → Workspace</strong> to set up your workspace first.
+      <Trans
+        i18nKey="connectors.nullInfo.description"
+        components={{
+          bold: <strong style={{ color: "var(--danger)" }} />,
+          boldSettings: <strong style={{ color: "var(--text-1)" }} />
+        }}
+      />
     </div>
   );
 }
@@ -827,6 +879,7 @@ function ActionButton({
   loading: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
@@ -848,7 +901,7 @@ function ActionButton({
       }}
     >
       {icon}
-      {loading ? "Generating..." : label}
+      {loading ? t("connectors.bridge.generating") : label}
     </button>
   );
 }
