@@ -107,7 +107,7 @@ fn tool_summary(tools: &[String]) -> String {
 }
 
 fn create_starter_folders(root: &std::path::Path) -> Result<(), String> {
-    for folder in &["context", "projects", "resources", "decisions"] {
+    for folder in &["identity", "content", "strategy", "operations", "decisions"] {
         fs::create_dir_all(root.join(folder))
             .map_err(|e| format!("Failed to create {}: {}", folder, e))?;
     }
