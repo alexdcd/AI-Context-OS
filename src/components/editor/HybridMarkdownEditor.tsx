@@ -4,7 +4,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
-import { EditorView, keymap, KeyBinding, ViewPlugin, Decoration, DecorationSet, ViewUpdate } from "@codemirror/view";
+import { EditorView, keymap, KeyBinding, ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
@@ -72,7 +72,7 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: t.strong, fontWeight: "bold" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: t.link, color: "var(--accent)", textDecoration: "underline" },
+  { tag: t.link, color: "var(--accent)", textDecoration: "underline", cursor: "pointer" },
   { tag: t.url, color: "var(--text-2)" },
   { tag: t.monospace, fontFamily: "monospace", color: "var(--text-0)", backgroundColor: "color-mix(in srgb, var(--bg-2) 60%, transparent)", borderRadius: "3px" },
   { tag: t.keyword, color: "var(--accent)" },
@@ -112,6 +112,96 @@ const headingDecorations = ViewPlugin.fromClass(class {
         }
       });
     }
+    return builder.finish();
+  }
+}, {
+  decorations: v => v.decorations
+});
+
+// Live Preview: Hides markdown markers unless cursor is on that line
+class LinkIconWidget extends WidgetType {
+  constructor(public url: string) { super(); }
+  
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-link-icon";
+    span.style.display = "inline-flex";
+    span.style.alignItems = "center";
+    span.style.marginLeft = "4px";
+    span.style.color = "var(--text-2)";
+    span.style.cursor = "pointer";
+    span.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+    
+    span.addEventListener("click", (e) => {
+      open(this.url).catch(console.error);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    return span;
+  }
+}
+
+const livePreviewPlugin = ViewPlugin.fromClass(class {
+  decorations: DecorationSet;
+
+  constructor(view: EditorView) {
+    this.decorations = this.buildDecorations(view);
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      this.decorations = this.buildDecorations(update.view);
+    }
+  }
+
+  buildDecorations(view: EditorView) {
+    const builder = new RangeSetBuilder<Decoration>();
+    const state = view.state;
+    
+    const activeLines = new Set<number>();
+    for (const range of state.selection.ranges) {
+      activeLines.add(state.doc.lineAt(range.head).number);
+    }
+
+    const hideDeco = Decoration.replace({});
+    const decos: {from: number, to: number, deco: Decoration}[] = [];
+
+    for (const {from, to} of view.visibleRanges) {
+      syntaxTree(state).iterate({
+        from, to,
+        enter(node) {
+          const isHiddenMarker = [
+            "HeaderMark",
+            "EmphasisMark",
+            "StrongEmphasisMark",
+            "StrikethroughMark",
+            "CodeMark",
+            "LinkMark"
+          ].includes(node.name);
+
+          const line = state.doc.lineAt(node.from).number;
+          if (!activeLines.has(line)) {
+            if (isHiddenMarker) {
+              decos.push({from: node.from, to: node.to, deco: hideDeco});
+            } else if (node.name === "URL" && node.node.parent?.name === "Link") {
+              const urlText = state.sliceDoc(node.from, node.to).replace(/^[\(\<]/, '').replace(/[\)\>]$/, '');
+              decos.push({
+                from: node.from, 
+                to: node.to, 
+                deco: Decoration.replace({ widget: new LinkIconWidget(urlText) }) 
+              });
+            }
+          }
+        }
+      });
+    }
+    
+    decos.sort((a, b) => a.from - b.from || a.to - b.to);
+    for (const d of decos) {
+      builder.add(d.from, d.to, d.deco);
+    }
+
     return builder.finish();
   }
 }, {
@@ -309,6 +399,7 @@ export function HybridMarkdownEditor({
     EditorView.lineWrapping,
     customTheme,
     headingDecorations,
+    livePreviewPlugin,
     syntaxHighlighting(markdownHighlightStyle),
     history(),
     keymap.of(markdownKeymap),
