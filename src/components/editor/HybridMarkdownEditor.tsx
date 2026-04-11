@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import TurndownService from "turndown";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
@@ -204,6 +205,52 @@ const markdownKeymap: KeyBinding[] = [
   { key: "~", run: wrapWith("~") },
 ];
 
+const turndownService = new TurndownService({
+  headingStyle: "atx",
+  hr: "---",
+  bulletListMarker: "-",
+  codeBlockStyle: "fenced",
+  emDelimiter: "*",
+  strongDelimiter: "**"
+});
+
+const pasteHandler = EditorView.domEventHandlers({
+  paste(event, view) {
+    const data = event.clipboardData;
+    if (!data) return false;
+
+    // Preserve VSCode plain-text formatting (avoid treating colored spans as markdown noise)
+    if (data.getData("vscode-editor-data") || data.getData("text/plain").includes("```")) {
+      return false;
+    }
+
+    const html = data.getData("text/html");
+    if (!html) return false;
+
+    try {
+      const parsedMarkdown = turndownService.turndown(html);
+      if (!parsedMarkdown) return false;
+
+      const changes = view.state.changeByRange((range) => {
+        return {
+          changes: [{ from: range.from, to: range.to, insert: parsedMarkdown }],
+          range: EditorSelection.range(range.from + parsedMarkdown.length, range.from + parsedMarkdown.length)
+        };
+      });
+
+      view.dispatch(
+        view.state.update(changes, { scrollIntoView: true, userEvent: "input.paste" })
+      );
+
+      event.preventDefault();
+      return true;
+    } catch (err) {
+      console.error("Paste Turndown Error:", err);
+      return false;
+    }
+  }
+});
+
 /**
  * Obsidian-like CodeMirror 6 markdown editor.
  */
@@ -224,6 +271,7 @@ export function HybridMarkdownEditor({
     history(),
     keymap.of(markdownKeymap),
     keymap.of([...defaultKeymap, ...historyKeymap]),
+    pasteHandler,
   ];
 
   return (
