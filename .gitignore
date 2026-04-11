@@ -23,3 +23,5 @@ Thumbs.db
 
 # Tauri
 src-tauri/gen/
+.tauri/
+*.key
