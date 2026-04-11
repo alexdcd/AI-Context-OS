@@ -341,7 +341,7 @@ const domHandlers = EditorView.domEventHandlers({
     }
   },
 
-  click(event, view) {
+  mousedown(event, view) {
     const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
     if (pos === null) return false;
 
