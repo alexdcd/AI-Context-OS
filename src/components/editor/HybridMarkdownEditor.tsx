@@ -341,55 +341,6 @@ const domHandlers = EditorView.domEventHandlers({
     }
   },
   
-  click(event, view) {
-    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-    if (pos === null) return false;
-
-    // If the clicked line is already the active (editing) line, don't navigate —
-    // just let the cursor land there so the user can edit the raw markdown.
-    const clickedLineNum = view.state.doc.lineAt(pos).number;
-    for (const range of view.state.selection.ranges) {
-      if (view.state.doc.lineAt(range.head).number === clickedLineNum) {
-        return false;
-      }
-    }
-
-    let node = syntaxTree(view.state).resolveInner(pos, 1);
-    
-    let urlNode = null;
-    let curr: typeof node | null = node;
-    while (curr && curr.name !== "Document") {
-      if (curr.name === "URL") {
-        urlNode = curr;
-        break;
-      }
-      if (curr.name === "Link") {
-        let child = curr.firstChild;
-        while (child) {
-          if (child.name === "URL") {
-            urlNode = child;
-            break;
-          }
-          child = child.nextSibling;
-        }
-        break;
-      }
-      curr = curr.parent;
-    }
-
-    if (urlNode) {
-      let urlText = view.state.sliceDoc(urlNode.from, urlNode.to);
-      urlText = urlText.replace(/^[\(\<]/, '').replace(/[\)\>]$/, '');
-      
-      // Open if they click directly on the URL string, or Cmd/Ctrl+Click anywhere on the Link
-      if (event.metaKey || event.ctrlKey || node.name === "URL") {
-        open(urlText).catch(e => console.error("Failed to open URL:", e));
-        event.preventDefault();
-        return true;
-      }
-    }
-    return false;
-  }
 });
 
 /**
