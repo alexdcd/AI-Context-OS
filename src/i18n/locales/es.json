@@ -38,6 +38,20 @@
       "showSystemFilesVisible": "Verás YAML, JSONL, claude.md y otros artefactos avanzados junto a las memorias.",
       "showSystemFilesHiddenDesc": "Mantiene el explorador centrado en las memorias, aunque el modo experto sigue disponible."
     },
+    "update": {
+      "title": "Actualizaciones",
+      "desc": "Comprueba si hay nuevas versiones de AI Context OS",
+      "check": "Buscar actualizaciones",
+      "checkDesc": "Comprueba si hay una nueva version disponible",
+      "checking": "Buscando actualizaciones...",
+      "upToDate": "Ya tienes la ultima version",
+      "available": "Version {{version}} disponible",
+      "downloadInstall": "Haz clic para descargar e instalar la actualizacion",
+      "downloading": "Descargando actualizacion...",
+      "ready": "Actualizacion lista — Reiniciar ahora",
+      "readyDesc": "La actualizacion se ha instalado. Reinicia para aplicarla.",
+      "error": "No se pudo comprobar las actualizaciones"
+    },
     "backup": {
       "title": "Copia de seguridad",
       "desc": "Exporta o importa tu espacio de trabajo completo como archivo .zip",

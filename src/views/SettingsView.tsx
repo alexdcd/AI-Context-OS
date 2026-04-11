@@ -8,6 +8,7 @@ import { useAppStore } from "../lib/store";
 import { useTranslation } from "react-i18next";
 import { type Language } from "../lib/settingsStore";
 import { VaultSettingsSection } from "../components/vault/VaultSettingsSection";
+import { UpdateSection } from "../components/settings/UpdateSection";
 
 export function SettingsView() {
   const { t } = useTranslation();
@@ -229,6 +230,9 @@ export function SettingsView() {
             </button>
           )}
         </section>
+
+        {/* Updates */}
+        <UpdateSection />
 
         {/* Backup / Restore */}
         <section className="obs-panel border border-[color:var(--border)] p-6">
