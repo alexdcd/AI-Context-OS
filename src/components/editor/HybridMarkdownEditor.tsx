@@ -25,7 +25,6 @@ const customTheme = EditorView.theme({
     color: "var(--text-0)",
     fontSize: "0.9375rem",
     lineHeight: "1.65",
-    letterSpacing: "-0.01em",
   },
   ".cm-content": {
     padding: "0",
@@ -57,18 +56,18 @@ const customTheme = EditorView.theme({
 // A custom highlighting style to mimic Obsidian's markdown highlight 
 // (e.g. bold is bold, headings are larger, but it's still text)
 const markdownHighlightStyle = HighlightStyle.define([
-  { tag: t.heading1, fontSize: "1.6em", fontWeight: "700", color: "var(--text-0)", marginTop: "1em", marginBottom: "0.5em" },
-  { tag: t.heading2, fontSize: "1.4em", fontWeight: "700", color: "var(--text-0)", marginTop: "0.8em", marginBottom: "0.4em" },
-  { tag: t.heading3, fontSize: "1.25em", fontWeight: "700", color: "var(--text-0)", marginTop: "0.6em", marginBottom: "0.3em" },
-  { tag: t.heading4, fontSize: "1.1em", fontWeight: "700", color: "var(--text-0)" },
-  { tag: t.heading5, fontSize: "1em", fontWeight: "700", color: "var(--text-0)" },
-  { tag: t.heading6, fontSize: "1em", fontWeight: "700", color: "var(--text-0)" },
+  { tag: t.heading1, fontWeight: "700", color: "var(--text-0)" },
+  { tag: t.heading2, fontWeight: "700", color: "var(--text-0)" },
+  { tag: t.heading3, fontWeight: "700", color: "var(--text-0)" },
+  { tag: t.heading4, fontWeight: "700", color: "var(--text-0)" },
+  { tag: t.heading5, fontWeight: "700", color: "var(--text-0)" },
+  { tag: t.heading6, fontWeight: "700", color: "var(--text-0)" },
   { tag: t.strong, fontWeight: "bold" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: t.link, color: "var(--accent)", textDecoration: "underline" },
   { tag: t.url, color: "var(--text-2)" },
-  { tag: t.monospace, fontFamily: "monospace", color: "var(--text-0)", backgroundColor: "color-mix(in srgb, var(--bg-2) 60%, transparent)", padding: "0.1em 0.3em", borderRadius: "3px", fontSize: "0.9em" },
+  { tag: t.monospace, fontFamily: "monospace", color: "var(--text-0)", backgroundColor: "color-mix(in srgb, var(--bg-2) 60%, transparent)", borderRadius: "3px" },
   { tag: t.keyword, color: "var(--accent)" },
   { tag: [t.processingInstruction, t.meta, t.punctuation], color: "var(--text-2)" }, // markdown markup characters (#, **, etc)
 ]);
