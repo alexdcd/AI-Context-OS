@@ -10,7 +10,7 @@ Extended system docs:
 - [Technical Paper](./docs/paper.md)
 - [Technical Whitepaper](./docs/whitepaper.md)
 
-AI Context OS is a desktop app (`Tauri v2 + React + TypeScript + Rust`) that turns a local folder into a universal, tool-agnostic memory layer for AI agents.
+AI Context OS is a desktop app (`React + TypeScript + Rust`) that turns a local folder into a universal, tool-agnostic memory layer for AI agents.
 
 This project is not a chat UI and not a wrapper around one provider. It is a filesystem-first brain layer with deterministic context loading (`L0/L1/L2`) and adapter-based integrations.
 
