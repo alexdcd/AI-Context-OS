@@ -2,12 +2,11 @@ import { clsx } from "clsx";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
-import { EditorView } from "@codemirror/view";
+import { EditorView, keymap, KeyBinding, ViewPlugin, Decoration, DecorationSet, ViewUpdate } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { keymap, KeyBinding } from "@codemirror/view";
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { StateCommand, EditorSelection } from "@codemirror/state";
+import { StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 
 interface Props {
   content: string;
@@ -51,6 +50,12 @@ const customTheme = EditorView.theme({
   ".cm-cursor": {
     borderLeftColor: "var(--text-0)",
   },
+  ".cm-line.cm-h1": { fontSize: "1.6em", fontWeight: "700", paddingTop: "0.5em", paddingBottom: "0.2em" },
+  ".cm-line.cm-h2": { fontSize: "1.4em", fontWeight: "700", paddingTop: "0.4em", paddingBottom: "0.2em" },
+  ".cm-line.cm-h3": { fontSize: "1.25em", fontWeight: "700", paddingTop: "0.3em", paddingBottom: "0.2em" },
+  ".cm-line.cm-h4": { fontSize: "1.1em", fontWeight: "700" },
+  ".cm-line.cm-h5": { fontSize: "1em", fontWeight: "700" },
+  ".cm-line.cm-h6": { fontSize: "1em", fontWeight: "700", color: "var(--text-2)" },
 });
 
 // A custom highlighting style to mimic Obsidian's markdown highlight 
@@ -71,6 +76,45 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: t.keyword, color: "var(--accent)" },
   { tag: [t.processingInstruction, t.meta, t.punctuation], color: "var(--text-2)" }, // markdown markup characters (#, **, etc)
 ]);
+
+// Decorates entire lines based on syntax tree (needed for font-size changes)
+const headingDecorations = ViewPlugin.fromClass(class {
+  decorations: DecorationSet;
+
+  constructor(view: EditorView) {
+    this.decorations = this.buildDecorations(view);
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged) {
+      this.decorations = this.buildDecorations(update.view);
+    }
+  }
+
+  buildDecorations(view: EditorView) {
+    const builder = new RangeSetBuilder<Decoration>();
+    for (const {from, to} of view.visibleRanges) {
+      syntaxTree(view.state).iterate({
+        from, to,
+        enter(node) {
+          if (node.name.includes("Heading")) {
+            const match = node.name.match(/Heading(\d)/);
+            if (match) {
+              const level = match[1];
+              // Add a class to the entire line
+              builder.add(node.from, node.from, Decoration.line({
+                class: `cm-h${level}`
+              }));
+            }
+          }
+        }
+      });
+    }
+    return builder.finish();
+  }
+}, {
+  decorations: v => v.decorations
+});
 
 // Helper to toggle a formatting string around the selection
 function toggleMark(mark: string): StateCommand {
@@ -175,6 +219,7 @@ export function HybridMarkdownEditor({
     markdown({ base: markdownLanguage, codeLanguages: languages }),
     EditorView.lineWrapping,
     customTheme,
+    headingDecorations,
     syntaxHighlighting(markdownHighlightStyle),
     history(),
     keymap.of(markdownKeymap),
