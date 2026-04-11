@@ -315,6 +315,14 @@ export interface ContextEventPayload {
   timestamp: string;
 }
 
+export interface VaultEntry {
+  name: string;
+  path: string;
+  last_accessed: string; // ISO 8601
+  template: string;
+  memory_count: number;
+}
+
 export const MEMORY_ONTOLOGY_COLORS: Record<MemoryOntology, string> = {
   source: "#0ea5e9",
   entity: "#10b981",

@@ -78,6 +78,9 @@ pub fn run_onboarding(
     state.set_root(root.clone())?;
     crate::commands::config::sync_workspace_runtime(state.inner(), Some(&app))?;
 
+    // Register vault with chosen template so the vault switcher shows the correct template name.
+    crate::commands::vault::register_vault_with_template(&root, &profile.template)?;
+
     Ok(true)
 }
 

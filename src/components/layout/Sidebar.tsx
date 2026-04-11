@@ -15,8 +15,13 @@ import {
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { useGovernanceBadge } from "../../lib/useGovernanceBadge";
+import { VaultSwitcherFooter } from "../vault/VaultSwitcherFooter";
 
 type SidebarKey = "explorer" | "journal" | "tasks" | "graph" | "simulation" | "governance" | "observability" | "connectors";
+
+interface SidebarProps {
+  onCreateVault?: () => void;
+}
 
 const navItems: { to: string; icon: React.ElementType; key: SidebarKey }[] = [
   { to: "/", icon: FolderTree, key: "explorer" },
@@ -29,7 +34,7 @@ const navItems: { to: string; icon: React.ElementType; key: SidebarKey }[] = [
   { to: "/connectors", icon: Plug, key: "connectors" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onCreateVault }: SidebarProps) {
   const { t } = useTranslation();
   const governanceCount = useGovernanceBadge();
   return (
@@ -67,8 +72,13 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="group relative mt-auto mb-4 flex w-full flex-col items-center">
-        <NavLink
+      <div className="mt-auto mb-4 flex w-full flex-col items-center gap-1">
+        {/* Vault switcher */}
+        <VaultSwitcherFooter onCreateNew={onCreateVault ?? (() => {})} />
+
+        {/* Settings */}
+        <div className="group relative flex w-full justify-center">
+          <NavLink
             to="/settings"
             className={({ isActive }) =>
               clsx(
@@ -78,11 +88,12 @@ export function Sidebar() {
                   : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]",
               )
             }
-        >
-          <Settings className="h-[18px] w-[18px]" />
-        </NavLink>
-        <div className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-50 -translate-y-1/2 scale-95 whitespace-nowrap rounded-md border border-[color:var(--border)] bg-[color:var(--bg-1)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-0)] opacity-0 shadow-sm transition-all duration-100 group-hover:scale-100 group-hover:opacity-100">
-          {t("sidebar.settings")}
+          >
+            <Settings className="h-[18px] w-[18px]" />
+          </NavLink>
+          <div className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-50 -translate-y-1/2 scale-95 whitespace-nowrap rounded-md border border-[color:var(--border)] bg-[color:var(--bg-1)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-0)] opacity-0 shadow-sm transition-all duration-100 group-hover:scale-100 group-hover:opacity-100">
+            {t("sidebar.settings")}
+          </div>
         </div>
       </div>
     </aside>

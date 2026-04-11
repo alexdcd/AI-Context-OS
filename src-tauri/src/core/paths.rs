@@ -111,6 +111,19 @@ impl SystemPaths {
     }
 }
 
+/// Expand `~/` prefixes to the actual home directory.
+pub fn expand_home(path: &str) -> PathBuf {
+    if path == "~" {
+        return dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    }
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
+    }
+    PathBuf::from(path)
+}
+
 pub fn folder_category(path: &Path, root: &Path) -> Option<String> {
     let relative = path.strip_prefix(root).ok()?;
     let mut components = relative.components();

@@ -11,3 +11,4 @@ pub mod onboarding;
 pub mod router;
 pub mod scoring;
 pub mod tasks;
+pub mod vault;

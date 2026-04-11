@@ -17,6 +17,7 @@ import type {
   ConsolidationSuggestion,
   TaskFilter,
   TaskItem,
+  VaultEntry,
 } from "./types";
 
 // Config
@@ -168,3 +169,14 @@ export const runOptimizationAnalysis = () =>
   invoke<OptimizationRecord[]>("run_optimization_analysis");
 export const getMcpConnectionInfo = () =>
   invoke<McpConnectionInfo>("get_mcp_connection_info");
+
+// Vault management
+export const listVaults = () => invoke<VaultEntry[]>("list_vaults");
+export const addVault = (path: string, name?: string) =>
+  invoke<VaultEntry>("add_vault", { path, name: name ?? null });
+export const removeVault = (path: string) =>
+  invoke<void>("remove_vault", { path });
+export const switchVault = (path: string) =>
+  invoke<void>("switch_vault", { path });
+export const renameVault = (path: string, name: string) =>
+  invoke<void>("rename_vault", { path, name });

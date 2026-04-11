@@ -7,9 +7,13 @@ import { save, open } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "../lib/store";
 import { useTranslation } from "react-i18next";
 import { type Language } from "../lib/settingsStore";
+import { VaultSettingsSection } from "../components/vault/VaultSettingsSection";
 
 export function SettingsView() {
   const { t } = useTranslation();
+  // Access showOnboardingForVault trigger via window event — avoids prop drilling
+  const handleCreateNew = () =>
+    window.dispatchEvent(new CustomEvent("vault:create-new"));
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
   const theme = useSettingsStore((s) => s.theme);
@@ -70,6 +74,9 @@ export function SettingsView() {
     <div className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-2xl space-y-6">
         <h1 className="mb-8 text-2xl font-semibold text-[color:var(--text-0)]">{t("settings.title")}</h1>
+
+        {/* Workspace / Vault section */}
+        <VaultSettingsSection onCreateNew={handleCreateNew} />
 
         {/* Appearance */}
         <section className="obs-panel border border-[color:var(--border)] p-6">

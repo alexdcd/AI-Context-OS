@@ -32,6 +32,7 @@ daily: get_daily_entries, append_daily_entry
 journal: get_journal_page, save_journal_page, list_journal_dates, get_today
 tasks: list_tasks, create_task, update_task, delete_task, toggle_task_state, generate_task_id
 onboarding: run_onboarding, is_onboarded
+vault: list_vaults, add_vault, remove_vault, switch_vault, rename_vault
 backup: backup_workspace, restore_workspace
 
 ## Zustand stores

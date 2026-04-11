@@ -8,6 +8,9 @@ import { useAppStore } from "./lib/store";
 import { isOnboarded } from "./lib/tauri";
 import { HealthBadge } from "./components/layout/HealthBadge";
 import { useThemeEffect } from "./lib/settingsStore";
+import { useVaultStore } from "./lib/vaultStore";
+import { VaultConfirmDialog } from "./components/vault/VaultConfirmDialog";
+import { VaultSwitchScreen } from "./components/vault/VaultSwitchScreen";
 import { PanelLeft } from "lucide-react";
 
 const ExplorerView = lazy(() =>
@@ -89,7 +92,9 @@ function AppContent() {
   const navigate = useNavigate();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [showOnboardingForVault, setShowOnboardingForVault] = useState(false);
   const titlebarRef = useRef<HTMLDivElement>(null);
+  const { setActiveVaultPath, loadVaults } = useVaultStore();
 
   // Responsive: auto-close explorer on narrow windows
   useEffect(() => {
@@ -136,6 +141,26 @@ function AppContent() {
       .catch(() => setOnboarded(false));
   }, []);
 
+  // Listen for vault:create-new from SettingsView (avoids prop drilling through routes)
+  useEffect(() => {
+    const handler = () => setShowOnboardingForVault(true);
+    window.addEventListener("vault:create-new", handler);
+    return () => window.removeEventListener("vault:create-new", handler);
+  }, []);
+
+  // Sync active vault path on boot (after app has initialized)
+  useEffect(() => {
+    if (onboarded) {
+      void loadVaults().then(() => {
+        const { vaults } = useVaultStore.getState();
+        // Best-effort: pick the first vault if none persisted yet
+        if (!useVaultStore.getState().activeVaultPath && vaults.length > 0) {
+          setActiveVaultPath(vaults[0].path);
+        }
+      });
+    }
+  }, [onboarded, loadVaults, setActiveVaultPath]);
+
   // Native DOM listener for window dragging — bypasses React's synthetic event system
   // which can interfere with macOS native drag handling
   useEffect(() => {
@@ -162,13 +187,21 @@ function AppContent() {
     );
   }
 
-  if (!onboarded) {
+  if (!onboarded || showOnboardingForVault) {
     return (
       <Suspense fallback={<FullscreenSpinner />}>
         <OnboardingWizard
           onComplete={() => {
-            setOnboarded(true);
-            initialize();
+            if (showOnboardingForVault) {
+              setShowOnboardingForVault(false);
+              // The onboarding already called run_onboarding which set_root —
+              // just reload app state and vault list
+              initialize();
+              void loadVaults();
+            } else {
+              setOnboarded(true);
+              initialize();
+            }
           }}
         />
       </Suspense>
@@ -176,6 +209,11 @@ function AppContent() {
   }
 
   return (
+    <>
+      {/* Vault overlays — rendered above everything */}
+      <VaultConfirmDialog />
+      <VaultSwitchScreen />
+
     <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--bg-0)]">
       <div 
         ref={titlebarRef}
@@ -214,7 +252,7 @@ function AppContent() {
       </div>
 
       <div className="obs-app-shell flex flex-1 overflow-hidden">
-        <Sidebar />
+        <Sidebar onCreateVault={() => setShowOnboardingForVault(true)} />
         <main className="relative flex-1 overflow-hidden">
           <div className="h-full overflow-hidden bg-[color:var(--bg-1)]">
             <Suspense fallback={<RouteFallback />}>
@@ -238,6 +276,7 @@ function AppContent() {
         <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       </Suspense>
     </div>
+    </>
   );
 }
 
