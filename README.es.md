@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/Memm_logo0.png" width="600" alt="AI Context OS Logo">
+  <img src="assets/Memm_logo0_transpa.png" width="600" alt="AI Context OS Logo">
 </p>
 
 <h1 align="center">MEMM — AI Context OS</h1>
