@@ -1,23 +1,13 @@
-<p align="center">
-  <img src="assets/Memm_logo0.png" width="600" alt="AI Context OS Logo">
-</p>
+# Translations [ES]
 
-<h1 align="center">MEMM — AI Context OS</h1>
+# AI Context OS
 
-<p align="center">
-  <strong>Capa de memoria universal para agentes de IA.</strong><br>
-  Filesystem-first • Contexto Determinista (L0/L1/L2) • Agnóstico de Herramienta
-</p>
+Documento principal en inglés: [README.md](./README.md)
 
-<p align="center">
-  <a href="https://memm.dev/"><b>Sitio Web</b></a> •
-  <a href="./README.md"><b>English</b></a> •
-  <a href="./docs/README.md"><b>Documentación</b></a>
-</p>
-
----
-
-[README.md](./README.md) en Inglés.
+Documentación extendida del sistema:
+- [Índice de Documentación](./docs/README.md)
+- [Paper Técnico](./docs/paper.md)
+- [Whitepaper Técnico](./docs/whitepaper.md)
 
 AI Context OS es una app desktop (`Tauri v2 + React + TypeScript + Rust`) que convierte una carpeta local en una capa de memoria universal y agnóstica de herramienta para agentes de IA.
 

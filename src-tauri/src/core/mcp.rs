@@ -416,7 +416,7 @@ impl AiContextMcpServer {
     )]
     async fn read_agent_diary(&self, Parameters(params): Parameters<ReadAgentDiaryParams>) -> String {
         let safe_agent_id = sanitize_agent_id(&params.agent_id);
-        if safe_agent_id.is_empty() {
+        if safe_agent_id.is_empty() || safe_agent_id != params.agent_id {
             return "Invalid agent ID. Must contain only alphanumeric characters, dashes, and underscores.".to_string();
         }
 
@@ -438,7 +438,7 @@ impl AiContextMcpServer {
         use std::io::Write;
 
         let safe_agent_id = sanitize_agent_id(&params.agent_id);
-        if safe_agent_id.is_empty() {
+        if safe_agent_id.is_empty() || safe_agent_id != params.agent_id {
             return "Invalid agent ID. Must contain only alphanumeric characters, dashes, and underscores.".to_string();
         }
 

@@ -245,18 +245,6 @@ Implementation philosophy:
 
 This keeps the system deterministic-first and explainable while still opening the door to semantic power.
 
-### Phase 6: Herramientas MCP Exploratorias / Navegación del Grafo 🌟🌟🌟
-
-**Qué es:** Darme herramientas para recorrer activamente nuestro "Scoring Engine" y el "Grafo" si el contexto automático se queda corto.
-
-**Por qué integrarlo:** Soluciona mi "ceguera". Si necesito saber todo sobre "autenticación", debería poder consultar los registros de esa comunidad directamente. En MemPalace usan herramientas como `mempalace_traverse` o `mempalace_list_rooms`.
-
-**Dificultad de Implementación (Baja):**
-AICO ya genera internamente grafos, relaciones y puntuaciones. Solo hay que exponer en el MCP:
-- `list_topics()` (lista tags/comunidades detectadas)
-- `get_related_memories(id)`
-- `search_by_tag(tag)`
-
 ## Recommendation on local models
 
 From a PM and engineering perspective, local models are useful, but mainly for maintenance and support tasks at first.
