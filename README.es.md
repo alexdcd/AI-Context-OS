@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/logo.png" width="160" alt="AI Context OS Logo">
+</p>
+
 # Translations [ES]
 
 # AI Context OS
