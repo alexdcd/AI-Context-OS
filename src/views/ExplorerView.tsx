@@ -45,6 +45,17 @@ export function ExplorerView() {
     return () => window.removeEventListener("keydown", handler);
   }, [setPendingCreate]);
 
+  // Open a file passed via OS "Open With" / file association double-click
+  useEffect(() => {
+    const { selectRawFile } = useAppStore.getState();
+    const handler = (e: Event) => {
+      const path = (e as CustomEvent<string>).detail;
+      if (path) void selectRawFile(path);
+    };
+    window.addEventListener("open-file-path", handler);
+    return () => window.removeEventListener("open-file-path", handler);
+  }, []);
+
   const handleRegenerate = async () => {
     try {
       await regenerateRouter();
