@@ -93,6 +93,10 @@ pub fn today_str() -> String {
 
 /// Validate that a date string is YYYY-MM-DD format.
 pub fn validate_date(date: &str) -> bool {
+    // YYYY-MM-DD
+    if date.len() != 10 {
+        return false;
+    }
     NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok()
 }
 
@@ -252,4 +256,41 @@ pub fn blocks_to_markdown(blocks: &[JournalBlock]) -> String {
     }
 
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_date_valid() {
+        assert!(validate_date("2024-05-15"));
+        assert!(validate_date("2000-01-01"));
+        assert!(validate_date("2024-02-29")); // leap year
+    }
+
+    #[test]
+    fn test_validate_date_invalid() {
+        // Missing padding
+        assert!(!validate_date("2024-5-15"));
+        assert!(!validate_date("2024-05-5"));
+
+        // Wrong separator
+        assert!(!validate_date("2024/05/15"));
+
+        // Invalid month
+        assert!(!validate_date("2024-13-15"));
+
+        // Invalid day
+        assert!(!validate_date("2024-02-30"));
+        assert!(!validate_date("2023-02-29")); // not a leap year
+
+        // Wrong format completely
+        assert!(!validate_date("invalid"));
+        assert!(!validate_date(""));
+
+        // Extra characters
+        assert!(!validate_date("2024-05-15T12:00:00Z"));
+        assert!(!validate_date(" 2024-05-15 "));
+    }
 }
