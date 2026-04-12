@@ -660,3 +660,36 @@ pub fn classify_task(description: &str) -> &'static str {
         "quick"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_task() {
+        // Writing
+        assert_eq!(classify_task("Write a blog post about rust"), "writing");
+        assert_eq!(classify_task("Escribe un contenido para linkedin"), "writing");
+        assert_eq!(classify_task("newsletter about ai"), "writing");
+        assert_eq!(classify_task("email to the team"), "writing");
+        assert_eq!(classify_task("article for the website"), "writing");
+
+        // Coding
+        assert_eq!(classify_task("Debug the api function"), "coding");
+        assert_eq!(classify_task("Revisar código y hacer test"), "coding");
+        assert_eq!(classify_task("fix the bug in production"), "coding");
+        assert_eq!(classify_task("code review for PR"), "coding");
+
+        // Strategy
+        assert_eq!(classify_task("plan the new research strategy"), "strategy");
+        assert_eq!(classify_task("análisis de decisión"), "strategy");
+        assert_eq!(classify_task("investigar mercado"), "strategy");
+        assert_eq!(classify_task("analyzing metrics"), "strategy");
+
+        // Quick / Fallback
+        assert_eq!(classify_task("hello world"), "quick");
+        assert_eq!(classify_task("buy groceries"), "quick");
+        assert_eq!(classify_task("meeting at 5pm"), "quick");
+        assert_eq!(classify_task(""), "quick");
+    }
+}
