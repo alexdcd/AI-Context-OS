@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar";
 import { useFileWatcher } from "./hooks/useFileWatcher";
@@ -147,6 +148,21 @@ function AppContent() {
     window.addEventListener("vault:create-new", handler);
     return () => window.removeEventListener("vault:create-new", handler);
   }, []);
+
+  // Handle files opened via OS "Open With" or double-click on associated file types
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<string[]>("open-files", (event) => {
+      const paths = event.payload;
+      if (!paths.length) return;
+      navigate("/");
+      // Dispatch a DOM event so ExplorerView can select/open the first file
+      window.dispatchEvent(new CustomEvent("open-file-path", { detail: paths[0] }));
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, [navigate]);
 
   // Sync active vault path on boot (after app has initialized)
   useEffect(() => {

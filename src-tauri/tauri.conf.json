@@ -35,7 +35,30 @@
       "icons/icon.ico",
       "icons/icon.icns"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown Document",
+        "description": "Markdown text file",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      },
+      {
+        "ext": ["txt"],
+        "name": "Plain Text",
+        "description": "Plain text file",
+        "mimeType": "text/plain",
+        "role": "Editor"
+      },
+      {
+        "ext": ["json"],
+        "name": "JSON Document",
+        "description": "JSON data file",
+        "mimeType": "application/json",
+        "role": "Editor"
+      }
+    ]
   },
   "plugins": {
     "updater": {

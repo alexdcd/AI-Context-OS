@@ -259,6 +259,32 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Opened { urls } = event {
+                let paths: Vec<String> = urls
+                    .iter()
+                    .filter_map(|url| {
+                        let s = url.as_str();
+                        if let Some(path) = s.strip_prefix("file://") {
+                            Some(path.to_string())
+                        } else if std::path::Path::new(s).exists() {
+                            Some(s.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if paths.is_empty() {
+                    return;
+                }
+
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.set_focus();
+                    let _ = window.emit("open-files", &paths);
+                }
+            }
+        });
 }
