@@ -660,3 +660,63 @@ pub fn classify_task(description: &str) -> &'static str {
         "quick"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_task_writing() {
+        assert_eq!(classify_task("I need to write a blog post"), "writing");
+        assert_eq!(classify_task("escribir un email"), "writing");
+        assert_eq!(classify_task("crear contenido para linkedin"), "writing");
+        assert_eq!(classify_task("send a newsletter"), "writing");
+        assert_eq!(classify_task("read an article"), "writing");
+    }
+
+    #[test]
+    fn test_classify_task_coding() {
+        assert_eq!(classify_task("fix a bug in the code"), "coding");
+        assert_eq!(classify_task("revisar el código"), "coding");
+        assert_eq!(classify_task("create a test function"), "coding"); // 'test' and 'function' trigger coding
+        assert_eq!(classify_task("debug the api"), "coding");
+        assert_eq!(classify_task("code review please"), "coding");
+    }
+
+    #[test]
+    fn test_classify_task_strategy() {
+        assert_eq!(classify_task("nueva estrategia de marketing"), "strategy");
+        assert_eq!(classify_task("market research and analysis"), "strategy");
+        assert_eq!(classify_task("análisis de datos"), "strategy");
+        assert_eq!(classify_task("plan de acción"), "strategy");
+        assert_eq!(classify_task("tomar una decisión"), "strategy");
+        assert_eq!(classify_task("investigación profunda"), "strategy");
+    }
+
+    #[test]
+    fn test_classify_task_quick_fallback() {
+        assert_eq!(classify_task("haz esto rápido"), "quick");
+        assert_eq!(classify_task("hello world"), "quick");
+        assert_eq!(classify_task(""), "quick");
+        assert_eq!(classify_task("   "), "quick");
+        assert_eq!(classify_task("just a random thought"), "quick");
+    }
+
+    #[test]
+    fn test_classify_task_case_insensitivity() {
+        assert_eq!(classify_task("WRITE a PoSt"), "writing");
+        assert_eq!(classify_task("CÓDIGO"), "coding");
+        assert_eq!(classify_task("BUG"), "coding");
+        assert_eq!(classify_task("ReSeArCh"), "strategy");
+    }
+
+    #[test]
+    fn test_classify_task_unicode_and_mixed() {
+        // "código" contains unicode, ensuring `to_lowercase` handles it or the match works
+        assert_eq!(classify_task("El CÓDIGO fuente"), "coding");
+        assert_eq!(classify_task("ANÁLISIS detallado"), "strategy");
+        // Emojis shouldn't crash it
+        assert_eq!(classify_task("fix this 🐛"), "quick"); // "bug" word is not there
+        assert_eq!(classify_task("fix this bug 🐛"), "coding");
+    }
+}
