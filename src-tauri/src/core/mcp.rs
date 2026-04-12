@@ -119,6 +119,20 @@ pub struct GetSkillParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct ReadAgentDiaryParams {
+    /// The ID of the agent whose diary to read
+    pub agent_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct WriteAgentDiaryParams {
+    /// The ID of the agent whose diary to write to
+    pub agent_id: String,
+    /// The content/learning to append to the diary
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct LogSessionParams {
     /// Type of event: start, end, milestone, error
     pub event_type: String,
@@ -134,6 +148,12 @@ pub struct LogSessionParams {
 
 fn default_source() -> String {
     "mcp".to_string()
+}
+
+fn sanitize_agent_id(id: &str) -> String {
+    id.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect()
 }
 
 #[derive(Debug, Serialize)]
@@ -388,6 +408,60 @@ impl AiContextMcpServer {
         }
 
         output
+    }
+
+    #[tool(
+        name = "read_agent_diary",
+        description = "Reads the content of an agent's personal diary. Use this to retrieve your past learnings, rules, or context specific to your role."
+    )]
+    async fn read_agent_diary(&self, Parameters(params): Parameters<ReadAgentDiaryParams>) -> String {
+        let safe_agent_id = sanitize_agent_id(&params.agent_id);
+        if safe_agent_id.is_empty() || safe_agent_id != params.agent_id {
+            return "Invalid agent ID. Must contain only alphanumeric characters, dashes, and underscores.".to_string();
+        }
+
+        let root = self.state.root_dir.read().unwrap().clone();
+        let diaries_dir = crate::core::paths::SystemPaths::new(&root).diaries_dir();
+        let file_path = diaries_dir.join(format!("{}.md", safe_agent_id));
+
+        match std::fs::read_to_string(&file_path) {
+            Ok(content) => content,
+            Err(_) => format!("No diary found for agent '{}'. It might be empty or not created yet.", safe_agent_id),
+        }
+    }
+
+    #[tool(
+        name = "write_agent_diary",
+        description = "Appends a new learning or note to an agent's personal diary. Use this to remember important project-specific details or patterns for your role."
+    )]
+    async fn write_agent_diary(&self, Parameters(params): Parameters<WriteAgentDiaryParams>) -> String {
+        use std::io::Write;
+
+        let safe_agent_id = sanitize_agent_id(&params.agent_id);
+        if safe_agent_id.is_empty() || safe_agent_id != params.agent_id {
+            return "Invalid agent ID. Must contain only alphanumeric characters, dashes, and underscores.".to_string();
+        }
+
+        let root = self.state.root_dir.read().unwrap().clone();
+        let diaries_dir = crate::core::paths::SystemPaths::new(&root).diaries_dir();
+        let file_path = diaries_dir.join(format!("{}.md", safe_agent_id));
+
+        if let Err(e) = std::fs::create_dir_all(&diaries_dir) {
+            return format!("Error creating diaries directory: {}", e);
+        }
+
+        let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
+        let entry = format!("\n## {}\n\n{}\n", now, params.content);
+
+        match std::fs::OpenOptions::new().create(true).append(true).open(&file_path) {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(entry.as_bytes()) {
+                    return format!("Error appending to agent diary: {}", e);
+                }
+                format!("Successfully appended to agent '{}' diary.", safe_agent_id)
+            }
+            Err(e) => format!("Error opening agent diary to append: {}", e),
+        }
     }
 
     #[tool(

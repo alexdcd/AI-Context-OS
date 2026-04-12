@@ -84,10 +84,4 @@
 
 - ⬚ **Onboarding mejorado** — Tutorial interactivo post-setup que explique el flujo completo
 - ✅ **Responsive sidebar** — Colapsar sidebar icon-only en pantallas pequeñas
-
-## Herramientas MCP
-
-- ⬚ **Herramientas MCP Exploratorias / Navegación del Grafo** 🌟🌟🌟 — Darle al usuario herramientas para recorrer activamente el Scoring Engine y el Grafo si el contexto automático se queda corto.
-    - `list_topics()`: Lista tags/comunidades detectadas.
-    - `get_related_memories(id)`: Devuelve memorias relacionadas con un ID.
-    - `search_by_tag(tag)`: Búsqueda directa por tag.
+- ⬚ **Temas adicionales** — Más allá de dark/light: variantes de color accent

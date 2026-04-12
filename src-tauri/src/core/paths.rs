@@ -15,6 +15,7 @@ pub const INBOX_DIR: &str = "inbox";
 pub const SOURCES_DIR: &str = "sources";
 pub const RULES_DIR: &str = "rules";
 pub const SKILLS_DIR: &str = "skills";
+pub const DIARIES_DIR: &str = "diaries";
 
 // ── Directories to skip during recursive memory scan ──
 
@@ -22,7 +23,7 @@ pub const SCAN_SKIP_DIRS: &[&str] = &[".git", "node_modules", ".cache"];
 
 /// `.ai/` subdirectories that are system-managed and should NOT be indexed as memories.
 /// Rules, skills, and context subdirs ARE scannable (they contain user-authored memory files).
-pub const AI_SKIP_SUBDIRS: &[&str] = &["tasks", "scratch", "journal"];
+pub const AI_SKIP_SUBDIRS: &[&str] = &["tasks", "scratch", "journal", "diaries"];
 
 impl SystemPaths {
     pub fn new(root: &Path) -> Self {
@@ -51,6 +52,10 @@ impl SystemPaths {
 
     pub fn skills_dir(&self) -> PathBuf {
         self.root.join(".ai/skills")
+    }
+
+    pub fn diaries_dir(&self) -> PathBuf {
+        self.root.join(".ai/diaries")
     }
 
     pub fn journal_dir(&self) -> PathBuf {
@@ -103,6 +108,7 @@ impl SystemPaths {
             self.ai_dir(),
             self.rules_dir(),
             self.skills_dir(),
+            self.diaries_dir(),
             self.journal_dir(),
             self.sessions_dir(),
             self.tasks_dir(),

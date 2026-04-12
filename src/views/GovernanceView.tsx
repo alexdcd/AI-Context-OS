@@ -214,7 +214,7 @@ export function GovernanceView() {
                       style={{ backgroundColor: MEMORY_ONTOLOGY_COLORS[type as keyof typeof MEMORY_ONTOLOGY_COLORS] }}
                     />
                     <span className="w-20 text-xs text-[color:var(--text-1)]">
-                      {t(`ontologies.${type}` as never)}
+                      {t(`ontologies.${type}` as any)}
                     </span>
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-[color:var(--bg-3)]">
                       <div

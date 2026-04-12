@@ -1,21 +1,18 @@
 <p align="center">
-  <img src="assets/Memm_logo0.png" width="600" alt="AI Context OS Logo">
+  <img src="./assets/logo.png" width="160" alt="AI Context OS Logo">
 </p>
 
-<h1 align="center">MEMM — AI Context OS</h1>
+# MEMM - AI Context OS
 
-<p align="center">
-  <strong>Universal memory layer for AI agents.</strong><br>
-  Filesystem-first • Deterministic Context (L0/L1/L2) • Tool-Agnostic
-</p>
+Translations:
+- [ES](./README.es.md)
 
-<p align="center">
-  <a href="https://memm.dev/"><b>Website</b></a> •
-  <a href="./README.es.md"><b>Español</b></a> •
-  <a href="./docs/README.md"><b>Documentation</b></a>
-</p>
+- Website: https://memm.dev/
 
----
+Extended system docs:
+- [Documentation Index](./docs/README.md)
+- [Technical Paper](./docs/paper.md)
+- [Technical Whitepaper](./docs/whitepaper.md)
 
 AI Context OS is a desktop app (`React + TypeScript + Rust`) that turns a local folder into a universal, tool-agnostic memory layer for AI agents.
 
