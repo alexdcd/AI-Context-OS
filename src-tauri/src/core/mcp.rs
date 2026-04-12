@@ -453,26 +453,14 @@ impl AiContextMcpServer {
         let now = Utc::now().format("%Y-%m-%d %H:%M:%S");
         let entry = format!("\n## {}\n\n{}\n", now, params.content);
 
-        if file_path.exists() {
-            match std::fs::OpenOptions::new().append(true).open(&file_path) {
-                Ok(mut file) => {
-                    if let Err(e) = file.write_all(entry.as_bytes()) {
-                        return format!("Error appending to agent diary: {}", e);
-                    }
-                    format!("Successfully appended to agent '{}' diary.", safe_agent_id)
+        match std::fs::OpenOptions::new().create(true).append(true).open(&file_path) {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(entry.as_bytes()) {
+                    return format!("Error appending to agent diary: {}", e);
                 }
-                Err(e) => format!("Error opening agent diary to append: {}", e),
+                format!("Successfully appended to agent '{}' diary.", safe_agent_id)
             }
-        } else {
-            // Include YAML frontmatter for new diary
-            let content_to_write = format!(
-                "---\nid: {}\ntype: concept\nl0: \"Diary for agent {}\"\nimportance: 0.8\n---\n\n# {} Diary\n{}",
-                safe_agent_id, safe_agent_id, safe_agent_id, entry
-            );
-            match std::fs::write(&file_path, content_to_write) {
-                Ok(_) => format!("Successfully created and wrote to agent '{}' diary.", safe_agent_id),
-                Err(e) => format!("Error writing to new agent diary: {}", e),
-            }
+            Err(e) => format!("Error opening agent diary to append: {}", e),
         }
     }
 

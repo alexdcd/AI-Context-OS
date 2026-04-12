@@ -15,8 +15,6 @@ pub enum MemoryOntology {
 pub enum SystemRole {
     Rule,
     Skill,
-    #[serde(rename = "agent_diary")]
-    AgentDiary,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

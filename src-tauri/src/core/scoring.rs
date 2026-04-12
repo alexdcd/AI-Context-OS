@@ -174,7 +174,7 @@ fn ontology_bonus_score(query: &str, memory: &Memory) -> f64 {
     ];
 
     match memory.meta.system_role {
-        Some(SystemRole::Skill) | Some(SystemRole::Rule) | Some(SystemRole::AgentDiary) => {
+        Some(SystemRole::Skill) | Some(SystemRole::Rule) => {
             if code_terms.iter().any(|t| q.contains(t)) {
                 return 0.8;
             }

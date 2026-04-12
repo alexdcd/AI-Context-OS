@@ -23,7 +23,7 @@ pub const SCAN_SKIP_DIRS: &[&str] = &[".git", "node_modules", ".cache"];
 
 /// `.ai/` subdirectories that are system-managed and should NOT be indexed as memories.
 /// Rules, skills, and context subdirs ARE scannable (they contain user-authored memory files).
-pub const AI_SKIP_SUBDIRS: &[&str] = &["tasks", "scratch", "journal"];
+pub const AI_SKIP_SUBDIRS: &[&str] = &["tasks", "scratch", "journal", "diaries"];
 
 impl SystemPaths {
     pub fn new(root: &Path) -> Self {
@@ -152,7 +152,6 @@ pub fn system_role(path: &Path, root: &Path) -> Option<SystemRole> {
     match second.as_ref() {
         RULES_DIR => Some(SystemRole::Rule),
         SKILLS_DIR => Some(SystemRole::Skill),
-        DIARIES_DIR => Some(SystemRole::AgentDiary),
         _ => None,
     }
 }
@@ -183,10 +182,6 @@ mod tests {
         assert_eq!(
             system_role(&root.join(".ai/rules/mi-regla.md"), &root),
             Some(SystemRole::Rule)
-        );
-        assert_eq!(
-            system_role(&root.join(".ai/diaries/agent.md"), &root),
-            Some(SystemRole::AgentDiary)
         );
         assert_eq!(system_role(&root.join("ideas/nota.md"), &root), None);
     }
