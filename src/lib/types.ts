@@ -1,6 +1,6 @@
 export type MemoryOntology = "source" | "entity" | "concept" | "synthesis";
 
-export type SystemRole = "rule" | "skill";
+export type SystemRole = "rule" | "skill" | "agent_diary";
 
 export type MemoryStatus = "unprocessed" | "processed";
 

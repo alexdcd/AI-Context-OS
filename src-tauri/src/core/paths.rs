@@ -15,6 +15,7 @@ pub const INBOX_DIR: &str = "inbox";
 pub const SOURCES_DIR: &str = "sources";
 pub const RULES_DIR: &str = "rules";
 pub const SKILLS_DIR: &str = "skills";
+pub const DIARIES_DIR: &str = "diaries";
 
 // ── Directories to skip during recursive memory scan ──
 
@@ -51,6 +52,10 @@ impl SystemPaths {
 
     pub fn skills_dir(&self) -> PathBuf {
         self.root.join(".ai/skills")
+    }
+
+    pub fn diaries_dir(&self) -> PathBuf {
+        self.root.join(".ai/diaries")
     }
 
     pub fn journal_dir(&self) -> PathBuf {
@@ -103,6 +108,7 @@ impl SystemPaths {
             self.ai_dir(),
             self.rules_dir(),
             self.skills_dir(),
+            self.diaries_dir(),
             self.journal_dir(),
             self.sessions_dir(),
             self.tasks_dir(),
@@ -146,6 +152,7 @@ pub fn system_role(path: &Path, root: &Path) -> Option<SystemRole> {
     match second.as_ref() {
         RULES_DIR => Some(SystemRole::Rule),
         SKILLS_DIR => Some(SystemRole::Skill),
+        DIARIES_DIR => Some(SystemRole::AgentDiary),
         _ => None,
     }
 }
@@ -176,6 +183,10 @@ mod tests {
         assert_eq!(
             system_role(&root.join(".ai/rules/mi-regla.md"), &root),
             Some(SystemRole::Rule)
+        );
+        assert_eq!(
+            system_role(&root.join(".ai/diaries/agent.md"), &root),
+            Some(SystemRole::AgentDiary)
         );
         assert_eq!(system_role(&root.join("ideas/nota.md"), &root), None);
     }

@@ -844,7 +844,6 @@ function SnippetCard({
 }
 
 function NullInfoBanner() {
-  const { t } = useTranslation();
   return (
     <div
       style={{

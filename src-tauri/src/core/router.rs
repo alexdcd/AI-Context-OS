@@ -160,5 +160,6 @@ fn system_role_label(role: &SystemRole) -> &str {
     match role {
         SystemRole::Rule => "rule",
         SystemRole::Skill => "skill",
+        SystemRole::AgentDiary => "agent_diary",
     }
 }
