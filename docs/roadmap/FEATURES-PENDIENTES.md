@@ -69,6 +69,7 @@
 ## Workflows / Agentes
 
 - ⬚ **Marketplace de Agentes (Premium)** — Funcionalidad Freemium para importar plantillas de agentes especializados (ej. SM Agent). [Ver plan detallado](./feature_agente.md)
+- ⬚ **Sistema Autónomo de Mantenimiento IA** — Capa de workflows gobernados para procesar inbox, proponer memorias y mantener documentación sin convertir a la IA en la fuente de verdad. [Ver documentación detallada](../sistema-autonomo-de-mantenimiento-ia.md)
 
 ## Infraestructura
 
