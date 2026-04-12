@@ -25,3 +25,10 @@ Thumbs.db
 src-tauri/gen/
 .tauri/
 *.key
+
+# AI agents and workspace artifacts
+AGENT.md
+AGENTS.md
+CLAUDE.md
+.cursorrules
+.windsurfrules

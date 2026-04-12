@@ -31,13 +31,15 @@
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
-      "icons/128x128@2x.png"
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
     ],
     "createUpdaterArtifacts": true
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_YOUR_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlFMEIwMEMwMzExRjAxMTcKUldRWEFSOHh3QUFMbmpWMCttcnF1SlB3SWF1L3hlNmw3OUJDZVhPa2llenpUTUowaUplWVJRMXAK",
       "endpoints": [
         "https://github.com/alexdcd/AI-Context-OS/releases/latest/download/latest.json"
       ]
