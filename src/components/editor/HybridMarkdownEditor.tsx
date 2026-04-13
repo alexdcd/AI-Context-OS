@@ -119,6 +119,19 @@ const headingDecorations = ViewPlugin.fromClass(class {
   decorations: v => v.decorations
 });
 
+// Pre-parsed SVG for the link icon to avoid innerHTML and re-parsing.
+const LINK_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+let cachedIcon: Element | null = null;
+
+function getLinkIcon() {
+  if (cachedIcon) return cachedIcon.cloneNode(true) as SVGElement;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(LINK_ICON_SVG, "image/svg+xml");
+  cachedIcon = doc.documentElement;
+  return cachedIcon.cloneNode(true) as SVGElement;
+}
+
 // Live Preview: Hides markdown markers unless cursor is on that line
 class LinkIconWidget extends WidgetType {
   constructor(public url: string) { super(); }
@@ -131,7 +144,9 @@ class LinkIconWidget extends WidgetType {
     span.style.marginLeft = "4px";
     span.style.color = "var(--text-2)";
     span.style.cursor = "pointer";
-    span.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+
+    // Safety: Appending a pre-parsed node from a static string is secure and avoids innerHTML.
+    span.appendChild(getLinkIcon());
     
     span.addEventListener("click", (e) => {
       open(this.url).catch(console.error);
