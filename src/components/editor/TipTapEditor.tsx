@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
+import type { Editor, JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { clsx } from "clsx";
@@ -82,14 +83,12 @@ export function TipTapEditor({
   return <EditorContent editor={editor} />;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function editorToMarkdown(editor: any): string {
+function editorToMarkdown(editor: Editor): string {
   const json = editor.getJSON();
   return normalizeMarkdown(jsonToMarkdown(json));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function jsonToMarkdown(node: any): string {
+function jsonToMarkdown(node: JSONContent): string {
   if (!node) return "";
 
   if (node.type === "text") {
@@ -106,8 +105,7 @@ function jsonToMarkdown(node: any): string {
   }
 
   const children = (node.content ?? [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((child: any) => jsonToMarkdown(child))
+    .map((child) => jsonToMarkdown(child))
     .join("");
 
   switch (node.type) {
@@ -123,15 +121,13 @@ function jsonToMarkdown(node: any): string {
     case "bulletList":
       return (
         (node.content ?? [])
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((li: any) => `- ${jsonToMarkdown(li).trim()}`)
+          .map((li) => `- ${jsonToMarkdown(li).trim()}`)
           .join("\n") + "\n"
       );
     case "orderedList":
       return (
         (node.content ?? [])
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((li: any, i: number) => `${i + 1}. ${jsonToMarkdown(li).trim()}`)
+          .map((li, i) => `${i + 1}. ${jsonToMarkdown(li).trim()}`)
           .join("\n") + "\n"
       );
     case "listItem":

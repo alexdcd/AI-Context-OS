@@ -14,10 +14,16 @@ use crate::state::AppState;
 #[tauri::command]
 pub fn get_conflicts(state: State<AppState>) -> Result<Vec<Conflict>, String> {
     let root = state.get_root();
-    let all_entries = scan_memories(&root);
+    let paths: Vec<String> = state
+        .memory_index
+        .read()
+        .unwrap()
+        .values()
+        .map(|(_, p)| p.clone())
+        .collect();
 
     let mut memories = Vec::new();
-    for (_meta, path) in &all_entries {
+    for path in &paths {
         if let Ok(mem) = read_memory(&root, std::path::Path::new(path)) {
             memories.push(mem);
         }

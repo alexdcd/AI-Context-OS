@@ -355,6 +355,170 @@ pub fn get_community_map_for_scoring(memories: &[Memory]) -> HashMap<String, u32
     compute_community_map(memories)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::types::{Memory, MemoryMeta, MemoryOntology};
+    use chrono::Utc;
+
+    fn make_memory(id: &str, related: Vec<&str>, tags: Vec<&str>, l1: &str) -> Memory {
+        Memory {
+            meta: MemoryMeta {
+                id: id.to_string(),
+                ontology: MemoryOntology::Concept,
+                l0: String::new(),
+                importance: 0.5,
+                always_load: false,
+                decay_rate: 0.998,
+                last_access: Utc::now(),
+                access_count: 0,
+                confidence: 0.9,
+                tags: tags.into_iter().map(|s| s.to_string()).collect(),
+                related: related.into_iter().map(|s| s.to_string()).collect(),
+                created: Utc::now(),
+                modified: Utc::now(),
+                version: 1,
+                triggers: vec![],
+                requires: vec![],
+                optional: vec![],
+                output_format: None,
+                status: None,
+                protected: false,
+                derived_from: vec![],
+                folder_category: None,
+                system_role: None,
+            },
+            l1_content: l1.to_string(),
+            l2_content: String::new(),
+            raw_content: String::new(),
+            file_path: format!("{}.md", id),
+        }
+    }
+
+    // --- extract_wikilinks ---
+
+    #[test]
+    fn extracts_single_wikilink() {
+        assert_eq!(extract_wikilinks("See [[mem-b]] for details."), vec!["mem-b"]);
+    }
+
+    #[test]
+    fn extracts_multiple_wikilinks() {
+        assert_eq!(
+            extract_wikilinks("See [[a]] and [[b]] and [[c]]."),
+            vec!["a", "b", "c"]
+        );
+    }
+
+    #[test]
+    fn returns_empty_when_no_wikilinks() {
+        assert!(extract_wikilinks("No links here.").is_empty());
+    }
+
+    #[test]
+    fn trims_whitespace_in_wikilinks() {
+        assert_eq!(extract_wikilinks("[[ mem-b ]]"), vec!["mem-b"]);
+    }
+
+    // --- build_graph ---
+
+    #[test]
+    fn related_memories_get_one_edge() {
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let graph = build_graph(&[a, b]);
+        assert_eq!(graph.node_count(), 2);
+        assert_eq!(graph.edge_count(), 1);
+    }
+
+    #[test]
+    fn wikilink_and_related_to_same_target_deduplicated_to_one_edge() {
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "See [[mem-b]]");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let graph = build_graph(&[a, b]);
+        assert_eq!(graph.edge_count(), 1);
+    }
+
+    #[test]
+    fn shared_tag_creates_edge() {
+        let a = make_memory("mem-a", vec![], vec!["rust"], "");
+        let b = make_memory("mem-b", vec![], vec!["rust"], "");
+        let graph = build_graph(&[a, b]);
+        assert_eq!(graph.edge_count(), 1);
+    }
+
+    #[test]
+    fn no_shared_tags_and_no_links_means_no_edges() {
+        let a = make_memory("mem-a", vec![], vec!["rust"], "");
+        let b = make_memory("mem-b", vec![], vec!["python"], "");
+        let graph = build_graph(&[a, b]);
+        assert_eq!(graph.edge_count(), 0);
+    }
+
+    #[test]
+    fn unresolvable_related_id_does_not_crash() {
+        let a = make_memory("mem-a", vec!["does-not-exist"], vec![], "");
+        let graph = build_graph(&[a]);
+        assert_eq!(graph.node_count(), 1);
+        assert_eq!(graph.edge_count(), 0);
+    }
+
+    // --- compute_community_map ---
+
+    #[test]
+    fn connected_memories_share_community() {
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let map = compute_community_map(&[a, b]);
+        assert_eq!(map["mem-a"], map["mem-b"]);
+    }
+
+    #[test]
+    fn isolated_memories_get_different_communities() {
+        let a = make_memory("mem-a", vec![], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let map = compute_community_map(&[a, b]);
+        assert_ne!(map["mem-a"], map["mem-b"]);
+    }
+
+    #[test]
+    fn empty_input_returns_empty_community_map() {
+        assert!(compute_community_map(&[]).is_empty());
+    }
+
+    // --- compute_god_nodes ---
+
+    #[test]
+    fn hub_with_two_connections_is_god_node() {
+        // degree=2 qualifies regardless of importance (rule: degree >= 2)
+        let hub = make_memory("hub", vec!["mem-a", "mem-b"], vec![], "");
+        let a = make_memory("mem-a", vec![], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let god_nodes = compute_god_nodes(&[hub, a, b]);
+        assert!(god_nodes.iter().any(|g| g.memory_id == "hub"));
+    }
+
+    #[test]
+    fn isolated_memory_is_not_god_node() {
+        let a = make_memory("mem-a", vec![], vec![], "");
+        assert!(compute_god_nodes(&[a]).is_empty());
+    }
+
+    #[test]
+    fn god_nodes_sorted_by_mismatch_score_descending() {
+        // hub-a has higher degree than hub-b → should appear first
+        let hub_a = make_memory("hub-a", vec!["x", "y", "z"], vec![], "");
+        let hub_b = make_memory("hub-b", vec!["x", "y"], vec![], "");
+        let x = make_memory("x", vec![], vec![], "");
+        let y = make_memory("y", vec![], vec![], "");
+        let z = make_memory("z", vec![], vec![], "");
+        let god_nodes = compute_god_nodes(&[hub_a, hub_b, x, y, z]);
+        let pos_a = god_nodes.iter().position(|g| g.memory_id == "hub-a").unwrap();
+        let pos_b = god_nodes.iter().position(|g| g.memory_id == "hub-b").unwrap();
+        assert!(pos_a < pos_b);
+    }
+}
+
 /// Get the count of connections for a memory (undirected graph degree, explicit links only).
 #[allow(dead_code)]
 pub fn connection_count(memory_id: &str, memories: &[Memory]) -> usize {

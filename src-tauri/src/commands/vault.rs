@@ -75,14 +75,13 @@ pub fn list_vaults(state: State<AppState>) -> Result<Vec<VaultEntry>, String> {
         save_registry(&vf)?;
     }
 
-    // Enrich memory_count live
+    // Active vault: live count from in-memory index.
+    // Inactive vaults: use cached count from registry (updated on switch/add).
     for entry in &mut vf.vaults {
         let p = expand_home(&entry.path);
-        entry.memory_count = if p == current_root {
-            state.memory_index.read().unwrap().len()
-        } else {
-            count_memories_in(&p)
-        };
+        if p == current_root {
+            entry.memory_count = state.memory_index.read().unwrap().len();
+        }
     }
 
     // Sort by last_accessed descending
