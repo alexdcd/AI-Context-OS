@@ -98,14 +98,85 @@ interface MenuAction {
   disabled?: boolean;
 }
 
+const FOLDER_COLOR_PALETTE = [
+  "#f87171", // red
+  "#fb923c", // orange
+  "#fbbf24", // amber
+  "#4ade80", // green
+  "#38bdf8", // sky
+  "#818cf8", // indigo
+  "#c084fc", // purple
+  "#f472b6", // pink
+];
+
+function FolderColorRow({
+  folderPath,
+  onClose,
+}: {
+  folderPath: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const folderColors = useSettingsStore((s: SettingsStore) => s.folderColors);
+  const setFolderColor = useSettingsStore((s: SettingsStore) => s.setFolderColor);
+  const clearFolderColor = useSettingsStore((s: SettingsStore) => s.clearFolderColor);
+  const currentColor = folderColors[folderPath];
+
+  return (
+    <div className="px-3 py-2">
+      <div className="mb-1.5 text-[11px] font-medium text-[color:var(--text-2)]">
+        {t("explorer.folderColor")}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          title={t("explorer.clearColor")}
+          className={clsx(
+            "flex h-5 w-5 items-center justify-center rounded-full border transition-transform hover:scale-110",
+            !currentColor
+              ? "border-[color:var(--text-0)] ring-1 ring-[color:var(--text-0)]"
+              : "border-[color:var(--border)]",
+          )}
+          onClick={() => {
+            clearFolderColor(folderPath);
+            onClose();
+          }}
+        >
+          <span className="block h-3 w-3 rounded-full bg-[color:var(--text-2)]" />
+        </button>
+        {FOLDER_COLOR_PALETTE.map((color) => (
+          <button
+            key={color}
+            type="button"
+            className={clsx(
+              "flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110",
+              currentColor === color && "ring-1 ring-offset-1 ring-offset-[color:var(--bg-1)]",
+            )}
+            style={{
+              backgroundColor: color,
+              ...(currentColor === color ? { ringColor: color } : {}),
+            }}
+            onClick={() => {
+              setFolderColor(folderPath, color);
+              onClose();
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ContextMenu({
   menu,
   groups,
   onClose,
+  folderPath,
 }: {
   menu: ContextMenuState;
   groups: MenuAction[][];
   onClose: () => void;
+  folderPath?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
