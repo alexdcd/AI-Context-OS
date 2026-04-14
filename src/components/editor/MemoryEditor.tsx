@@ -352,7 +352,6 @@ export function MemoryEditor() {
               {meta.system_role && ` · ${meta.system_role}`}
               {meta.folder_category && ` · ${meta.folder_category}`}
               {meta.importance >= 0.7 ? ` · ${t("memoryEditor.meta.high")}` : meta.importance >= 0.4 ? "" : ` · ${t("memoryEditor.meta.low")}`}
-              {meta.always_load && ` · ${t("memoryEditor.meta.pinned")}`}
               {meta.tags.length > 0 && ` · ${meta.tags.join(", ")}`}
               {` · ${t("memoryEditor.meta.l2Content")} · v${meta.version}`}
             </p>
@@ -895,7 +894,6 @@ function toComparableMemoryMeta(meta: MemoryMeta) {
     ontology: meta.ontology,
     l0: meta.l0,
     importance: meta.importance,
-    always_load: meta.always_load,
     decay_rate: meta.decay_rate,
     confidence: meta.confidence,
     tags: meta.tags,

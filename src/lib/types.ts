@@ -9,7 +9,6 @@ export interface MemoryMeta {
   ontology: MemoryOntology;
   l0: string;
   importance: number;
-  always_load: boolean;
   decay_rate: number;
   last_access: string;
   access_count: number;

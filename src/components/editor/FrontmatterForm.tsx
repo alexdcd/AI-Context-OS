@@ -142,16 +142,6 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
         </select>
       </Field>
 
-      <label className="flex items-center gap-2 text-xs text-[color:var(--text-1)]">
-        <input
-          type="checkbox"
-          checked={meta.always_load}
-          onChange={(e) => update({ always_load: e.target.checked })}
-          disabled={readonly}
-          className="accent-[color:var(--accent)]"
-        />
-        {t("memoryEditor.frontmatter.alwaysLoad")}
-      </label>
 
       <label className="flex items-center gap-2 text-xs text-[color:var(--text-1)]">
         <input
