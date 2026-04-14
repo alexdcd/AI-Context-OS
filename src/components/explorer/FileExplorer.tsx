@@ -388,11 +388,11 @@ function TreeNode({
               <ChevronRight className="h-3 w-3 shrink-0 text-[color:var(--text-2)]" />
             )}
             {isInboxNode(node) ? (
-              <Inbox className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+              <Inbox className="h-3.5 w-3.5 shrink-0" style={{ color: getFolderColor(node) ?? "var(--text-2)" }} />
             ) : isSourcesNode(node) ? (
-              <BookOpen className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+              <BookOpen className="h-3.5 w-3.5 shrink-0" style={{ color: getFolderColor(node) ?? "var(--text-2)" }} />
             ) : (
-              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: color ?? "var(--text-2)" }} />
+              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: getFolderColor(node) ?? "var(--text-0)" }} />
             )}
           </>
         ) : (
@@ -405,7 +405,7 @@ function TreeNode({
                 <GripVertical className="h-3 w-3 text-[color:var(--text-2)] opacity-70 transition-opacity group-hover:opacity-100" />
               ) : null}
             </span>
-            <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: color ?? "var(--text-2)" }} />
+            <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: getFileOntologyColor(memoryMeta?.ontology) ?? "var(--text-2)" }} />
           </>
         )}
 
