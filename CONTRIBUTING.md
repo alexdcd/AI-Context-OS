@@ -36,8 +36,88 @@ Because the core project is under the FSL, we want to clarify how plugins work r
 2. If you are proposing a large architectural change, please open a Discussion or an Issue first.
 3. Fork the Repo.
 4. Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
-5. Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
+5. Commit your Changes (see our **Commit Convention** below).
 6. Push to the Branch (`git push origin feature/AmazingFeature`).
-7. Open a Pull Request and sign the CLA!.
+7. Open a Pull Request following our **Pull Request Guidelines** and sign the CLA!.
+
+## Commit Convention
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+`<type>(<scope>): <subject>`
+
+`<body>`
+
+`<footer>`
+
+### Types
+
+| Type | Description |
+|---|---|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation |
+| `style` | Code style (no logic change) |
+| `refactor` | Code refactoring |
+| `perf` | Performance improvement |
+| `test` | Tests |
+| `chore` | Build/tooling |
+
+### Examples
+
+```bash
+# New feature
+git commit -m "feat(parser): add support for xlsx files"
+
+# Bug fix
+git commit -m "fix(retrieval): fix score calculation in rerank"
+
+# Documentation
+git commit -m "docs: update quick start guide"
+
+# Refactoring
+git commit -m "refactor(storage): simplify interface methods"
+```
+
+## Pull Request Guidelines
+
+### PR Title
+Use the same format as commit messages.
+
+### PR Description Template
+
+When creating a PR, please structure your description as follows:
+
+```markdown
+## Summary
+
+Brief description of the changes and their purpose.
+
+## Type of Change
+
+- [ ] New feature (feat)
+- [ ] Bug fix (fix)
+- [ ] Documentation (docs)
+- [ ] Refactoring (refactor)
+- [ ] Other
+
+## Testing
+
+Describe how to test these changes:
+- [ ] Unit tests pass
+- [ ] Manual testing completed
+
+## Related Issues
+
+- Fixes #123
+- Related to #456
+
+## Checklist
+
+- [ ] Code follows project style guidelines
+- [ ] Tests added for new functionality
+- [ ] Documentation updated (if needed)
+- [ ] All tests pass
+```
 
 We look forward to reviewing your PRs!
