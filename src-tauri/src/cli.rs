@@ -234,7 +234,6 @@ fn main() {
             let claude_md = render_claude_adapter(&neutral);
             std::fs::write(root.join("claude.md"), &claude_md).unwrap();
             let index_yaml = generate_index_yaml(&manifest).unwrap();
-            let index_yaml = generate_index_yaml(&metas);
             let paths = core::paths::SystemPaths::new(&root);
             std::fs::write(paths.index_yaml(), &index_yaml).unwrap();
             std::fs::write(paths.catalog_md(), render_catalog_markdown(&manifest)).unwrap();
