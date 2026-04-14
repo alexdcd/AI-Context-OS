@@ -242,6 +242,11 @@ function ContextMenu({
           ))}
         </div>
       ))}
+      {folderPath && (
+        <div className="mt-1 border-t border-[color:var(--border)] pt-1">
+          <FolderColorRow folderPath={folderPath} onClose={onClose} />
+        </div>
+      )}
     </div>
   );
 }
@@ -339,6 +344,7 @@ function TreeNode({
 }: TreeNodeProps) {
   const { t } = useTranslation();
   const { selectedPath, selectFile, selectRawFile, memories } = useAppStore();
+  const folderColor = useSettingsStore((s: SettingsStore) => s.folderColors[node.path]);
   const isExpanded = expanded.has(node.path);
   const isSelected = selectedPath === node.path;
   const isSpecialFolder = isSpecialWorkspaceNode(node);
@@ -442,11 +448,11 @@ function TreeNode({
               <ChevronRight className="h-3 w-3 shrink-0 text-[color:var(--text-2)]" />
             )}
             {isInboxNode(node) ? (
-              <Inbox className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+              <Inbox className="h-3.5 w-3.5 shrink-0" style={{ color: folderColor ?? "var(--text-2)" }} />
             ) : isSourcesNode(node) ? (
-              <BookOpen className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+              <BookOpen className="h-3.5 w-3.5 shrink-0" style={{ color: folderColor ?? "var(--text-2)" }} />
             ) : (
-              <Folder className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-2)]" />
+              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: folderColor ?? "var(--text-2)" }} />
             )}
           </>
         ) : (
@@ -1532,6 +1538,7 @@ export function FileExplorer() {
           menu={ctxMenu}
           groups={menuGroups}
           onClose={closeContextMenu}
+          folderPath={currentNode?.is_dir ? currentNode.path : undefined}
         />
       )}
 
