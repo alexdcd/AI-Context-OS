@@ -146,6 +146,10 @@ pub fn read_file(path: String) -> Result<String, String> {
 /// Write raw content to a file.
 #[tauri::command]
 pub fn write_file(path: String, content: String, state: State<AppState>) -> Result<(), String> {
+    let root = state.get_root();
+    if let Some(error) = path_contains_protected_content(&root, Path::new(&path)) {
+        return Err(error);
+    }
     // Ensure parent directory exists
     if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
@@ -164,12 +168,16 @@ pub fn create_directory(path: String) -> Result<String, String> {
 
 /// Rename or move a file or directory.
 #[tauri::command]
-pub fn rename_path(old_path: String, new_path: String) -> Result<String, String> {
+pub fn rename_path(old_path: String, new_path: String, state: State<AppState>) -> Result<String, String> {
     let old = PathBuf::from(&old_path);
     let new = PathBuf::from(&new_path);
+    let root = state.get_root();
 
     if !old.exists() {
         return Err(format!("Path does not exist: {}", old_path));
+    }
+    if let Some(error) = path_contains_protected_content(&root, &old) {
+        return Err(error);
     }
     if new.exists() && new != old {
         return Err(format!("Target already exists: {}", new_path));
@@ -191,10 +199,14 @@ pub fn rename_path(old_path: String, new_path: String) -> Result<String, String>
 
 /// Delete a file or directory recursively.
 #[tauri::command]
-pub fn delete_path(path: String) -> Result<(), String> {
+pub fn delete_path(path: String, state: State<AppState>) -> Result<(), String> {
     let target = PathBuf::from(&path);
+    let root = state.get_root();
     if !target.exists() {
         return Err(format!("Path does not exist: {}", path));
+    }
+    if let Some(error) = path_contains_protected_content(&root, &target) {
+        return Err(error);
     }
 
     if target.is_dir() {
