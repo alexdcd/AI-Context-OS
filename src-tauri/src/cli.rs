@@ -149,12 +149,13 @@ fn main() {
             let paths = core::paths::SystemPaths::new(&root);
             let yaml = serde_yaml::to_string(&config).unwrap();
             std::fs::write(paths.config_yaml(), yaml).unwrap();
-            std::fs::write(
-                paths.claude_md(),
-                "# AI Context OS — Router\n\nInitialized.\n",
-            )
-            .unwrap();
-            std::fs::write(paths.index_yaml(), "memories: []\n").unwrap();
+            let manifest = build_router_manifest(&[], &root, &config);
+            let neutral = render_static_router(&manifest);
+            std::fs::write(paths.claude_md(), render_claude_adapter(&neutral)).unwrap();
+            std::fs::write(paths.cursorrules(), render_cursor_adapter(&neutral)).unwrap();
+            std::fs::write(paths.windsurfrules(), render_windsurf_adapter(&neutral)).unwrap();
+            std::fs::write(paths.index_yaml(), generate_index_yaml(&manifest).unwrap()).unwrap();
+            std::fs::write(paths.catalog_md(), render_catalog_markdown(&manifest)).unwrap();
 
             println!("Workspace initialized at {}", root.display());
         }

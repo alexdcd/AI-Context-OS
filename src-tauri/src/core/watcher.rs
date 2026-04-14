@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use chrono::Utc;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use tauri::{AppHandle, Emitter};
@@ -29,12 +28,12 @@ impl WatcherHandle {
 
 /// Start a file watcher on the workspace directory.
 /// Emits Tauri events when files change.
-/// When an external process modifies a .md memory file, updates last_access in the index.
+/// Ignores generated system artifacts and emits change notifications for real workspace files.
 #[allow(dead_code)]
 pub fn start_watcher(
     root: PathBuf,
     app_handle: AppHandle,
-    memory_index: Option<MemoryIndex>,
+    _memory_index: Option<MemoryIndex>,
     is_recent_write: Arc<dyn Fn(&str) -> bool + Send + Sync>,
 ) -> Result<WatcherHandle, String> {
     if !root.exists() {
@@ -78,6 +77,8 @@ pub fn start_watcher(
                             || path_str.ends_with("\\claude.md")
                             || path_str.ends_with("/.ai/index.yaml")
                             || path_str.ends_with("\\.ai\\index.yaml")
+                            || path_str.ends_with("/.ai/catalog.md")
+                            || path_str.ends_with("\\.ai\\catalog.md")
                             || path_str.ends_with("/.ai/config.yaml")
                             || path_str.ends_with("\\.ai\\config.yaml")
                             || path_str.ends_with("/.cursorrules")
@@ -98,21 +99,6 @@ pub fn start_watcher(
                                     continue;
                                 }
 
-                                // Track external access: update last_access in memory index
-                                if path_str.ends_with(".md") {
-                                    if let Some(ref index) = memory_index {
-                                        if let Ok(mut idx) = index.write() {
-                                            let now = Utc::now();
-                                            for (_id, (meta, stored_path)) in idx.iter_mut() {
-                                                if *stored_path == path_str {
-                                                    meta.access_count += 1;
-                                                    meta.last_access = now;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
 
                                 let _ = app_handle.emit("memory-changed", &path_str);
                             }
