@@ -37,7 +37,8 @@ import {
   renamePath,
   showInFileManager,
 } from "../../lib/tauri";
-import type { Conflict, FileNode } from "../../lib/types";
+import type { Conflict, FileNode, MemoryOntology } from "../../lib/types";
+import { MEMORY_ONTOLOGY_COLORS } from "../../lib/types";
 
 interface ContextMenuState {
   x: number;
@@ -175,41 +176,20 @@ function ContextMenu({
   );
 }
 
-const FALLBACK_COLORS = [
-  "#f87171", // red
-  "#fb923c", // orange
-  "#fbbf24", // amber
-  "#a3e635", // lime
-  "#4ade80", // green
-  "#34d399", // emerald
-  "#2dd4bf", // teal
-  "#22d3ee", // cyan
-  "#38bdf8", // sky
-  "#818cf8", // indigo
-  "#a78bfa", // violet
-  "#c084fc", // purple
-  "#e879f9", // fuchsia
-  "#f472b6", // pink
-  "#fb7185", // rose
-];
+const DEFAULT_FOLDER_COLORS: Record<string, string> = {
+  inbox: "#f59e0b",    // amber — transient, attention-worthy
+  sources: "#0ea5e9",  // cyan — reference material
+  ".ai": "#8b5cf6",    // purple — system/config
+  docs: "#10b981",     // green — documentation
+};
 
-function getStringColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+function getFolderColor(node: FileNode): string | undefined {
+  return DEFAULT_FOLDER_COLORS[node.name];
 }
 
-function getTypeColor(node: FileNode): string | undefined {
-  // Los archivos no editables (no markdown) no tienen color (serán grises)
-  if (!node.is_dir && !isMarkdownFile(node.name)) {
-    return undefined;
-  }
-
-  // Zero Gravity: no folder-based type inference — use hash color for untyped nodes
-  const stringToHash = node.is_dir ? node.name : (node.path.split("/").slice(-2, -1)[0] || node.name);
-  return getStringColor(stringToHash);
+function getFileOntologyColor(ontology: MemoryOntology | undefined): string | undefined {
+  if (!ontology) return undefined;
+  return MEMORY_ONTOLOGY_COLORS[ontology];
 }
 
 function defaultOntologyForDirectory(path: string): "source" | "entity" | "concept" | "synthesis" {
@@ -307,7 +287,6 @@ function TreeNode({
   const { selectedPath, selectFile, selectRawFile, memories } = useAppStore();
   const isExpanded = expanded.has(node.path);
   const isSelected = selectedPath === node.path;
-  const color = getTypeColor(node);
   const isSpecialFolder = isSpecialWorkspaceNode(node);
 
   const isMarkdown = isMarkdownFile(node.name);
