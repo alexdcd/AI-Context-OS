@@ -8,6 +8,7 @@ use crate::core::index::scan_memories;
 use crate::core::memory::{read_memory, write_memory};
 use crate::core::paths::{enrich_memory_meta, SystemPaths};
 use crate::core::types::{CreateMemoryInput, Memory, MemoryFilter, MemoryMeta, SaveMemoryInput};
+use crate::core::usage::record_access;
 use crate::state::AppState;
 
 fn should_regenerate_router(
@@ -21,12 +22,57 @@ fn should_regenerate_router(
         || old_meta.ontology != new_meta.ontology
         || old_meta.l0 != new_meta.l0
         || old_meta.importance != new_meta.importance
-        || old_meta.always_load != new_meta.always_load
         || old_meta.tags != new_meta.tags
         || old_meta.triggers != new_meta.triggers
         || old_meta.related != new_meta.related
         || old_meta.requires != new_meta.requires
         || old_meta.optional != new_meta.optional
+        || old_meta.output_format != new_meta.output_format
+        || old_meta.status != new_meta.status
+        || old_meta.protected != new_meta.protected
+        || old_meta.derived_from != new_meta.derived_from
+}
+
+fn same_edit_signature(a: &MemoryMeta, b: &MemoryMeta) -> bool {
+    a.id == b.id
+        && a.ontology == b.ontology
+        && a.l0 == b.l0
+        && a.importance == b.importance
+        && a.decay_rate == b.decay_rate
+        && a.confidence == b.confidence
+        && a.tags == b.tags
+        && a.related == b.related
+        && a.created == b.created
+        && a.triggers == b.triggers
+        && a.requires == b.requires
+        && a.optional == b.optional
+        && a.output_format == b.output_format
+        && a.status == b.status
+        && a.derived_from == b.derived_from
+}
+
+fn can_unlock_protected_memory(
+    current: &Memory,
+    requested_meta: &MemoryMeta,
+    requested_l1: &str,
+    requested_l2: &str,
+) -> bool {
+    current.meta.protected
+        && !requested_meta.protected
+        && current.l1_content == requested_l1
+        && current.l2_content == requested_l2
+        && same_edit_signature(&current.meta, requested_meta)
+}
+
+fn ensure_not_protected(meta: &MemoryMeta, action: &str) -> Result<(), String> {
+    if meta.protected {
+        Err(format!(
+            "Memory '{}' is protected. Unprotect it before {}.",
+            meta.id, action
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 fn normalize_existing_dir(path: &Path) -> Result<PathBuf, String> {
@@ -116,20 +162,18 @@ pub fn list_memories(
 pub fn get_memory(id: String, state: State<AppState>) -> Result<Memory, String> {
     let root = state.get_root();
     let index = state.memory_index.read().unwrap();
-
+    let (meta, path) = index
     let (_meta, path) = index
         .get(&id)
         .ok_or_else(|| format!("Memory not found: {}", id))?;
 
     let mut memory = read_memory(&root, std::path::Path::new(path))?;
+    let timestamp = Utc::now();
 
-    // Update access tracking
-    memory.meta.access_count += 1;
-    memory.meta.last_access = Utc::now();
-
-    // Persist updated counters to disk
-    write_memory(std::path::Path::new(path), &memory)?;
-    state.mark_recent_write(std::path::Path::new(path));
+    // Update runtime access tracking without touching canonical frontmatter
+    record_access(&root, &id, timestamp)?;
+    memory.meta.access_count = meta.access_count.saturating_add(1);
+    memory.meta.last_access = timestamp;
 
     // Update in-memory index
     drop(index);
@@ -188,6 +232,17 @@ pub fn save_memory(
         return Err(format!("Memory already exists: {}", input.meta.id));
     }
     drop(index);
+
+    if old_meta.protected {
+        let current = read_memory(&root, &old_file_path)?;
+        if !can_unlock_protected_memory(&current, &input.meta, &input.l1_content, &input.l2_content)
+        {
+            return Err(format!(
+                "Memory '{}' is protected. Unprotect it first, then retry the edit.",
+                old_meta.id
+            ));
+        }
+    }
 
     let mut meta = input.meta;
     meta.modified = Utc::now();
@@ -253,10 +308,16 @@ pub fn save_memory(
 /// Delete a memory file.
 #[tauri::command]
 pub fn delete_memory(id: String, app: AppHandle, state: State<AppState>) -> Result<(), String> {
-    let mut index = state.memory_index.write().unwrap();
-    let (_meta, path) = index
-        .remove(&id)
+    let index = state.memory_index.read().unwrap();
+    let (meta, path) = index
+        .get(&id)
         .ok_or_else(|| format!("Memory not found: {}", id))?;
+    ensure_not_protected(meta, "deleting it")?;
+    let path = path.clone();
+    drop(index);
+
+    let mut index = state.memory_index.write().unwrap();
+    index.remove(&id);
     drop(index);
 
     fs::remove_file(&path).map_err(|e| format!("Failed to delete {}: {}", path, e))?;
@@ -282,6 +343,7 @@ pub fn rename_memory_file(
 
     let root = state.get_root();
     let mut memory = read_memory(&root, &old_path)?;
+    ensure_not_protected(&memory.meta, "renaming it")?;
     let old_id = memory.meta.id.clone();
     let trimmed_id = new_id.trim();
     if trimmed_id.is_empty() {
@@ -378,7 +440,6 @@ pub fn duplicate_memory_file(
             ontology: source.meta.ontology,
             l0: source.meta.l0,
             importance: source.meta.importance,
-            always_load: source.meta.always_load,
             decay_rate: source.meta.decay_rate,
             last_access: now,
             access_count: 0,
@@ -443,6 +504,7 @@ pub fn move_memory_file(
     let destination_dir = validate_memory_directory(&root, &destination_dir)?;
 
     let mut memory = read_memory(&root, &source_path)?;
+    ensure_not_protected(&memory.meta, "moving it")?;
     let target_path = destination_dir.join(format!("{}.md", memory.meta.id));
     if target_path == source_path {
         return Ok(memory);
@@ -515,7 +577,6 @@ fn create_memory_internal(
         ontology: input.ontology,
         l0: input.l0,
         importance: input.importance,
-        always_load: false,
         decay_rate: 0.998,
         last_access: now,
         access_count: 0,
