@@ -152,6 +152,10 @@ This was chosen as the lowest-risk path:
 
 ## Recommended next phases
 
+### Related roadmap documents
+
+- [Plan implementacion separacion L1/L2 sin MCP](./roadmap/plan-implementacion-separacion-l1-l2-sin-mcp.md)
+
 ### Phase 2: ingestion MVP
 
 Recommended scope:
