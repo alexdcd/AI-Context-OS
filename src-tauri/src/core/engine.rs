@@ -7,7 +7,7 @@ use crate::core::graph::get_community_map_for_scoring;
 use crate::core::index::scan_memories;
 use crate::core::levels::estimate_tokens;
 use crate::core::memory::read_memory;
-use crate::core::router::generate_router_content;
+use crate::core::router::{build_router_manifest, render_mcp_prelude};
 use crate::core::scoring::compute_score;
 use crate::core::types::{Config, LoadLevel, Memory, ScoreBreakdown, ScoredMemory, SystemRole};
 
@@ -63,17 +63,18 @@ pub fn execute_context_query(
 ) -> Result<ContextResult, String> {
     let all_entries = scan_memories(root);
     let total_memories = all_entries.len() as u32;
+    let manifest = build_router_manifest(&all_entries, root, config);
+    let rules_content = render_mcp_prelude(&manifest);
 
     let mut memories: Vec<Memory> = Vec::new();
-    for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(root, std::path::Path::new(path)) {
+    for (meta, path) in &all_entries {
+        if let Ok(mut mem) = read_memory(root, std::path::Path::new(path)) {
+            mem.meta = meta.clone();
             memories.push(mem);
         }
     }
 
     if memories.is_empty() {
-        // Generate rules even with no memories
-        let rules_content = generate_router_content(&[], config);
         return Ok(ContextResult {
             scored_memories: Vec::new(),
             loaded: Vec::new(),
@@ -244,9 +245,6 @@ pub fn execute_context_query(
         });
     }
 
-    // Generate rules content
-    let all_metas: Vec<_> = memories.iter().map(|m| m.meta.clone()).collect();
-    let rules_content = generate_router_content(&all_metas, config);
 
     let tokens_used = token_budget - remaining_budget;
 

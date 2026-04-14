@@ -55,24 +55,9 @@ pub fn run_onboarding(
         _ => {} // "custom" = empty
     }
 
-    // Step 6: Regenerate router
+    // Step 6: Regenerate router artifacts from the shared manifest pipeline
     let config = state.config.read().unwrap().clone();
-    let all = crate::core::index::scan_memories(&root);
-    let metas: Vec<_> = all.iter().map(|(m, _)| m.clone()).collect();
-    let neutral = crate::core::router::generate_router_content(&metas, &config);
-    let claude_md = crate::core::compat::render_claude_adapter(&neutral);
-    fs::write(root.join("claude.md"), &claude_md)
-        .map_err(|e| format!("Failed to write claude.md: {}", e))?;
-
-    let paths = crate::core::paths::SystemPaths::new(&root);
-    let index_yaml = crate::core::router::generate_index_yaml(&metas);
-    fs::write(paths.index_yaml(), &index_yaml)
-        .map_err(|e| format!("Failed to write index.yaml: {}", e))?;
-
-    let cursorrules = crate::core::compat::render_cursor_adapter(&neutral);
-    fs::write(root.join(".cursorrules"), &cursorrules).ok();
-    let windsurfrules = crate::core::compat::render_windsurf_adapter(&neutral);
-    fs::write(root.join(".windsurfrules"), &windsurfrules).ok();
+    crate::commands::router::regenerate_router_files(&root, &config)?;
 
     // Persist selected root and refresh runtime bindings for this workspace.
     state.set_root(root.clone())?;
@@ -135,7 +120,6 @@ fn create_profile_memory(
             profile.name, profile.role, tools_label
         ),
         importance: 0.95,
-        always_load: true,
         decay_rate: 0.999,
         last_access: now,
         access_count: 0,
@@ -204,7 +188,6 @@ fn write_memory_file(
         ontology,
         l0: l0.to_string(),
         importance,
-        always_load: false,
         decay_rate: 0.998,
         last_access: now,
         access_count: 0,
