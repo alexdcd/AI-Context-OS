@@ -24,7 +24,16 @@ pub fn get_conflicts(state: State<AppState>) -> Result<Vec<Conflict>, String> {
 
     let mut memories = Vec::new();
     for path in &paths {
-        if let Ok(mem) = read_memory(&root, std::path::Path::new(path)) {
+        if let Ok(mut mem) = read_memory(&root, std::path::Path::new(path)) {
+            if let Some((meta, _)) = state
+                .memory_index
+                .read()
+                .unwrap()
+                .values()
+                .find(|(_, stored_path)| stored_path == path)
+            {
+                mem.meta = meta.clone();
+            }
             memories.push(mem);
         }
     }

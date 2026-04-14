@@ -14,8 +14,11 @@ pub fn get_graph_data(state: State<AppState>) -> Result<GraphData, String> {
     let all_entries = scan_memories(&root);
 
     let mut memories = Vec::new();
-    for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(&root, std::path::Path::new(path)) {
+    for (meta, path) in &all_entries {
+        if let Ok(mut mem) = read_memory(&root, std::path::Path::new(path)) {
+            mem.meta = meta.clone();
+ {
+            mem.meta = meta.clone();
             memories.push(mem);
         }
     }

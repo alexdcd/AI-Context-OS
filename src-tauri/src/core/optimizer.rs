@@ -17,8 +17,9 @@ pub fn run_optimizations(
 
     // Load all memories for analysis
     let mut memories = Vec::new();
-    for (_meta, path) in &all_entries {
-        if let Ok(mem) = read_memory(root, std::path::Path::new(path)) {
+    for (meta, path) in &all_entries {
+        if let Ok(mut mem) = read_memory(root, std::path::Path::new(path)) {
+            mem.meta = meta.clone();
             memories.push(mem);
         }
     }
