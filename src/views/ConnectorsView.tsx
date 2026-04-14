@@ -663,7 +663,7 @@ export function ConnectorsView() {
                 />
               )}
 
-              {!info && active.tier === "Local Native" && (
+              {!info && active.tier !== "Bridge" && (
                 <NullInfoBanner />
               )}
             </div>
