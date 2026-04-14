@@ -6,7 +6,7 @@ import { useTranslation, Trans } from "react-i18next";
 import { getMcpConnectionInfo, simulateContext, writeFile } from "../lib/tauri";
 import type { McpConnectionInfo } from "../lib/types";
 
-type IntegrationTier = "Local Native" | "Bridge";
+type IntegrationTier = "Native MCP" | "Remote MCP" | "Bridge";
 
 interface ConnectorDef {
   id: string;
@@ -31,7 +31,7 @@ export function ConnectorsView() {
     {
       id: "claude-desktop",
       name: t("connectors.list.claudeDesktop.name"),
-      tier: "Local Native",
+      tier: "Native MCP",
       description: t("connectors.list.claudeDesktop.description"),
       icon: "C",
       capabilities: [
@@ -43,7 +43,7 @@ export function ConnectorsView() {
     {
       id: "claude-code",
       name: t("connectors.list.claudeCode.name"),
-      tier: "Local Native",
+      tier: "Native MCP",
       description: t("connectors.list.claudeCode.description"),
       icon: ">_",
       capabilities: [
@@ -54,7 +54,7 @@ export function ConnectorsView() {
     {
       id: "cursor",
       name: t("connectors.list.cursor.name"),
-      tier: "Local Native",
+      tier: "Remote MCP",
       description: t("connectors.list.cursor.description"),
       icon: "↗",
       capabilities: [
@@ -65,7 +65,7 @@ export function ConnectorsView() {
     {
       id: "windsurf",
       name: t("connectors.list.windsurf.name"),
-      tier: "Local Native",
+      tier: "Remote MCP",
       description: t("connectors.list.windsurf.description"),
       icon: "W",
       capabilities: [
@@ -74,21 +74,20 @@ export function ConnectorsView() {
       ],
     },
     {
-      id: "chatgpt",
-      name: t("connectors.list.chatgpt.name"),
-      tier: "Local Native",
-      description: t("connectors.list.chatgpt.description"),
-      icon: "G",
+      id: "codex-cli",
+      name: t("connectors.list.codexCli.name"),
+      tier: "Native MCP",
+      description: t("connectors.list.codexCli.description"),
+      icon: "⌘",
       capabilities: [
-        t("connectors.list.chatgpt.cap1"),
-        t("connectors.list.chatgpt.cap2"),
-        t("connectors.list.chatgpt.cap3"),
+        t("connectors.list.codexCli.cap1"),
+        t("connectors.list.codexCli.cap2"),
       ],
     },
     {
       id: "gemini-cli",
       name: t("connectors.list.geminiCli.name"),
-      tier: "Local Native",
+      tier: "Native MCP",
       description: t("connectors.list.geminiCli.description"),
       icon: "♊",
       capabilities: [
@@ -97,7 +96,18 @@ export function ConnectorsView() {
       ],
     },
     {
-      id: "gemini",
+      id: "chatgpt-web",
+      name: t("connectors.list.chatgptWeb.name"),
+      tier: "Bridge",
+      description: t("connectors.list.chatgptWeb.description"),
+      icon: "G",
+      capabilities: [
+        t("connectors.list.chatgptWeb.cap1"),
+        t("connectors.list.chatgptWeb.cap2"),
+      ],
+    },
+    {
+      id: "gemini-web",
       name: t("connectors.list.geminiWeb.name"),
       tier: "Bridge",
       description: t("connectors.list.geminiWeb.description"),
@@ -121,7 +131,8 @@ export function ConnectorsView() {
   ], [t]);
 
   const TIER_COLORS: Record<IntegrationTier, { bg: string; text: string; label: string }> = {
-    "Local Native": { bg: "var(--bg-2)", text: "var(--success)", label: t("connectors.tiers.localNative") },
+    "Native MCP": { bg: "var(--bg-2)", text: "var(--success)", label: t("connectors.tiers.nativeMcp") },
+    "Remote MCP": { bg: "var(--bg-2)", text: "var(--accent)", label: t("connectors.tiers.remoteMcp") },
     "Bridge": { bg: "var(--bg-2)", text: "var(--warning)", label: t("connectors.tiers.bridge") },
   };
 
@@ -228,7 +239,7 @@ export function ConnectorsView() {
       <div style={{ display: "flex", gap: 16 }}>
         {/* Connector list */}
         <div style={{ width: 200, flexShrink: 0 }}>
-          {(["Local Native", "Bridge"] as IntegrationTier[]).map((tier) => (
+              {(["Native MCP", "Remote MCP", "Bridge"] as IntegrationTier[]).map((tier) => (
             <div key={tier}>
               <div
                 style={{
@@ -526,7 +537,7 @@ export function ConnectorsView() {
                 </div>
               )}
 
-              {active.id === "chatgpt" && info && (
+              {active.id === "codex-cli" && info && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
                     <SectionLabel>{t("connectors.sections.codexCli")}</SectionLabel>
@@ -557,23 +568,6 @@ export function ConnectorsView() {
                     />
                   </InfoBox>
 
-                  <div>
-                    <SectionLabel>{t("connectors.sections.chatgptWeb")}</SectionLabel>
-                    <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-                      <Trans
-                        i18nKey="connectors.sections.chatgptWebDesc"
-                        components={{ bold: <strong /> }}
-                      />
-                    </p>
-                  </div>
-                  <BridgePanel
-                    connectorId={active.id}
-                    status={bridgeStatus}
-                    resultText={bridgeText}
-                    feedback={bridgeFeedback}
-                    error={bridgeError}
-                    onAction={handleBridgeAction}
-                  />
                 </div>
               )}
 
@@ -636,7 +630,29 @@ export function ConnectorsView() {
                 </div>
               )}
 
-              {active.tier === "Bridge" && active.id !== "chatgpt" && (
+              {active.id === "chatgpt-web" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <SectionLabel>{t("connectors.sections.chatgptWeb")}</SectionLabel>
+                    <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
+                      <Trans
+                        i18nKey="connectors.sections.chatgptWebDesc"
+                        components={{ bold: <strong /> }}
+                      />
+                    </p>
+                  </div>
+                  <BridgePanel
+                    connectorId={active.id}
+                    status={bridgeStatus}
+                    resultText={bridgeText}
+                    feedback={bridgeFeedback}
+                    error={bridgeError}
+                    onAction={handleBridgeAction}
+                  />
+                </div>
+              )}
+
+              {active.tier === "Bridge" && active.id !== "chatgpt-web" && (
                 <BridgePanel
                   connectorId={active.id}
                   status={bridgeStatus}
