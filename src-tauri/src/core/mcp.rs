@@ -17,6 +17,7 @@ use crate::core::memory::read_memory;
 use crate::core::observability::{classify_task, ObservabilityDb};
 use crate::core::paths::{enrich_memory_meta, AI_DIR, RULES_DIR, SKILLS_DIR};
 use crate::core::types::{Config, LoadLevel, MemoryMeta, MemoryOntology, SystemRole};
+use crate::core::usage::record_accesses;
 
 /// Shared state accessible by the MCP server tools.
 pub struct McpSharedState {
@@ -224,6 +225,13 @@ impl AiContextMcpServer {
                     }
                 }
 
+                let loaded_ids = result
+                    .loaded
+                    .iter()
+                    .map(|mem| mem.memory_id.clone())
+                    .collect::<Vec<_>>();
+                let _ = record_accesses(&root, &loaded_ids, Utc::now());
+
                 assemble_context_package(&result)
             }
             Err(e) => format!("Error loading context: {}", e),
@@ -250,37 +258,63 @@ impl AiContextMcpServer {
             }
         };
 
-        let target_folder = match resolve_memory_folder(&root, params.folder.as_deref()) {
-            Ok(path) => path,
-            Err(e) => return format!("Invalid folder: {}", e),
-        };
-        let file_path = target_folder.join(format!("{}.md", params.id));
+        let all_entries = scan_memories(&root);
 
         let now = Utc::now();
-        let mut meta = MemoryMeta {
-            id: params.id.clone(),
-            ontology,
-            l0: params.l0,
-            importance: params.importance.clamp(0.0, 1.0),
-            always_load: false,
-            decay_rate: 0.998,
-            last_access: now,
-            access_count: 0,
-            confidence: 0.9,
-            tags: params.tags,
-            related: vec![],
-            created: now,
-            modified: now,
-            version: 1,
-            triggers: vec![],
-            requires: vec![],
-            optional: vec![],
-            output_format: None,
-            status: None,
-            protected: false,
-            derived_from: vec![],
-            folder_category: None,
-            system_role: None,
+        let existing = all_entries
+            .iter()
+            .find(|(meta, _)| meta.id == params.id)
+            .cloned();
+        let file_path = if let Some((existing_meta, existing_path)) = &existing {
+            if existing_meta.protected {
+                return format!(
+                    "Memory '{}' is protected. Unprotect it before saving through MCP.",
+                    existing_meta.id
+                );
+            }
+            PathBuf::from(existing_path)
+        } else {
+            let target_folder = match resolve_memory_folder(&root, params.folder.as_deref()) {
+                Ok(path) => path,
+                Err(e) => return format!("Invalid folder: {}", e),
+            };
+            target_folder.join(format!("{}.md", params.id))
+        };
+
+        let mut meta = if let Some((existing_meta, _)) = existing {
+            let mut meta = existing_meta;
+            meta.ontology = ontology;
+            meta.l0 = params.l0;
+            meta.importance = params.importance.clamp(0.0, 1.0);
+            meta.tags = params.tags;
+            meta.modified = now;
+            meta.version = meta.version.saturating_add(1);
+            meta
+        } else {
+            MemoryMeta {
+                id: params.id.clone(),
+                ontology,
+                l0: params.l0,
+                importance: params.importance.clamp(0.0, 1.0),
+                decay_rate: 0.998,
+                last_access: now,
+                access_count: 0,
+                confidence: 0.9,
+                tags: params.tags,
+                related: vec![],
+                created: now,
+                modified: now,
+                version: 1,
+                triggers: vec![],
+                requires: vec![],
+                optional: vec![],
+                output_format: None,
+                status: None,
+                protected: false,
+                derived_from: vec![],
+                folder_category: None,
+                system_role: None,
+            }
         };
         enrich_memory_meta(&mut meta, &file_path, &root);
 
@@ -294,7 +328,20 @@ impl AiContextMcpServer {
                     }
                 }
                 match std::fs::write(&file_path, content) {
-                    Ok(_) => format!("Memory '{}' saved to {}", params.id, file_path.display()),
+                    Ok(_) => {
+                        let config = self.state.config.read().unwrap().clone();
+                        match crate::commands::router::regenerate_router_files(&root, &config) {
+                            Ok(_) => {
+                                format!("Memory '{}' saved to {}", params.id, file_path.display())
+                            }
+                            Err(e) => format!(
+                                "Memory '{}' saved to {} but router regeneration failed: {}",
+                                params.id,
+                                file_path.display(),
+                                e
+                            ),
+                        }
+                    }
                     Err(e) => format!("Error writing file: {}", e),
                 }
             }
@@ -386,6 +433,7 @@ impl AiContextMcpServer {
             Err(e) => return format!("Error reading skill: {}", e),
         }
 
+        let _ = record_accesses(&root, &loaded_ids, Utc::now());
         output
     }
 
