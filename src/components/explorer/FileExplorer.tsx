@@ -148,13 +148,10 @@ function FolderColorRow({
           <button
             key={color}
             type="button"
-            className={clsx(
-              "flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110",
-              currentColor === color && "ring-1 ring-offset-1 ring-offset-[color:var(--bg-1)]",
-            )}
+            className="flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110"
             style={{
               backgroundColor: color,
-              ...(currentColor === color ? { ringColor: color } : {}),
+              boxShadow: currentColor === color ? `0 0 0 1.5px var(--bg-1), 0 0 0 3px ${color}` : undefined,
             }}
             onClick={() => {
               setFolderColor(folderPath, color);
