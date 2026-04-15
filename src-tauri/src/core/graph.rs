@@ -636,6 +636,32 @@ mod tests {
         // Each edge should have a weight > 0
         assert!(data.edges.iter().all(|e| e.weight > 0.0));
     }
+
+    #[test]
+    fn to_graph_data_degree_ignores_inferred_edges() {
+        let a = make_memory("mem-a", vec![], vec!["rust"], "See [[mem-b]]");
+        let b = make_memory("mem-b", vec![], vec!["rust"], "");
+
+        let data = to_graph_data(&[a, b], 0.0);
+        let degrees: HashMap<_, _> = data
+            .nodes
+            .iter()
+            .map(|node| (node.id.as_str(), node.degree))
+            .collect();
+
+        assert_eq!(degrees.get("mem-a"), Some(&0));
+        assert_eq!(degrees.get("mem-b"), Some(&0));
+    }
+
+    #[test]
+    fn tag_only_connections_do_not_create_god_nodes() {
+        let hub = make_memory("hub", vec![], vec!["rust", "graph"], "");
+        let a = make_memory("mem-a", vec![], vec!["rust"], "");
+        let b = make_memory("mem-b", vec![], vec!["graph"], "");
+
+        let god_nodes = compute_god_nodes(&[hub, a, b]);
+        assert!(!god_nodes.iter().any(|g| g.memory_id == "hub"));
+    }
 }
 
 /// Get the count of connections for a memory (undirected graph degree, explicit links only).
