@@ -425,55 +425,90 @@ export function GraphViewPage() {
     return map;
   }, [graphData]);
 
-  // Recompute layout whenever data, visual mode, or seed changes
-  useEffect(() => {
-    if (filteredData.nodes.length === 0) {
-      setNodes([]);
-      setEdges([]);
-      return;
+  // Compute which node IDs are neighbors of the hovered node
+  const highlightedIds = useMemo<Set<string>>(() => {
+    if (!hoveredNodeId) return new Set();
+    const ids = new Set<string>([hoveredNodeId]);
+    for (const e of filteredData.edges) {
+      if (e.source === hoveredNodeId) ids.add(e.target);
+      if (e.target === hoveredNodeId) ids.add(e.source);
     }
+    return ids;
+  }, [hoveredNodeId, filteredData.edges]);
 
-    let cancelled = false;
-    setLayouting(true);
+  // Build flow nodes/edges from simulation positions
+  const buildFlowData = useCallback((simNodes: SimNode[]) => {
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const n of simNodes) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
 
-    void layoutWithForce(filteredData.nodes, filteredData.edges, viewMode).then((positions) => {
-      if (cancelled) return;
+    const newNodes: FlowNode[] = filteredData.nodes.map((node) => {
+      const isCards = viewMode === "cards";
+      const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 80);
+      return {
+        id: node.id,
+        type: viewMode,
+        position: positions[node.id] ?? { x: 0, y: 0 },
+        style: { width: w },
+        data: { node, colorByCommunity, godMode, godIds, highlighted: highlightedIds.has(node.id) },
+      };
+    });
 
-      const newNodes: FlowNode[] = filteredData.nodes.map((node) => {
-        const isCards = viewMode === "cards";
-        const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 60);
-        return {
-          id: node.id,
-          type: viewMode,
-          position: positions[node.id] ?? { x: 0, y: 0 },
-          style: { width: w },
-          data: { node, colorByCommunity, godMode, godIds },
-        };
-      });
-
-      const newEdges: FlowEdge[] = filteredData.edges.map((edge, i) => ({
+    const newEdges: FlowEdge[] = filteredData.edges.map((edge, i) => {
+      const isHighlighted = highlightedIds.has(edge.source) && highlightedIds.has(edge.target);
+      return {
         id: `e-${edge.source}-${edge.target}-${i}`,
         source: edge.source,
         target: edge.target,
         label: edge.edge_type !== "tag" ? edge.edge_type : undefined,
-        animated: edge.edge_type === "requires",
+        animated: edge.edge_type === "requires" || isHighlighted,
         style: {
-          stroke: EDGE_COLORS[edge.edge_type] ?? "#6b7280",
-          strokeWidth: viewMode === "cosmos"
-            ? Math.max(0.5, (edge.weight ?? 0.5) * 2)
-            : Math.max(0.8, (edge.weight ?? 0.5) * 2.5),
-          strokeDasharray: edge.edge_type === "tag" ? "4 3" : undefined,
+          stroke: isHighlighted ? "#fff" : (EDGE_COLORS[edge.edge_type] ?? "#6b7280"),
+          strokeWidth: isHighlighted
+            ? Math.max(1.5, (edge.weight ?? 0.5) * 3)
+            : viewMode === "cosmos"
+              ? Math.max(0.5, (edge.weight ?? 0.5) * 2)
+              : Math.max(0.8, (edge.weight ?? 0.5) * 2.5),
+          strokeDasharray: edge.edge_type === "tag" && !isHighlighted ? "4 3" : undefined,
         },
-        labelStyle: { fill: "#8b9cb4", fontSize: 9 },
-      }));
-
-      setNodes(newNodes);
-      setEdges(newEdges);
-      setLayouting(false);
+        labelStyle: { fill: isHighlighted ? "#fff" : "#8b9cb4", fontSize: isHighlighted ? 10 : 9 },
+      };
     });
 
-    return () => { cancelled = true; };
-  }, [filteredData, layoutSeed, viewMode, colorByCommunity, godMode, godIds, setNodes, setEdges]);
+    return { newNodes, newEdges };
+  }, [filteredData, viewMode, colorByCommunity, godMode, godIds, highlightedIds]);
+
+  // Create simulation and run initial layout
+  useEffect(() => {
+    if (filteredData.nodes.length === 0) {
+      setNodes([]);
+      setEdges([]);
+      simulationRef.current?.stop();
+      simulationRef.current = null;
+      return;
+    }
+
+    setLayouting(true);
+    const { simulation, simNodes } = createSimulation(filteredData.nodes, filteredData.edges, viewMode);
+    simulationRef.current = simulation;
+    simNodesRef.current = simNodes;
+
+    const { newNodes, newEdges } = buildFlowData(simNodes);
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setLayouting(false);
+
+    return () => { simulation.stop(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredData, layoutSeed, viewMode]);
+
+  // Update node data (highlight, colors) without recomputing layout
+  useEffect(() => {
+    if (simNodesRef.current.length === 0) return;
+    const { newNodes, newEdges } = buildFlowData(simNodesRef.current);
+    setNodes(newNodes);
+    setEdges(newEdges);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedIds, colorByCommunity, godMode, godIds]);
 
   // Fit view after layout completes or when flowInstance becomes available
   useEffect(() => {
@@ -481,6 +516,54 @@ export function GraphViewPage() {
       requestAnimationFrame(() => flowInstance.fitView({ padding: 0.15, duration: 400 }));
     }
   }, [flowInstance, nodes.length, layouting]);
+
+  // --- Interactive drag: pin dragged node, reheat simulation, update positions ---
+  const onNodeDragStart: NodeDragHandler<FlowNode> = useCallback((_event, node) => {
+    const sim = simulationRef.current;
+    if (!sim) return;
+    const simNode = simNodesRef.current.find((n) => n.id === node.id);
+    if (simNode) {
+      simNode.fx = node.position.x;
+      simNode.fy = node.position.y;
+    }
+    sim.alphaTarget(0.3).restart();
+  }, []);
+
+  const onNodeDrag: NodeDragHandler<FlowNode> = useCallback((_event, node) => {
+    const simNode = simNodesRef.current.find((n) => n.id === node.id);
+    if (simNode) {
+      simNode.fx = node.position.x;
+      simNode.fy = node.position.y;
+    }
+    // Update all other nodes to follow the simulation
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const n of simNodesRef.current) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === node.id ? n : { ...n, position: positions[n.id] ?? n.position },
+      ),
+    );
+  }, [setNodes]);
+
+  const onNodeDragStop: NodeDragHandler<FlowNode> = useCallback((_event, node) => {
+    const sim = simulationRef.current;
+    if (!sim) return;
+    const simNode = simNodesRef.current.find((n) => n.id === node.id);
+    if (simNode) {
+      simNode.fx = null;
+      simNode.fy = null;
+    }
+    sim.alphaTarget(0);
+  }, []);
+
+  // --- Hover highlighting ---
+  const onNodeMouseEnter = useCallback((_event: React.MouseEvent, node: FlowNode) => {
+    setHoveredNodeId(node.id);
+  }, []);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+  }, []);
 
   const onConnect = useCallback(
     async (connection: Connection) => {
@@ -641,6 +724,11 @@ export function GraphViewPage() {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onNodeDoubleClick={onNodeDoubleClick}
+              onNodeDragStart={onNodeDragStart}
+              onNodeDrag={onNodeDrag}
+              onNodeDragStop={onNodeDragStop}
+              onNodeMouseEnter={onNodeMouseEnter}
+              onNodeMouseLeave={onNodeMouseLeave}
               onInit={setFlowInstance}
               nodeTypes={nodeTypes}
               fitView
