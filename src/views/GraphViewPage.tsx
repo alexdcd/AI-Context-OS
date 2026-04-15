@@ -529,7 +529,7 @@ export function GraphViewPage() {
     sim.alphaTarget(0.3).restart();
   }, []);
 
-  const onNodeDrag: NodeDragHandler<FlowNode> = useCallback((_event, node) => {
+  const onNodeDrag: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const simNode = simNodesRef.current.find((n) => n.id === node.id);
     if (simNode) {
       simNode.fx = node.position.x;
@@ -545,7 +545,7 @@ export function GraphViewPage() {
     );
   }, [setNodes]);
 
-  const onNodeDragStop: NodeDragHandler<FlowNode> = useCallback((_event, node) => {
+  const onNodeDragStop: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const sim = simulationRef.current;
     if (!sim) return;
     const simNode = simNodesRef.current.find((n) => n.id === node.id);
