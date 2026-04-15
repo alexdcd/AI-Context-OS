@@ -75,43 +75,55 @@ function cosmosRadius(degree: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Force-directed layout (params differ by mode)
+// Force simulation types
 // ---------------------------------------------------------------------------
 
-function layoutWithForce(
+interface SimNode extends d3.SimulationNodeDatum {
+  id: string;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+interface SimLink extends d3.SimulationLinkDatum<SimNode> {
+  weight: number;
+}
+
+// ---------------------------------------------------------------------------
+// Create a d3-force simulation (stays alive for interactive dragging)
+// ---------------------------------------------------------------------------
+
+function createSimulation(
   gnodes: GNode[],
   gedges: GraphEdge[],
   mode: ViewMode,
-): Promise<Record<string, { x: number; y: number }>> {
-  return new Promise((resolve) => {
-    if (gnodes.length === 0) { resolve({}); return; }
+): { simulation: d3.Simulation<SimNode, SimLink>; simNodes: SimNode[] } {
+  const simNodes: SimNode[] = gnodes.map((n, i) => ({
+    id: n.id,
+    x: Math.cos(2 * Math.PI * i / gnodes.length) * 150,
+    y: Math.sin(2 * Math.PI * i / gnodes.length) * 150,
+  }));
 
-    const simNodes = gnodes.map((n, i) => ({
-      id: n.id,
-      x: Math.cos(2 * Math.PI * i / gnodes.length) * 100,
-      y: Math.sin(2 * Math.PI * i / gnodes.length) * 100,
-    }));
-    const nodeSet = new Set(gnodes.map((n) => n.id));
-    const simLinks = gedges
-      .filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target))
-      .map((e) => ({ source: e.source, target: e.target, weight: e.weight ?? 0.5 }));
+  const nodeSet = new Set(gnodes.map((n) => n.id));
+  const simLinks: SimLink[] = gedges
+    .filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target))
+    .map((e) => ({ source: e.source, target: e.target, weight: e.weight ?? 0.5 }));
 
-    const linkDist  = mode === "cosmos" ? 90  : 150;
-    const charge    = mode === "cosmos" ? -220 : -380;
-    const collide   = mode === "cosmos" ? 52  : 95;
+  const linkDist = mode === "cosmos" ? 90 : 150;
+  const charge = mode === "cosmos" ? -220 : -380;
+  const collide = mode === "cosmos" ? 52 : 95;
 
-    d3.forceSimulation(simNodes)
-      .force("link",    d3.forceLink(simLinks).id((d) => (d as { id: string }).id).distance(linkDist).strength((l) => 0.25 + 0.35 * ((l as unknown as { weight: number }).weight ?? 0.5)))
-      .force("charge",  d3.forceManyBody().strength(charge))
-      .force("center",  d3.forceCenter(0, 0))
-      .force("collide", d3.forceCollide(collide))
-      .stop()
-      .tick(300);
+  const simulation = d3.forceSimulation<SimNode, SimLink>(simNodes)
+    .force("link", d3.forceLink<SimNode, SimLink>(simLinks).id((d) => d.id).distance(linkDist).strength((l) => 0.25 + 0.35 * l.weight))
+    .force("charge", d3.forceManyBody().strength(charge))
+    .force("center", d3.forceCenter(0, 0))
+    .force("collide", d3.forceCollide(collide))
+    .alphaDecay(0.02)
+    .velocityDecay(0.3);
 
-    const positions: Record<string, { x: number; y: number }> = {};
-    for (const n of simNodes) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
-    resolve(positions);
-  });
+  // Run initial layout to convergence
+  simulation.stop().tick(300);
+
+  return { simulation, simNodes };
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +135,7 @@ interface NodeData extends Record<string, unknown> {
   colorByCommunity: boolean;
   godMode: boolean;
   godIds: Set<string>;
+  highlighted: boolean;
 }
 
 interface FlowNode {
