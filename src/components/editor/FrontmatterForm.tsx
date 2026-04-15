@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { MemoryMeta, MemoryOntology } from "../../lib/types";
 
@@ -84,6 +84,11 @@ const toMemoryRef = (value: string) =>
 
 export function FrontmatterForm({ meta, onChange, readonly = false }: FrontmatterFormProps) {
   const { t } = useTranslation();
+  const [localId, setLocalId] = useState(meta.id);
+
+  useEffect(() => {
+    setLocalId(meta.id);
+  }, [meta.id]);
 
   const update = (partial: Partial<MemoryMeta>) => {
     onChange({ ...meta, ...partial });
@@ -103,8 +108,20 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
       <Field label={t("memoryEditor.frontmatter.id")}>
         <input
           type="text"
-          value={meta.id}
-          onChange={(e) => update({ id: toMemoryRef(e.target.value) })}
+          value={localId}
+          onChange={(e) => setLocalId(toMemoryRef(e.target.value))}
+          onBlur={() => {
+            if (localId && localId !== meta.id) {
+              update({ id: localId });
+            } else {
+              setLocalId(meta.id);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
           disabled={readonly}
           className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]"
           placeholder={t("memoryEditor.frontmatter.memoryIdPlaceholder")}
