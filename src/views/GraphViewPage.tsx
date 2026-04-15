@@ -222,6 +222,7 @@ function CosmosNode({ data }: { data: NodeData }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       {/* Circle */}
       <div className="flex justify-center">
         <div
@@ -253,6 +254,7 @@ function CosmosNode({ data }: { data: NodeData }) {
       >
         {gn.label || gn.id}
       </div>
+      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
 
       {hovered && gn.preview && (
         <HoverTooltip node={gn} />
