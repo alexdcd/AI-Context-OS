@@ -8,6 +8,64 @@ use regex::Regex;
 use crate::core::decay::decay_score;
 use crate::core::types::{GodNode, GraphData, GraphEdge, GraphNode, Memory};
 
+// ─── Edge types and weights ───────────────────────────────────────────────────
+
+/// Semantic weight of each edge kind.
+/// Higher weight = stronger affinity for community detection and graph layout.
+const WEIGHT_REQUIRES: f64 = 1.0;  // hard dependency
+const WEIGHT_RELATED:  f64 = 0.7;  // explicit semantic link
+const WEIGHT_WIKILINK: f64 = 0.5;  // inline reference, intentional
+const WEIGHT_OPTIONAL: f64 = 0.4;  // weak explicit link
+const WEIGHT_TAG_STRONG: f64 = 0.3; // ≥2 shared tags
+const WEIGHT_TAG_WEAK:   f64 = 0.1; // exactly 1 shared tag
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum EdgeKind {
+    Requires,
+    Related,
+    Optional,
+    Wikilink,
+    TagStrong,
+    TagWeak,
+}
+
+impl EdgeKind {
+    fn weight(self) -> f64 {
+        match self {
+            EdgeKind::Requires  => WEIGHT_REQUIRES,
+            EdgeKind::Related   => WEIGHT_RELATED,
+            EdgeKind::Wikilink  => WEIGHT_WIKILINK,
+            EdgeKind::Optional  => WEIGHT_OPTIONAL,
+            EdgeKind::TagStrong => WEIGHT_TAG_STRONG,
+            EdgeKind::TagWeak   => WEIGHT_TAG_WEAK,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            EdgeKind::Requires  => "requires",
+            EdgeKind::Related   => "related",
+            EdgeKind::Optional  => "optional",
+            EdgeKind::Wikilink  => "wikilink",
+            EdgeKind::TagStrong => "tag",
+            EdgeKind::TagWeak   => "tag",
+        }
+    }
+}
+
+/// A typed, weighted edge between two memory indices.
+struct TypedEdge {
+    source: usize,
+    target: usize,
+    kind: EdgeKind,
+}
+
+impl TypedEdge {
+    fn weight(&self) -> f64 {
+        self.kind.weight()
+    }
+}
+
 /// Extract [[wikilink]] targets from markdown content.
 fn extract_wikilinks(content: &str) -> Vec<String> {
     let re = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
@@ -17,90 +75,122 @@ fn extract_wikilinks(content: &str) -> Vec<String> {
         .collect()
 }
 
-/// Build an undirected graph from:
-///   - Explicit relationships (related/requires/optional)
-///   - Wikilinks [[id]] in l1_content / l2_content
-///   - Tag co-occurrence (≥1 shared tag)
-pub fn build_graph(memories: &[Memory]) -> Graph<String, String, Undirected> {
-    let mut graph = Graph::<String, String, Undirected>::new_undirected();
-    let mut id_to_node: HashMap<String, NodeIndex> = HashMap::new();
+// ─── Unified edge generation ──────────────────────────────────────────────────
 
-    for m in memories {
-        let idx = graph.add_node(m.meta.id.clone());
-        id_to_node.insert(m.meta.id.clone(), idx);
-    }
+/// Collect all typed edges between memories. This is the single source of truth
+/// for edge semantics, used by both the visualization graph and community detection.
+///
+/// Edge kinds and their weights:
+///   - `requires`  → 1.0 (hard dependency)
+///   - `related`   → 0.7 (explicit semantic link)
+///   - `wikilink`  → 0.5 (inline [[ref]])
+///   - `optional`  → 0.4 (soft dependency)
+///   - `tag` (≥2 shared) → 0.3 (significant thematic overlap)
+///   - `tag` (1 shared)  → 0.1 (weak signal)
+fn collect_typed_edges(memories: &[Memory]) -> Vec<TypedEdge> {
+    let n = memories.len();
+    let idx_map: HashMap<&str, usize> = memories
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.meta.id.as_str(), i))
+        .collect();
 
-    for m in memories {
-        if let Some(&source) = id_to_node.get(&m.meta.id) {
-            // Explicit: related
-            for related_id in &m.meta.related {
-                if let Some(&target) = id_to_node.get(related_id) {
-                    if !graph.contains_edge(source, target) {
-                        graph.add_edge(source, target, "related".to_string());
-                    }
-                }
+    // Track existing pairs to avoid duplicates (keep highest-weight edge)
+    let mut pair_best: HashMap<(usize, usize), EdgeKind> = HashMap::new();
+
+    let mut try_add = |src: usize, tgt: usize, kind: EdgeKind| {
+        if src == tgt {
+            return;
+        }
+        let key = if src < tgt { (src, tgt) } else { (tgt, src) };
+        let entry = pair_best.entry(key).or_insert(kind);
+        if kind.weight() > entry.weight() {
+            *entry = kind;
+        }
+    };
+
+    // Explicit edges
+    for (i, m) in memories.iter().enumerate() {
+        for req_id in &m.meta.requires {
+            if let Some(&j) = idx_map.get(req_id.as_str()) {
+                try_add(i, j, EdgeKind::Requires);
             }
-            // Explicit: requires
-            for req_id in &m.meta.requires {
-                if let Some(&target) = id_to_node.get(req_id) {
-                    if !graph.contains_edge(source, target) {
-                        graph.add_edge(source, target, "requires".to_string());
-                    }
-                }
+        }
+        for rel_id in &m.meta.related {
+            if let Some(&j) = idx_map.get(rel_id.as_str()) {
+                try_add(i, j, EdgeKind::Related);
             }
-            // Explicit: optional
-            for opt_id in &m.meta.optional {
-                if let Some(&target) = id_to_node.get(opt_id) {
-                    if !graph.contains_edge(source, target) {
-                        graph.add_edge(source, target, "optional".to_string());
-                    }
-                }
+        }
+        for opt_id in &m.meta.optional {
+            if let Some(&j) = idx_map.get(opt_id.as_str()) {
+                try_add(i, j, EdgeKind::Optional);
             }
-            // Wikilinks from content
-            let wikilinks: Vec<String> = extract_wikilinks(&m.l1_content)
-                .into_iter()
-                .chain(extract_wikilinks(&m.l2_content))
-                .collect();
-            for linked_id in wikilinks {
-                if let Some(&target) = id_to_node.get(&linked_id) {
-                    if !graph.contains_edge(source, target) {
-                        graph.add_edge(source, target, "wikilink".to_string());
-                    }
-                }
+        }
+        // Wikilinks from content
+        let wikilinks: Vec<String> = extract_wikilinks(&m.l1_content)
+            .into_iter()
+            .chain(extract_wikilinks(&m.l2_content))
+            .collect();
+        for linked_id in wikilinks {
+            if let Some(&j) = idx_map.get(linked_id.as_str()) {
+                try_add(i, j, EdgeKind::Wikilink);
             }
         }
     }
 
-    // Tag co-occurrence edges (≥1 shared tag)
-    let mem_vec: Vec<&Memory> = memories.iter().collect();
-    for i in 0..mem_vec.len() {
-        for j in (i + 1)..mem_vec.len() {
-            let shared = mem_vec[i]
+    // Tag co-occurrence: differentiate 1 shared tag (weak) vs ≥2 (strong)
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let shared_count = memories[i]
                 .meta
                 .tags
                 .iter()
-                .any(|t| mem_vec[j].meta.tags.contains(t));
-            if shared {
-                if let (Some(&src), Some(&tgt)) = (
-                    id_to_node.get(&mem_vec[i].meta.id),
-                    id_to_node.get(&mem_vec[j].meta.id),
-                ) {
-                    if !graph.contains_edge(src, tgt) {
-                        graph.add_edge(src, tgt, "tag".to_string());
-                    }
-                }
+                .filter(|t| memories[j].meta.tags.contains(t))
+                .count();
+            if shared_count >= 2 {
+                try_add(i, j, EdgeKind::TagStrong);
+            } else if shared_count == 1 {
+                try_add(i, j, EdgeKind::TagWeak);
             }
         }
+    }
+
+    pair_best
+        .into_iter()
+        .map(|((s, t), kind)| TypedEdge {
+            source: s,
+            target: t,
+            kind,
+        })
+        .collect()
+}
+
+/// Build an undirected petgraph from all typed edges.
+/// Used for frontend visualization and god-node degree computation.
+pub fn build_graph(memories: &[Memory]) -> Graph<String, String, Undirected> {
+    let mut graph = Graph::<String, String, Undirected>::new_undirected();
+    let mut node_indices: Vec<NodeIndex> = Vec::with_capacity(memories.len());
+
+    for m in memories {
+        node_indices.push(graph.add_node(m.meta.id.clone()));
+    }
+
+    for edge in collect_typed_edges(memories) {
+        let src = node_indices[edge.source];
+        let tgt = node_indices[edge.target];
+        graph.add_edge(src, tgt, edge.kind.label().to_string());
     }
 
     graph
 }
 
-/// Compute community assignments using Label Propagation Algorithm (LPA).
+/// Compute community assignments using Weighted Label Propagation Algorithm.
 ///
-/// Edges include:
-///   - Explicit links (related, requires, optional)
-///   - Implicit tag co-occurrence: two memories sharing ≥2 tags
+/// Unlike basic LPA where each neighbor vote counts equally, weighted LPA
+/// sums edge weights per label. This means a `requires` edge (1.0) pulls
+/// a node much harder into a community than a single shared tag (0.1).
+///
+/// Uses the unified `collect_typed_edges()` as single source of truth.
 ///
 /// Returns a map from memory_id → community_id (0-indexed, sequential).
 /// Isolated nodes (no edges) each get their own singleton community.
@@ -110,74 +200,17 @@ pub fn compute_community_map(memories: &[Memory]) -> HashMap<String, u32> {
         return HashMap::new();
     }
 
-    // Build index map for fast lookup
-    let idx_map: HashMap<&str, usize> = memories
-        .iter()
-        .enumerate()
-        .map(|(i, m)| (m.meta.id.as_str(), i))
-        .collect();
+    // Build weighted adjacency from unified edge source
+    let typed_edges = collect_typed_edges(memories);
+    let mut adj: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
 
-    // Adjacency list (by index), undirected
-    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
-
-    // Explicit edges
-    for (i, m) in memories.iter().enumerate() {
-        for linked_id in m
-            .meta
-            .related
-            .iter()
-            .chain(m.meta.requires.iter())
-            .chain(m.meta.optional.iter())
-        {
-            if let Some(&j) = idx_map.get(linked_id.as_str()) {
-                if !adj[i].contains(&j) {
-                    adj[i].push(j);
-                }
-                if !adj[j].contains(&i) {
-                    adj[j].push(i);
-                }
-            }
-        }
+    for edge in &typed_edges {
+        let w = edge.weight();
+        adj[edge.source].push((edge.target, w));
+        adj[edge.target].push((edge.source, w));
     }
 
-    // Implicit tag co-occurrence edges (≥1 shared tag)
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let shared = memories[i]
-                .meta
-                .tags
-                .iter()
-                .any(|t| memories[j].meta.tags.contains(t));
-            if shared {
-                if !adj[i].contains(&j) {
-                    adj[i].push(j);
-                }
-                if !adj[j].contains(&i) {
-                    adj[j].push(i);
-                }
-            }
-        }
-    }
-
-    // Also add wikilink edges to community adjacency
-    for (i, m) in memories.iter().enumerate() {
-        let wikilinks: Vec<String> = extract_wikilinks(&m.l1_content)
-            .into_iter()
-            .chain(extract_wikilinks(&m.l2_content))
-            .collect();
-        for linked_id in wikilinks {
-            if let Some(&j) = idx_map.get(linked_id.as_str()) {
-                if !adj[i].contains(&j) {
-                    adj[i].push(j);
-                }
-                if !adj[j].contains(&i) {
-                    adj[j].push(i);
-                }
-            }
-        }
-    }
-
-    // LPA: initialize each node with its own label (index as label)
+    // Weighted LPA: initialize each node with its own label
     let mut labels: Vec<u32> = (0..n as u32).collect();
     let mut changed = true;
     let mut iterations = 0;
@@ -191,16 +224,20 @@ pub fn compute_community_map(memories: &[Memory]) -> HashMap<String, u32> {
                 continue;
             }
 
-            // Count neighbor label frequencies
-            let mut freq: HashMap<u32, usize> = HashMap::new();
-            for &j in &adj[i] {
-                *freq.entry(labels[j]).or_insert(0) += 1;
+            // Sum neighbor label weights (not counts)
+            let mut weight_by_label: HashMap<u32, f64> = HashMap::new();
+            for &(j, w) in &adj[i] {
+                *weight_by_label.entry(labels[j]).or_insert(0.0) += w;
             }
 
-            // Most frequent label; ties broken by smallest label (deterministic)
-            let best_label = freq
+            // Highest-weight label; ties broken by smallest label (deterministic)
+            let best_label = weight_by_label
                 .into_iter()
-                .max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)))
+                .max_by(|a, b| {
+                    a.1.partial_cmp(&b.1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then(b.0.cmp(&a.0))
+                })
                 .map(|(label, _)| label)
                 .unwrap();
 
@@ -293,10 +330,11 @@ pub fn compute_god_nodes(memories: &[Memory]) -> Vec<GodNode> {
 }
 
 /// Convert the petgraph graph + memories into serializable GraphData for the frontend.
-/// Includes community assignment computed via LPA.
+/// Includes community assignment computed via weighted LPA.
 pub fn to_graph_data(memories: &[Memory], _decay_threshold: f64) -> GraphData {
     let graph = build_graph(memories);
     let community_map = compute_community_map(memories);
+    let typed_edges = collect_typed_edges(memories);
 
     let id_map: HashMap<&str, &Memory> =
         memories.iter().map(|m| (m.meta.id.as_str(), m)).collect();
@@ -336,13 +374,13 @@ pub fn to_graph_data(memories: &[Memory], _decay_threshold: f64) -> GraphData {
         }
     }
 
-    for edge_idx in graph.edge_indices() {
-        let (source_idx, target_idx) = graph.edge_endpoints(edge_idx).unwrap();
-        let edge_type = graph[edge_idx].clone();
+    // Use typed edges to include weight for frontend layout/rendering
+    for edge in &typed_edges {
         edges.push(GraphEdge {
-            source: graph[source_idx].clone(),
-            target: graph[target_idx].clone(),
-            edge_type,
+            source: memories[edge.source].meta.id.clone(),
+            target: memories[edge.target].meta.id.clone(),
+            edge_type: edge.kind.label().to_string(),
+            weight: edge.weight(),
         });
     }
 

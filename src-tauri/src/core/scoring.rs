@@ -248,7 +248,7 @@ fn max_access_count(memories: &[Memory]) -> u32 {
 
 /// Graph proximity with two-level spreading activation plus community membership boost.
 ///
-/// L1 (direct connection in selected_ids): +0.10 per match.
+/// L1 (direct connection via related/requires/optional in selected_ids): +0.10 per match.
 /// L2 (connection-of-connection in selected_ids): +0.03 per match.
 /// Community bonus: +0.08 if memory shares a community with any selected memory.
 ///
@@ -263,11 +263,19 @@ fn graph_proximity_score(
         return 0.0;
     }
 
-    // Level 1: direct related IDs that appear in selected_ids
-    let l1_ids: Vec<&String> = memory
+    // All explicit outgoing links (related + requires + optional)
+    let all_links: Vec<&String> = memory
         .meta
         .related
         .iter()
+        .chain(memory.meta.requires.iter())
+        .chain(memory.meta.optional.iter())
+        .collect();
+
+    // Level 1: direct links that appear in selected_ids
+    let l1_ids: Vec<&String> = all_links
+        .iter()
+        .copied()
         .filter(|id| selected_ids.contains(id))
         .collect();
     let l1_score = l1_ids.len() as f64 * 0.10;
@@ -276,8 +284,14 @@ fn graph_proximity_score(
     let l2_count = all_memories
         .iter()
         .filter(|m| l1_ids.contains(&&m.meta.id))
-        .flat_map(|m| m.meta.related.iter())
-        .filter(|id| selected_ids.contains(id) && !memory.meta.related.contains(id))
+        .flat_map(|m| {
+            m.meta
+                .related
+                .iter()
+                .chain(m.meta.requires.iter())
+                .chain(m.meta.optional.iter())
+        })
+        .filter(|id| selected_ids.contains(id) && !all_links.contains(id))
         .count();
     let l2_score = l2_count as f64 * 0.03;
 

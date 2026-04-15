@@ -155,7 +155,9 @@ pub struct GodNode {
 pub struct GraphEdge {
     pub source: String,
     pub target: String,
-    pub edge_type: String, // "related", "requires", "optional"
+    pub edge_type: String, // "related", "requires", "optional", "wikilink", "tag"
+    /// Semantic weight of this edge (0.1–1.0). Higher = stronger affinity.
+    pub weight: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
