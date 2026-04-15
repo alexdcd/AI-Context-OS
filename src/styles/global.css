@@ -283,6 +283,27 @@ textarea {
   animation: spin 0.8s linear infinite;
 }
 
+/* ─── Cosmos Semantic Glyphs ─── */
+
+@keyframes cosmos-pulse {
+  0%, 100% { opacity: 0.85; filter: brightness(1); }
+  50%      { opacity: 1;    filter: brightness(1.15); }
+}
+
+@keyframes cosmos-god-spin {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -20; }
+}
+
+.cosmos-glyph-pulse {
+  animation: cosmos-pulse 3s ease-in-out infinite;
+}
+
+.cosmos-glyph-god-ring {
+  stroke-dasharray: 4 3;
+  animation: cosmos-god-spin 1.2s linear infinite;
+}
+
 /* Selection / focus */
 ::selection {
   background: rgba(124, 138, 255, 0.25);

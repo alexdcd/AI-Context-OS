@@ -75,6 +75,55 @@ function cosmosRadius(degree: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// SVG glyph shapes by ontology — "Semantic Glyphs"
+// Each ontology type gets a distinct geometric shape so users can visually
+// parse node types at a glance without relying on color alone.
+// ---------------------------------------------------------------------------
+
+/** Hexagon path for `source` nodes (raw data / input material). */
+function hexagonPath(cx: number, cy: number, r: number): string {
+  const pts = Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+  });
+  return `M${pts.join("L")}Z`;
+}
+
+/** Rounded-square path for `entity` nodes (concrete, structured). */
+function squirclePath(cx: number, cy: number, r: number): string {
+  const h = r * 0.85; // half-side
+  const cr = r * 0.28; // corner radius
+  return `M${cx - h + cr},${cy - h} L${cx + h - cr},${cy - h} Q${cx + h},${cy - h} ${cx + h},${cy - h + cr} L${cx + h},${cy + h - cr} Q${cx + h},${cy + h} ${cx + h - cr},${cy + h} L${cx - h + cr},${cy + h} Q${cx - h},${cy + h} ${cx - h},${cy + h - cr} L${cx - h},${cy - h + cr} Q${cx - h},${cy - h} ${cx - h + cr},${cy - h}Z`;
+}
+
+/** Diamond path for `concept` nodes (abstract, ideas). */
+function diamondPath(cx: number, cy: number, r: number): string {
+  const s = r * 1.1;
+  return `M${cx},${cy - s} L${cx + s},${cy} L${cx},${cy + s} L${cx - s},${cy}Z`;
+}
+
+/** 6-point starburst path for `synthesis` nodes (composed from others). */
+function starburstPath(cx: number, cy: number, r: number): string {
+  const pts: string[] = [];
+  const outer = r * 1.1;
+  const inner = r * 0.55;
+  for (let i = 0; i < 12; i++) {
+    const a = (Math.PI / 6) * i - Math.PI / 2;
+    const rad = i % 2 === 0 ? outer : inner;
+    pts.push(`${cx + rad * Math.cos(a)},${cy + rad * Math.sin(a)}`);
+  }
+  return `M${pts.join("L")}Z`;
+}
+
+type OntologyShapeFn = (cx: number, cy: number, r: number) => string;
+const ONTOLOGY_SHAPES: Record<string, OntologyShapeFn> = {
+  source: hexagonPath,
+  entity: squirclePath,
+  concept: diamondPath,
+  synthesis: starburstPath,
+};
+
+// ---------------------------------------------------------------------------
 // Force simulation types
 // ---------------------------------------------------------------------------
 
@@ -182,14 +231,19 @@ function CardsNode({ data }: { data: NodeData }) {
         style={isGod ? { borderColor: "#ef4444", boxShadow: "0 0 0 1px #ef444440" } : {}}
       >
         <div className="flex items-center gap-1.5">
-          <span
-            className="shrink-0 rounded-full"
-            style={{
-              backgroundColor: color,
-              width: 6 + Math.min(gn.degree * 1.5, 8),
-              height: 6 + Math.min(gn.degree * 1.5, 8),
-            }}
-          />
+          {/* Mini ontology glyph */}
+          <svg
+            className="shrink-0"
+            width={10 + Math.min(gn.degree * 1.2, 6)}
+            height={10 + Math.min(gn.degree * 1.2, 6)}
+            viewBox="0 0 20 20"
+          >
+            <path
+              d={(ONTOLOGY_SHAPES[gn.ontology] ?? ONTOLOGY_SHAPES.entity)(10, 10, 9)}
+              fill={color}
+              opacity={0.9}
+            />
+          </svg>
           <span className="truncate text-xs font-medium text-[color:var(--text-0)]">{gn.id}</span>
           {gn.degree > 0 && (
             <span className="ml-auto shrink-0 rounded bg-[color:var(--bg-2)] px-1 font-mono text-[9px] text-[color:var(--text-2)]">
@@ -229,12 +283,30 @@ function CosmosNode({ data }: { data: NodeData }) {
 
   const active = hovered || highlighted;
   const r = cosmosRadius(gn.degree);
-  const diam = r * 2;
+  const svgSize = (r + 6) * 2; // extra space for ring + glow filter
+  const cx = svgSize / 2;
+  const cy = svgSize / 2;
+
+  // Importance ring: SVG circle that fills proportionally (0-1)
+  const ringR = r + 3;
+  const ringCircum = 2 * Math.PI * ringR;
+  const ringFill = gn.importance * ringCircum;
+
+  // Shape path based on ontology
+  const shapeFn = ONTOLOGY_SHAPES[gn.ontology] ?? ONTOLOGY_SHAPES.entity;
+  const shapePath = shapeFn(cx, cy, r);
+
+  // Decay drives pulse: fresh nodes (>0.7) pulse, stale ones are static
+  const shouldPulse = gn.decay_score > 0.7 && !isGod;
+
+  // Unique gradient id per node
+  const gradId = `grad-${gn.id.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const glowId = `glow-${gn.id.replace(/[^a-zA-Z0-9]/g, "")}`;
 
   return (
     <div
       style={{
-        width: diam + 80,
+        width: svgSize + 80,
         opacity: Math.max(0.35, gn.decay_score),
         position: "relative",
         transition: "transform 0.2s ease, opacity 0.2s ease",
@@ -245,30 +317,114 @@ function CosmosNode({ data }: { data: NodeData }) {
       onMouseLeave={() => setHovered(false)}
     >
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
-      {/* Circle */}
+
+      {/* SVG Semantic Glyph */}
       <div className="flex justify-center">
-        <div
-          className="rounded-full"
-          style={{
-            width: diam,
-            height: diam,
-            backgroundColor: color,
-            opacity: active ? 1 : 0.85,
-            boxShadow: isGod
-              ? `0 0 0 2px #ef4444, 0 0 12px ${color}60`
-              : active
-                ? `0 0 14px ${color}90, 0 0 4px ${color}`
-                : `0 0 8px ${color}50`,
-            transition: "box-shadow 0.25s ease, opacity 0.25s ease",
-          }}
-        />
+        <svg
+          width={svgSize}
+          height={svgSize}
+          viewBox={`0 0 ${svgSize} ${svgSize}`}
+          style={{ overflow: "visible" }}
+        >
+          <defs>
+            {/* Radial gradient for depth */}
+            <radialGradient id={gradId} cx="40%" cy="35%" r="65%">
+              <stop offset="0%" stopColor={color} stopOpacity="1" />
+              <stop offset="100%" stopColor={color} stopOpacity="0.6" />
+            </radialGradient>
+            {/* Glow filter */}
+            <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation={active ? 6 : 3} result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Importance ring (background track) */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={ringR}
+            fill="none"
+            stroke={color}
+            strokeOpacity={0.15}
+            strokeWidth={2}
+          />
+
+          {/* Importance ring (filled arc) */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={ringR}
+            fill="none"
+            stroke={color}
+            strokeOpacity={active ? 0.9 : 0.6}
+            strokeWidth={2}
+            strokeDasharray={`${ringFill} ${ringCircum - ringFill}`}
+            strokeDashoffset={ringCircum * 0.25}
+            strokeLinecap="round"
+            style={{ transition: "stroke-opacity 0.3s ease" }}
+          />
+
+          {/* God node outer ring */}
+          {isGod && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={ringR + 2}
+              fill="none"
+              stroke="#ef4444"
+              strokeWidth={1.5}
+              strokeOpacity={0.7}
+              className="cosmos-glyph-god-ring"
+            />
+          )}
+
+          {/* Main shape */}
+          <path
+            d={shapePath}
+            fill={`url(#${gradId})`}
+            filter={`url(#${glowId})`}
+            opacity={active ? 1 : 0.85}
+            className={shouldPulse ? "cosmos-glyph-pulse" : undefined}
+            style={{ transition: "opacity 0.25s ease" }}
+          />
+
+          {/* Inner highlight (glass effect) */}
+          <path
+            d={shapePath}
+            fill="none"
+            stroke="rgba(255,255,255,0.15)"
+            strokeWidth={1}
+          />
+        </svg>
       </div>
-      {/* Label below circle — expands when highlighted */}
+
+      {/* Ontology micro-badge */}
       <div
-        className="mt-1 text-center font-medium leading-tight"
+        className="mx-auto mt-0.5 w-fit rounded-full px-1.5 py-px text-center"
+        style={{
+          fontSize: 8,
+          color: color,
+          backgroundColor: `${color}18`,
+          opacity: active ? 1 : 0.7,
+          transition: "opacity 0.2s ease",
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          fontWeight: 600,
+        }}
+      >
+        {gn.ontology}
+      </div>
+
+      {/* Label below glyph */}
+      <div
+        className="mt-0.5 text-center font-medium leading-tight"
         style={{
           fontSize: active ? 13 : Math.max(9, Math.min(10 + gn.degree, 12)),
-          maxWidth: diam + 80,
+          maxWidth: svgSize + 80,
           overflow: active ? "visible" : "hidden",
           display: "-webkit-box",
           WebkitLineClamp: active ? 4 : 2,
