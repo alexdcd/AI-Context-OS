@@ -243,7 +243,7 @@
       "notAvailable": "No disponible"
     },
     "frontmatter": {
-      "id": "ID",
+      "id": "Nombre del archivo (ID)",
       "memoryIdPlaceholder": "memory-id",
       "status": "Estado",
       "unprocessed": "Sin procesar",
