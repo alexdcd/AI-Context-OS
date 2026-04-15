@@ -55,6 +55,7 @@ export function MemoryEditor() {
   const [l1, setL1] = useState("");
   const [l2, setL2] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [sourceId, setSourceId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [showInspector, setShowInspector] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("properties");
@@ -69,6 +70,7 @@ export function MemoryEditor() {
       setMeta(activeMemory.meta);
       setL1(activeMemory.l1_content);
       setL2(activeMemory.l2_content);
+      setSourceId(activeMemory.meta.id);
       setDirty(false);
       setSaveStatus("saved");
       setInspectorTab("properties");
@@ -82,19 +84,19 @@ export function MemoryEditor() {
   }, []);
 
   useEffect(() => {
-    if (!activeMemory || !meta || !dirty || activeMemory.meta.id !== meta.id) {
+    if (!activeMemory || !meta || !dirty || !sourceId || sourceId !== activeMemory.meta.id) {
       latestDraftRef.current = null;
       return;
     }
 
     latestDraftRef.current = {
-      sourceId: activeMemory.meta.id,
+      sourceId,
       l1,
       l2,
       meta,
       refreshDerivedState: hasDerivedMemoryChanges(activeMemory, meta),
     };
-  }, [activeMemory, meta, l1, l2, dirty]);
+  }, [activeMemory, sourceId, meta, l1, l2, dirty]);
 
   const flushQueuedSave = useCallback(async () => {
     if (isSavingRef.current || !queuedDraftRef.current) return;
