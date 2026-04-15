@@ -612,6 +612,30 @@ mod tests {
         assert_eq!(map["mem-a"], map["mem-b"]);
         // C might or might not join; but A-B bond is what matters
     }
+
+    #[test]
+    fn to_graph_data_returns_nodes_and_edges_for_vault_like_data() {
+        // Simulates the real vault: 3 memories share tag "comida",
+        // plus isolated memories with no connections.
+        let baicon = make_memory("baicon", vec![], vec!["comida", "menu"], "");
+        let patat = make_memory("patat", vec![], vec!["comida", "memor"], "");
+        let boniato = make_memory("boniato", vec![], vec!["comida"], "");
+        let queso = make_memory("queso", vec![], vec![], "");
+        let perfil = make_memory("perfil", vec![], vec![], "");
+
+        let data = to_graph_data(&[baicon, patat, boniato, queso, perfil], 0.0);
+
+        // All 5 should be nodes
+        assert_eq!(data.nodes.len(), 5);
+        // At least 3 edges from shared "comida" tag: baicon↔patat, baicon↔boniato, patat↔boniato
+        assert!(
+            data.edges.len() >= 3,
+            "expected ≥3 edges from shared tag 'comida', got {}",
+            data.edges.len()
+        );
+        // Each edge should have a weight > 0
+        assert!(data.edges.iter().all(|e| e.weight > 0.0));
+    }
 }
 
 /// Get the count of connections for a memory (undirected graph degree, explicit links only).

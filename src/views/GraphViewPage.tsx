@@ -83,7 +83,11 @@ function layoutWithForce(
   return new Promise((resolve) => {
     if (gnodes.length === 0) { resolve({}); return; }
 
-    const simNodes = gnodes.map((n) => ({ id: n.id, x: 0, y: 0 }));
+    const simNodes = gnodes.map((n, i) => ({
+      id: n.id,
+      x: Math.cos(2 * Math.PI * i / gnodes.length) * 100,
+      y: Math.sin(2 * Math.PI * i / gnodes.length) * 100,
+    }));
     const nodeSet = new Set(gnodes.map((n) => n.id));
     const simLinks = gedges
       .filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target))
@@ -431,11 +435,17 @@ export function GraphViewPage() {
       setNodes(newNodes);
       setEdges(newEdges);
       setLayouting(false);
-      requestAnimationFrame(() => flowInstance?.fitView({ padding: 0.15, duration: 400 }));
     });
 
     return () => { cancelled = true; };
-  }, [filteredData, layoutSeed, viewMode, colorByCommunity, godMode, godIds, flowInstance, setNodes, setEdges]);
+  }, [filteredData, layoutSeed, viewMode, colorByCommunity, godMode, godIds, setNodes, setEdges]);
+
+  // Fit view after layout completes or when flowInstance becomes available
+  useEffect(() => {
+    if (flowInstance && nodes.length > 0 && !layouting) {
+      requestAnimationFrame(() => flowInstance.fitView({ padding: 0.15, duration: 400 }));
+    }
+  }, [flowInstance, nodes.length, layouting]);
 
   const onConnect = useCallback(
     async (connection: Connection) => {
