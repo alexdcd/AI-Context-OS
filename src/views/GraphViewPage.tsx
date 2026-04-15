@@ -80,47 +80,53 @@ function cosmosRadius(degree: number): number {
 // parse node types at a glance without relying on color alone.
 // ---------------------------------------------------------------------------
 
-/** Hexagon path for `source` nodes (raw data / input material). */
-function hexagonPath(cx: number, cy: number, r: number): string {
-  const pts = Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2;
+/** Circle path for `source` nodes — simple, origin, raw data. */
+function circlePath(cx: number, cy: number, r: number): string {
+  return `M${cx - r},${cy} A${r},${r} 0 1,1 ${cx + r},${cy} A${r},${r} 0 1,1 ${cx - r},${cy}Z`;
+}
+
+/** Sharp square path for `entity` nodes — concrete, structured, defined.
+ *  Very small corner radius so it reads as a square, not a circle. */
+function squarePath(cx: number, cy: number, r: number): string {
+  const h = r * 0.88;
+  const cr = r * 0.12; // tiny corner radius — reads as square
+  return [
+    `M${cx - h + cr},${cy - h}`,
+    `L${cx + h - cr},${cy - h}`,
+    `Q${cx + h},${cy - h} ${cx + h},${cy - h + cr}`,
+    `L${cx + h},${cy + h - cr}`,
+    `Q${cx + h},${cy + h} ${cx + h - cr},${cy + h}`,
+    `L${cx - h + cr},${cy + h}`,
+    `Q${cx - h},${cy + h} ${cx - h},${cy + h - cr}`,
+    `L${cx - h},${cy - h + cr}`,
+    `Q${cx - h},${cy - h} ${cx - h + cr},${cy - h}`,
+    "Z",
+  ].join(" ");
+}
+
+/** Tall diamond path for `concept` nodes — abstract, faceted idea.
+ *  Stretched vertically (1.25x) so it's unmistakably not a square. */
+function diamondPath(cx: number, cy: number, r: number): string {
+  const sx = r * 0.95;
+  const sy = r * 1.2;
+  return `M${cx},${cy - sy} L${cx + sx},${cy} L${cx},${cy + sy} L${cx - sx},${cy}Z`;
+}
+
+/** Pentagon path for `synthesis` nodes — composed from others, unique shape. */
+function pentagonPath(cx: number, cy: number, r: number): string {
+  const pts = Array.from({ length: 5 }, (_, i) => {
+    const a = (2 * Math.PI / 5) * i - Math.PI / 2;
     return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
   });
   return `M${pts.join("L")}Z`;
 }
 
-/** Rounded-square path for `entity` nodes (concrete, structured). */
-function squirclePath(cx: number, cy: number, r: number): string {
-  const h = r * 0.85; // half-side
-  const cr = r * 0.28; // corner radius
-  return `M${cx - h + cr},${cy - h} L${cx + h - cr},${cy - h} Q${cx + h},${cy - h} ${cx + h},${cy - h + cr} L${cx + h},${cy + h - cr} Q${cx + h},${cy + h} ${cx + h - cr},${cy + h} L${cx - h + cr},${cy + h} Q${cx - h},${cy + h} ${cx - h},${cy + h - cr} L${cx - h},${cy - h + cr} Q${cx - h},${cy - h} ${cx - h + cr},${cy - h}Z`;
-}
-
-/** Diamond path for `concept` nodes (abstract, ideas). */
-function diamondPath(cx: number, cy: number, r: number): string {
-  const s = r * 1.1;
-  return `M${cx},${cy - s} L${cx + s},${cy} L${cx},${cy + s} L${cx - s},${cy}Z`;
-}
-
-/** 6-point starburst path for `synthesis` nodes (composed from others). */
-function starburstPath(cx: number, cy: number, r: number): string {
-  const pts: string[] = [];
-  const outer = r * 1.1;
-  const inner = r * 0.55;
-  for (let i = 0; i < 12; i++) {
-    const a = (Math.PI / 6) * i - Math.PI / 2;
-    const rad = i % 2 === 0 ? outer : inner;
-    pts.push(`${cx + rad * Math.cos(a)},${cy + rad * Math.sin(a)}`);
-  }
-  return `M${pts.join("L")}Z`;
-}
-
 type OntologyShapeFn = (cx: number, cy: number, r: number) => string;
 const ONTOLOGY_SHAPES: Record<string, OntologyShapeFn> = {
-  source: hexagonPath,
-  entity: squirclePath,
+  source: circlePath,
+  entity: squarePath,
   concept: diamondPath,
-  synthesis: starburstPath,
+  synthesis: pentagonPath,
 };
 
 // ---------------------------------------------------------------------------
