@@ -71,6 +71,16 @@ pub struct MemoryMeta {
     pub system_role: Option<SystemRole>,
 }
 
+impl MemoryMeta {
+    /// All explicit outgoing links (related + requires + optional).
+    pub fn explicit_links(&self) -> impl Iterator<Item = &String> {
+        self.related
+            .iter()
+            .chain(self.requires.iter())
+            .chain(self.optional.iter())
+    }
+}
+
 fn default_importance() -> f64 {
     0.5
 }
@@ -155,7 +165,9 @@ pub struct GodNode {
 pub struct GraphEdge {
     pub source: String,
     pub target: String,
-    pub edge_type: String, // "related", "requires", "optional"
+    pub edge_type: String, // "related", "requires", "optional", "wikilink", "tag"
+    /// Semantic weight of this edge (0.1–1.0). Higher = stronger affinity.
+    pub weight: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,14 +1,17 @@
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  Handle,
+  Position,
   useNodesState,
   useEdgesState,
   addEdge,
   type Connection,
   type ReactFlowInstance,
+  type OnNodeDrag,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import * as d3 from "d3-force";
@@ -72,39 +75,55 @@ function cosmosRadius(degree: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Force-directed layout (params differ by mode)
+// Force simulation types
 // ---------------------------------------------------------------------------
 
-function layoutWithForce(
+interface SimNode extends d3.SimulationNodeDatum {
+  id: string;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+interface SimLink extends d3.SimulationLinkDatum<SimNode> {
+  weight: number;
+}
+
+// ---------------------------------------------------------------------------
+// Create a d3-force simulation (stays alive for interactive dragging)
+// ---------------------------------------------------------------------------
+
+function createSimulation(
   gnodes: GNode[],
   gedges: GraphEdge[],
   mode: ViewMode,
-): Promise<Record<string, { x: number; y: number }>> {
-  return new Promise((resolve) => {
-    if (gnodes.length === 0) { resolve({}); return; }
+): { simulation: d3.Simulation<SimNode, SimLink>; simNodes: SimNode[] } {
+  const simNodes: SimNode[] = gnodes.map((n, i) => ({
+    id: n.id,
+    x: Math.cos(2 * Math.PI * i / gnodes.length) * 150,
+    y: Math.sin(2 * Math.PI * i / gnodes.length) * 150,
+  }));
 
-    const simNodes = gnodes.map((n) => ({ id: n.id, x: 0, y: 0 }));
-    const nodeSet = new Set(gnodes.map((n) => n.id));
-    const simLinks = gedges
-      .filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target))
-      .map((e) => ({ source: e.source, target: e.target }));
+  const nodeSet = new Set(gnodes.map((n) => n.id));
+  const simLinks: SimLink[] = gedges
+    .filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target))
+    .map((e) => ({ source: e.source, target: e.target, weight: e.weight ?? 0.5 }));
 
-    const linkDist  = mode === "cosmos" ? 90  : 150;
-    const charge    = mode === "cosmos" ? -220 : -380;
-    const collide   = mode === "cosmos" ? 52  : 95;
+  const linkDist = mode === "cosmos" ? 90 : 150;
+  const charge = mode === "cosmos" ? -220 : -380;
+  const collide = mode === "cosmos" ? 52 : 95;
 
-    d3.forceSimulation(simNodes)
-      .force("link",    d3.forceLink(simLinks).id((d) => (d as { id: string }).id).distance(linkDist).strength(0.45))
-      .force("charge",  d3.forceManyBody().strength(charge))
-      .force("center",  d3.forceCenter(0, 0))
-      .force("collide", d3.forceCollide(collide))
-      .stop()
-      .tick(300);
+  const simulation = d3.forceSimulation<SimNode, SimLink>(simNodes)
+    .force("link", d3.forceLink<SimNode, SimLink>(simLinks).id((d) => d.id).distance(linkDist).strength((l) => 0.25 + 0.35 * l.weight))
+    .force("charge", d3.forceManyBody().strength(charge))
+    .force("center", d3.forceCenter(0, 0))
+    .force("collide", d3.forceCollide(collide))
+    .alphaDecay(0.02)
+    .velocityDecay(0.3);
 
-    const positions: Record<string, { x: number; y: number }> = {};
-    for (const n of simNodes) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
-    resolve(positions);
-  });
+  // Run initial layout to convergence
+  simulation.stop().tick(300);
+
+  return { simulation, simNodes };
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +135,7 @@ interface NodeData extends Record<string, unknown> {
   colorByCommunity: boolean;
   godMode: boolean;
   godIds: Set<string>;
+  highlighted: boolean;
 }
 
 interface FlowNode {
@@ -156,6 +176,7 @@ function CardsNode({ data }: { data: NodeData }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       <div
         className="rounded border border-[var(--border)] bg-[color:var(--bg-1)] px-2.5 py-2"
         style={isGod ? { borderColor: "#ef4444", boxShadow: "0 0 0 1px #ef444440" } : {}}
@@ -184,6 +205,7 @@ function CardsNode({ data }: { data: NodeData }) {
           <span className="ml-auto font-mono text-[10px] text-[color:var(--text-2)]">{gn.importance.toFixed(1)}</span>
         </div>
       </div>
+      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
 
       {hovered && gn.preview && (
         <HoverTooltip node={gn} />
@@ -197,7 +219,7 @@ function CardsNode({ data }: { data: NodeData }) {
 // ---------------------------------------------------------------------------
 
 function CosmosNode({ data }: { data: NodeData }) {
-  const { node: gn, colorByCommunity, godMode, godIds } = data;
+  const { node: gn, colorByCommunity, godMode, godIds, highlighted } = data;
   const [hovered, setHovered] = useState(false);
 
   const isGod = godMode && godIds.has(gn.id);
@@ -205,46 +227,60 @@ function CosmosNode({ data }: { data: NodeData }) {
     : colorByCommunity ? communityColor(gn.community)
     : (MEMORY_ONTOLOGY_COLORS[gn.ontology] ?? "#64748b");
 
+  const active = hovered || highlighted;
   const r = cosmosRadius(gn.degree);
   const diam = r * 2;
 
   return (
     <div
-      style={{ width: diam + 60, opacity: Math.max(0.35, gn.decay_score), position: "relative" }}
+      style={{
+        width: diam + 80,
+        opacity: Math.max(0.35, gn.decay_score),
+        position: "relative",
+        transition: "transform 0.2s ease, opacity 0.2s ease",
+        transform: active ? "scale(1.12)" : "scale(1)",
+        zIndex: active ? 10 : 1,
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       {/* Circle */}
       <div className="flex justify-center">
         <div
-          className="rounded-full transition-transform"
+          className="rounded-full"
           style={{
             width: diam,
             height: diam,
             backgroundColor: color,
-            opacity: 0.85,
+            opacity: active ? 1 : 0.85,
             boxShadow: isGod
               ? `0 0 0 2px #ef4444, 0 0 12px ${color}60`
-              : `0 0 8px ${color}50`,
-            transform: hovered ? "scale(1.15)" : "scale(1)",
+              : active
+                ? `0 0 14px ${color}90, 0 0 4px ${color}`
+                : `0 0 8px ${color}50`,
+            transition: "box-shadow 0.25s ease, opacity 0.25s ease",
           }}
         />
       </div>
-      {/* Label below circle */}
+      {/* Label below circle — expands when highlighted */}
       <div
-        className="mt-1 text-center font-medium leading-tight text-[color:var(--text-1)]"
+        className="mt-1 text-center font-medium leading-tight"
         style={{
-          fontSize: Math.max(9, Math.min(10 + gn.degree, 12)),
-          maxWidth: diam + 60,
-          overflow: "hidden",
+          fontSize: active ? 13 : Math.max(9, Math.min(10 + gn.degree, 12)),
+          maxWidth: diam + 80,
+          overflow: active ? "visible" : "hidden",
           display: "-webkit-box",
-          WebkitLineClamp: 2,
+          WebkitLineClamp: active ? 4 : 2,
           WebkitBoxOrient: "vertical",
-          textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+          color: active ? "var(--text-0)" : "var(--text-1)",
+          textShadow: active ? "0 1px 6px rgba(0,0,0,0.9)" : "0 1px 3px rgba(0,0,0,0.8)",
+          transition: "font-size 0.2s ease, color 0.2s ease",
         }}
       >
         {gn.label || gn.id}
       </div>
+      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
 
       {hovered && gn.preview && (
         <HoverTooltip node={gn} />
@@ -341,6 +377,12 @@ export function GraphViewPage() {
   const [colorByCommunity, setColorByCommunity] = useState(false);
   const [godMode, setGodMode] = useState(false);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const simulationRef = useRef<d3.Simulation<SimNode, SimLink> | null>(null);
+  const simNodesRef = useRef<SimNode[]>([]);
+  const simNodeMapRef = useRef<Map<string, SimNode>>(new Map());
+  const draggedNodeIdRef = useRef<string | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
@@ -386,54 +428,184 @@ export function GraphViewPage() {
     return map;
   }, [graphData]);
 
-  // Recompute layout whenever data, visual mode, or seed changes
-  useEffect(() => {
-    if (filteredData.nodes.length === 0) {
-      setNodes([]);
-      setEdges([]);
-      return;
+  // Compute which node IDs are neighbors of the hovered node
+  const highlightedIds = useMemo<Set<string>>(() => {
+    if (!hoveredNodeId) return new Set();
+    const ids = new Set<string>([hoveredNodeId]);
+    for (const e of filteredData.edges) {
+      if (e.source === hoveredNodeId) ids.add(e.target);
+      if (e.target === hoveredNodeId) ids.add(e.source);
     }
+    return ids;
+  }, [hoveredNodeId, filteredData.edges]);
 
-    let cancelled = false;
-    setLayouting(true);
+  // Build flow nodes/edges from simulation positions
+  const buildFlowData = useCallback((simNodes: SimNode[]) => {
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const n of simNodes) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
 
-    void layoutWithForce(filteredData.nodes, filteredData.edges, viewMode).then((positions) => {
-      if (cancelled) return;
+    const newNodes: FlowNode[] = filteredData.nodes.map((node) => {
+      const isCards = viewMode === "cards";
+      const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 80);
+      return {
+        id: node.id,
+        type: viewMode,
+        position: positions[node.id] ?? { x: 0, y: 0 },
+        style: { width: w },
+        data: { node, colorByCommunity, godMode, godIds, highlighted: highlightedIds.has(node.id) },
+      };
+    });
 
-      const newNodes: FlowNode[] = filteredData.nodes.map((node) => {
-        const isCards = viewMode === "cards";
-        const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 60);
-        return {
-          id: node.id,
-          type: viewMode,
-          position: positions[node.id] ?? { x: 0, y: 0 },
-          style: { width: w },
-          data: { node, colorByCommunity, godMode, godIds },
-        };
-      });
-
-      const newEdges: FlowEdge[] = filteredData.edges.map((edge, i) => ({
+    const newEdges: FlowEdge[] = filteredData.edges.map((edge, i) => {
+      const isHighlighted = highlightedIds.has(edge.source) && highlightedIds.has(edge.target);
+      return {
         id: `e-${edge.source}-${edge.target}-${i}`,
         source: edge.source,
         target: edge.target,
         label: edge.edge_type !== "tag" ? edge.edge_type : undefined,
-        animated: edge.edge_type === "requires",
+        animated: edge.edge_type === "requires" || isHighlighted,
         style: {
-          stroke: EDGE_COLORS[edge.edge_type] ?? "#6b7280",
-          strokeWidth: viewMode === "cosmos" ? 1 : edge.edge_type === "tag" ? 1 : 1.5,
-          strokeDasharray: edge.edge_type === "tag" ? "4 3" : undefined,
+          stroke: isHighlighted ? "#fff" : (EDGE_COLORS[edge.edge_type] ?? "#6b7280"),
+          strokeWidth: isHighlighted
+            ? Math.max(1.5, (edge.weight ?? 0.5) * 3)
+            : viewMode === "cosmos"
+              ? Math.max(0.5, (edge.weight ?? 0.5) * 2)
+              : Math.max(0.8, (edge.weight ?? 0.5) * 2.5),
+          strokeDasharray: edge.edge_type === "tag" && !isHighlighted ? "4 3" : undefined,
         },
-        labelStyle: { fill: "#8b9cb4", fontSize: 9 },
-      }));
-
-      setNodes(newNodes);
-      setEdges(newEdges);
-      setLayouting(false);
-      requestAnimationFrame(() => flowInstance?.fitView({ padding: 0.15, duration: 400 }));
+        labelStyle: { fill: isHighlighted ? "#fff" : "#8b9cb4", fontSize: isHighlighted ? 10 : 9 },
+      };
     });
 
-    return () => { cancelled = true; };
-  }, [filteredData, layoutSeed, viewMode, colorByCommunity, godMode, godIds, flowInstance, setNodes, setEdges]);
+    return { newNodes, newEdges };
+  }, [filteredData, viewMode, colorByCommunity, godMode, godIds, highlightedIds]);
+
+  // Create simulation and run initial layout
+  useEffect(() => {
+    if (filteredData.nodes.length === 0) {
+      setNodes([]);
+      setEdges([]);
+      simulationRef.current?.stop();
+      simulationRef.current = null;
+      simNodesRef.current = [];
+      simNodeMapRef.current = new Map();
+      draggedNodeIdRef.current = null;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      return;
+    }
+
+    setLayouting(true);
+    const { simulation, simNodes } = createSimulation(filteredData.nodes, filteredData.edges, viewMode);
+    simulationRef.current = simulation;
+    simNodesRef.current = simNodes;
+    simNodeMapRef.current = new Map(simNodes.map((node) => [node.id, node]));
+
+    const { newNodes, newEdges } = buildFlowData(simNodes);
+    setNodes(newNodes);
+    setEdges(newEdges);
+
+    simulation.on("tick", () => {
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        const draggedNodeId = draggedNodeIdRef.current;
+        const positions = new Map(
+          simNodesRef.current.map((simNode) => [
+            simNode.id,
+            { x: simNode.x ?? 0, y: simNode.y ?? 0 },
+          ]),
+        );
+
+        setNodes((prev) =>
+          prev.map((flowNode) => {
+            if (flowNode.id === draggedNodeId) return flowNode;
+            const nextPosition = positions.get(flowNode.id);
+            if (!nextPosition) return flowNode;
+            if (
+              flowNode.position.x === nextPosition.x
+              && flowNode.position.y === nextPosition.y
+            ) {
+              return flowNode;
+            }
+            return { ...flowNode, position: nextPosition };
+          }),
+        );
+      });
+    });
+
+    setLayouting(false);
+
+    return () => {
+      simulation.on("tick", null);
+      simulation.stop();
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredData, layoutSeed, viewMode]);
+
+  // Update node data (highlight, colors) without recomputing layout
+  useEffect(() => {
+    if (simNodesRef.current.length === 0) return;
+    const { newNodes, newEdges } = buildFlowData(simNodesRef.current);
+    setNodes(newNodes);
+    setEdges(newEdges);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedIds, colorByCommunity, godMode, godIds]);
+
+  // Fit view after layout completes or when flowInstance becomes available
+  useEffect(() => {
+    if (flowInstance && nodes.length > 0 && !layouting) {
+      requestAnimationFrame(() => flowInstance.fitView({ padding: 0.15, duration: 400 }));
+    }
+  }, [flowInstance, nodes.length, layouting]);
+
+  // --- Interactive drag: pin dragged node, reheat simulation, update positions ---
+  const onNodeDragStart: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
+    const sim = simulationRef.current;
+    if (!sim) return;
+    draggedNodeIdRef.current = node.id;
+    const simNode = simNodeMapRef.current.get(node.id);
+    if (simNode) {
+      simNode.fx = node.position.x;
+      simNode.fy = node.position.y;
+    }
+    sim.alphaTarget(0.3).restart();
+  }, []);
+
+  const onNodeDrag: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
+    const simNode = simNodeMapRef.current.get(node.id);
+    if (simNode) {
+      simNode.fx = node.position.x;
+      simNode.fy = node.position.y;
+    }
+  }, []);
+
+  const onNodeDragStop: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
+    const sim = simulationRef.current;
+    if (!sim) return;
+    const simNode = simNodeMapRef.current.get(node.id);
+    if (simNode) {
+      simNode.fx = null;
+      simNode.fy = null;
+    }
+    draggedNodeIdRef.current = null;
+    sim.alphaTarget(0);
+  }, []);
+
+  // --- Hover highlighting ---
+  const onNodeMouseEnter = useCallback((_event: React.MouseEvent, node: FlowNode) => {
+    setHoveredNodeId(node.id);
+  }, []);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+  }, []);
 
   const onConnect = useCallback(
     async (connection: Connection) => {
@@ -594,6 +766,11 @@ export function GraphViewPage() {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onNodeDoubleClick={onNodeDoubleClick}
+              onNodeDragStart={onNodeDragStart}
+              onNodeDrag={onNodeDrag}
+              onNodeDragStop={onNodeDragStop}
+              onNodeMouseEnter={onNodeMouseEnter}
+              onNodeMouseLeave={onNodeMouseLeave}
               onInit={setFlowInstance}
               nodeTypes={nodeTypes}
               fitView

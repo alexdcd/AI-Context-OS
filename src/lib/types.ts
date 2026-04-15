@@ -96,6 +96,8 @@ export interface GraphEdge {
   source: string;
   target: string;
   edge_type: string;
+  /** Semantic weight of this edge (0.1–1.0). Higher = stronger affinity. */
+  weight: number;
 }
 
 export interface GraphData {

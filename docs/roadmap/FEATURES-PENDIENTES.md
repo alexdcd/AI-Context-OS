@@ -30,7 +30,7 @@
 ## Graph
 
 
-- ⬚ **Clusters automáticos (Leiden)** — Agrupar memorias visual y lógicamente usando el algoritmo de Leiden (por densidad de aristas, superando a K-means) para detectar comunidades topológicas en el grafo
+- ✅ **Comunidades con Weighted LPA** — Detección de comunidades con Label Propagation pesado: edges `requires` (1.0) dominan sobre tags compartidos (0.1) para clusters topológicos reales. Leiden descartado por escala (10-200 nodos) y falta de crate Rust fiable
 
 ## Observability
 
