@@ -219,7 +219,7 @@ function CardsNode({ data }: { data: NodeData }) {
 // ---------------------------------------------------------------------------
 
 function CosmosNode({ data }: { data: NodeData }) {
-  const { node: gn, colorByCommunity, godMode, godIds } = data;
+  const { node: gn, colorByCommunity, godMode, godIds, highlighted } = data;
   const [hovered, setHovered] = useState(false);
 
   const isGod = godMode && godIds.has(gn.id);
@@ -227,12 +227,20 @@ function CosmosNode({ data }: { data: NodeData }) {
     : colorByCommunity ? communityColor(gn.community)
     : (MEMORY_ONTOLOGY_COLORS[gn.ontology] ?? "#64748b");
 
+  const active = hovered || highlighted;
   const r = cosmosRadius(gn.degree);
   const diam = r * 2;
 
   return (
     <div
-      style={{ width: diam + 60, opacity: Math.max(0.35, gn.decay_score), position: "relative" }}
+      style={{
+        width: diam + 80,
+        opacity: Math.max(0.35, gn.decay_score),
+        position: "relative",
+        transition: "transform 0.2s ease, opacity 0.2s ease",
+        transform: active ? "scale(1.12)" : "scale(1)",
+        zIndex: active ? 10 : 1,
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -240,30 +248,34 @@ function CosmosNode({ data }: { data: NodeData }) {
       {/* Circle */}
       <div className="flex justify-center">
         <div
-          className="rounded-full transition-transform"
+          className="rounded-full"
           style={{
             width: diam,
             height: diam,
             backgroundColor: color,
-            opacity: 0.85,
+            opacity: active ? 1 : 0.85,
             boxShadow: isGod
               ? `0 0 0 2px #ef4444, 0 0 12px ${color}60`
-              : `0 0 8px ${color}50`,
-            transform: hovered ? "scale(1.15)" : "scale(1)",
+              : active
+                ? `0 0 14px ${color}90, 0 0 4px ${color}`
+                : `0 0 8px ${color}50`,
+            transition: "box-shadow 0.25s ease, opacity 0.25s ease",
           }}
         />
       </div>
-      {/* Label below circle */}
+      {/* Label below circle — expands when highlighted */}
       <div
-        className="mt-1 text-center font-medium leading-tight text-[color:var(--text-1)]"
+        className="mt-1 text-center font-medium leading-tight"
         style={{
-          fontSize: Math.max(9, Math.min(10 + gn.degree, 12)),
-          maxWidth: diam + 60,
-          overflow: "hidden",
+          fontSize: active ? 13 : Math.max(9, Math.min(10 + gn.degree, 12)),
+          maxWidth: diam + 80,
+          overflow: active ? "visible" : "hidden",
           display: "-webkit-box",
-          WebkitLineClamp: 2,
+          WebkitLineClamp: active ? 4 : 2,
           WebkitBoxOrient: "vertical",
-          textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+          color: active ? "var(--text-0)" : "var(--text-1)",
+          textShadow: active ? "0 1px 6px rgba(0,0,0,0.9)" : "0 1px 3px rgba(0,0,0,0.8)",
+          transition: "font-size 0.2s ease, color 0.2s ease",
         }}
       >
         {gn.label || gn.id}
@@ -365,6 +377,9 @@ export function GraphViewPage() {
   const [colorByCommunity, setColorByCommunity] = useState(false);
   const [godMode, setGodMode] = useState(false);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<FlowNode, FlowEdge> | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const simulationRef = useRef<d3.Simulation<SimNode, SimLink> | null>(null);
+  const simNodesRef = useRef<SimNode[]>([]);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
