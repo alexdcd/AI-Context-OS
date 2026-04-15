@@ -380,6 +380,9 @@ export function GraphViewPage() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const simulationRef = useRef<d3.Simulation<SimNode, SimLink> | null>(null);
   const simNodesRef = useRef<SimNode[]>([]);
+  const simNodeMapRef = useRef<Map<string, SimNode>>(new Map());
+  const draggedNodeIdRef = useRef<string | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
@@ -484,6 +487,13 @@ export function GraphViewPage() {
       setEdges([]);
       simulationRef.current?.stop();
       simulationRef.current = null;
+      simNodesRef.current = [];
+      simNodeMapRef.current = new Map();
+      draggedNodeIdRef.current = null;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
       return;
     }
 
@@ -491,13 +501,51 @@ export function GraphViewPage() {
     const { simulation, simNodes } = createSimulation(filteredData.nodes, filteredData.edges, viewMode);
     simulationRef.current = simulation;
     simNodesRef.current = simNodes;
+    simNodeMapRef.current = new Map(simNodes.map((node) => [node.id, node]));
 
     const { newNodes, newEdges } = buildFlowData(simNodes);
     setNodes(newNodes);
     setEdges(newEdges);
+
+    simulation.on("tick", () => {
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        const draggedNodeId = draggedNodeIdRef.current;
+        const positions = new Map(
+          simNodesRef.current.map((simNode) => [
+            simNode.id,
+            { x: simNode.x ?? 0, y: simNode.y ?? 0 },
+          ]),
+        );
+
+        setNodes((prev) =>
+          prev.map((flowNode) => {
+            if (flowNode.id === draggedNodeId) return flowNode;
+            const nextPosition = positions.get(flowNode.id);
+            if (!nextPosition) return flowNode;
+            if (
+              flowNode.position.x === nextPosition.x
+              && flowNode.position.y === nextPosition.y
+            ) {
+              return flowNode;
+            }
+            return { ...flowNode, position: nextPosition };
+          }),
+        );
+      });
+    });
+
     setLayouting(false);
 
-    return () => { simulation.stop(); };
+    return () => {
+      simulation.on("tick", null);
+      simulation.stop();
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredData, layoutSeed, viewMode]);
 
@@ -521,7 +569,8 @@ export function GraphViewPage() {
   const onNodeDragStart: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const sim = simulationRef.current;
     if (!sim) return;
-    const simNode = simNodesRef.current.find((n) => n.id === node.id);
+    draggedNodeIdRef.current = node.id;
+    const simNode = simNodeMapRef.current.get(node.id);
     if (simNode) {
       simNode.fx = node.position.x;
       simNode.fy = node.position.y;
@@ -530,29 +579,22 @@ export function GraphViewPage() {
   }, []);
 
   const onNodeDrag: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
-    const simNode = simNodesRef.current.find((n) => n.id === node.id);
+    const simNode = simNodeMapRef.current.get(node.id);
     if (simNode) {
       simNode.fx = node.position.x;
       simNode.fy = node.position.y;
     }
-    // Update all other nodes to follow the simulation
-    const positions: Record<string, { x: number; y: number }> = {};
-    for (const n of simNodesRef.current) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.id === node.id ? n : { ...n, position: positions[n.id] ?? n.position },
-      ),
-    );
-  }, [setNodes]);
+  }, []);
 
   const onNodeDragStop: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const sim = simulationRef.current;
     if (!sim) return;
-    const simNode = simNodesRef.current.find((n) => n.id === node.id);
+    const simNode = simNodeMapRef.current.get(node.id);
     if (simNode) {
       simNode.fx = null;
       simNode.fy = null;
     }
+    draggedNodeIdRef.current = null;
     sim.alphaTarget(0);
   }, []);
 
