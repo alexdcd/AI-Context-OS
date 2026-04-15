@@ -94,7 +94,7 @@ function layoutWithForce(
     const collide   = mode === "cosmos" ? 52  : 95;
 
     d3.forceSimulation(simNodes)
-      .force("link",    d3.forceLink(simLinks).id((d) => (d as { id: string }).id).distance(linkDist).strength(0.45))
+      .force("link",    d3.forceLink(simLinks).id((d) => (d as { id: string }).id).distance(linkDist).strength((l) => 0.25 + 0.35 * ((l as unknown as { weight: number }).weight ?? 0.5)))
       .force("charge",  d3.forceManyBody().strength(charge))
       .force("center",  d3.forceCenter(0, 0))
       .force("collide", d3.forceCollide(collide))
