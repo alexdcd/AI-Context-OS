@@ -37,7 +37,7 @@ pub enum MemoryStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryMeta {
     pub id: String,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default = "default_ontology")]
     pub ontology: MemoryOntology,
     pub l0: String,
     #[serde(default = "default_importance")]
