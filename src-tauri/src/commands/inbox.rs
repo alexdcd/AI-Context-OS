@@ -1977,12 +1977,65 @@ pub async fn test_inference_provider(
 
 #[tauri::command]
 pub async fn chat_completion(
-    request: ChatCompletionRequest,
+    mut request: ChatCompletionRequest,
     state: State<'_, AppState>,
 ) -> Result<ChatCompletionResponse, String> {
     let root = state.get_root();
     let config = load_provider_config(&root)?
         .ok_or_else(|| "No provider configured".to_string())?;
+
+    // Fallback: if the frontend didn't pre-assemble vault context, do it here.
+    // This is the authoritative path — it guarantees the LLM receives grounding
+    // regardless of frontend toggle state or HMR/bundle staleness.
+    let incoming_ctx_len = request
+        .context_prompt
+        .as_deref()
+        .map(|s| s.trim().len())
+        .unwrap_or(0);
+    if incoming_ctx_len == 0 {
+        if let Some(query) = request
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == "user")
+            .map(|m| m.content.clone())
+        {
+            let trimmed = query.trim();
+            if !trimmed.is_empty() {
+                let scoring_config = state.config.read().unwrap().clone();
+                let budget = scoring_config.default_token_budget.max(1000);
+                match crate::core::engine::execute_context_query(
+                    &root,
+                    trimmed,
+                    budget,
+                    &scoring_config,
+                ) {
+                    Ok(result) => {
+                        let assembled =
+                            crate::core::engine::assemble_chat_context_package(&result);
+                        log::info!(
+                            "chat_completion auto-assembled vault context — query={:?} budget={} loaded={} total={} assembled_len={}",
+                            trimmed,
+                            budget,
+                            result.loaded.len(),
+                            result.total_memories,
+                            assembled.len(),
+                        );
+                        if !assembled.trim().is_empty() {
+                            request.context_prompt = Some(assembled);
+                        }
+                    }
+                    Err(err) => {
+                        log::warn!(
+                            "chat_completion auto-assembly of vault context FAILED: {}",
+                            err
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     let ctx_len = request
         .context_prompt
         .as_deref()
@@ -2000,7 +2053,7 @@ pub async fn chat_completion(
     );
     if ctx_len == 0 {
         log::warn!(
-            "chat_completion received NO context_prompt — the LLM will answer without vault context. Check useVaultContext toggle in the UI and build_chat_context logs above."
+            "chat_completion received NO context_prompt even after auto-assembly fallback — the LLM will answer without vault context."
         );
     }
     provider_chat_completion(&config, &request).await
