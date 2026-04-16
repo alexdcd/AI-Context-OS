@@ -8,6 +8,12 @@ pub enum MemoryOntology {
     Entity,
     Concept,
     Synthesis,
+    /// Any ontology value we don't natively recognize (legacy, UI-generated,
+    /// or future variants). The memory is still loaded; only internal scoring
+    /// falls back to a neutral weight. Frontmatter round-tripping is
+    /// lossy for this variant — the original string is not preserved.
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -22,6 +28,10 @@ pub enum SystemRole {
 pub enum MemoryStatus {
     Unprocessed,
     Processed,
+    /// Any status value we don't natively recognize (e.g. `normalized`,
+    /// `promoted`, `discarded` from inbox workflows). Does not block loading.
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
