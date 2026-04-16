@@ -94,7 +94,8 @@
       "connect": "Connect",
       "loadModels": "Load available models",
       "connectionOk": "Connected",
-      "connectionFailed": "Connection failed"
+      "connectionFailed": "Connection failed",
+      "connecting": "Connecting..."
     }
   },
   "search": {

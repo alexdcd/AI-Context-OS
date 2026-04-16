@@ -780,11 +780,23 @@ async fn health_check(config: &InferenceProviderConfig) -> Result<String, String
                 }
             }
             let response = req.send().await.map_err(|e| format!("Health check failed: {}", e))?;
-            if response.status().is_success() {
-                Ok("Connection successful".to_string())
-            } else {
-                Err(format!("Health check returned status {}", response.status()))
+            if !response.status().is_success() {
+                return Err(format!("Health check returned status {}", response.status()));
             }
+            let body: Value = response
+                .json()
+                .await
+                .unwrap_or(json!({}));
+            let model_count = body
+                .get("data")
+                .and_then(|d| d.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            Ok(format!(
+                "Connection successful — {} model{} available",
+                model_count,
+                if model_count == 1 { "" } else { "s" }
+            ))
         }
         InferenceProviderKind::Anthropic => {
             let _ = anthropic_chat(

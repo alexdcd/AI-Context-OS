@@ -94,7 +94,8 @@
       "connect": "Conectar",
       "loadModels": "Cargar modelos disponibles",
       "connectionOk": "Conectado",
-      "connectionFailed": "Conexión fallida"
+      "connectionFailed": "Conexión fallida",
+      "connecting": "Conectando..."
     }
   },
   "search": {

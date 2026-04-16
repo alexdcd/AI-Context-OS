@@ -146,17 +146,39 @@ export function SettingsView() {
   const handleSaveProvider = useCallback(async () => {
     setProviderBusy("saving");
     try {
-      const saved = await saveInferenceProviderConfig({
+      const configToSave = {
         ...providerConfig,
         base_url: providerConfig.base_url?.trim() || null,
         api_key: providerConfig.api_key?.trim() || null,
-      });
+      };
+      const saved = await saveInferenceProviderConfig(configToSave);
       setProviderConfig({
         ...saved,
         base_url: saved.base_url ?? "",
         api_key: saved.api_key ?? "",
       });
-      setProviderStatus(await getInferenceProviderStatus());
+      // Auto-test after save so user sees immediate feedback
+      if (saved.enabled) {
+        setProviderBusy("testing");
+        try {
+          const status = await testInferenceProvider(saved);
+          setProviderStatus(status);
+        } catch (error) {
+          setProviderStatus({
+            configured: true,
+            enabled: saved.enabled,
+            healthy: false,
+            kind: saved.kind,
+            preset: saved.preset,
+            base_url: saved.base_url ?? null,
+            model: saved.model || null,
+            capabilities: saved.capabilities,
+            message: String(error),
+          });
+        }
+      } else {
+        setProviderStatus(await getInferenceProviderStatus());
+      }
     } finally {
       setProviderBusy("idle");
     }
@@ -172,7 +194,7 @@ export function SettingsView() {
       });
       setProviderStatus(status);
     } catch (error) {
-      setProviderStatus((current) => ({
+      setProviderStatus({
         configured: true,
         enabled: providerConfig.enabled,
         healthy: false,
@@ -182,8 +204,7 @@ export function SettingsView() {
         model: providerConfig.model || null,
         capabilities: providerConfig.capabilities,
         message: String(error),
-        ...(current ?? {}),
-      }));
+      });
     } finally {
       setProviderBusy("idle");
     }
@@ -214,17 +235,46 @@ export function SettingsView() {
     }
   }, [providerConfig.model]);
 
-  const handleConnectProvider = useCallback((provider: DiscoveredProvider) => {
-    setProviderConfig((current) => ({
-      ...current,
-      kind: "openai_compatible" as InferenceProviderKind,
-      preset: provider.preset,
-      base_url: provider.base_url,
-      model: provider.models[0]?.id ?? current.model,
-      api_key: "",
+  const handleConnectProvider = useCallback(async (provider: DiscoveredProvider) => {
+    const newConfig: InferenceProviderConfig = {
       enabled: true,
-    }));
+      kind: "openai_compatible",
+      preset: provider.preset,
+      model: provider.models[0]?.id ?? "",
+      base_url: provider.base_url,
+      api_key: "",
+      capabilities: ["proposal", "classification", "summary", "chat", "streaming"],
+    };
+    setProviderConfig(newConfig);
     setAvailableModels(provider.models);
+
+    // Auto-save + test in one flow
+    setProviderBusy("saving");
+    try {
+      const saved = await saveInferenceProviderConfig(newConfig);
+      setProviderConfig({
+        ...saved,
+        base_url: saved.base_url ?? "",
+        api_key: saved.api_key ?? "",
+      });
+      setProviderBusy("testing");
+      const status = await testInferenceProvider(saved);
+      setProviderStatus(status);
+    } catch (error) {
+      setProviderStatus({
+        configured: true,
+        enabled: true,
+        healthy: false,
+        kind: "openai_compatible",
+        preset: provider.preset,
+        base_url: provider.base_url,
+        model: provider.models[0]?.id ?? null,
+        capabilities: [],
+        message: String(error),
+      });
+    } finally {
+      setProviderBusy("idle");
+    }
   }, []);
 
   const handleLoadModels = useCallback(async () => {
@@ -462,11 +512,18 @@ export function SettingsView() {
                     </div>
                     {provider.reachable && (
                       <button
-                        onClick={() => handleConnectProvider(provider)}
-                        className="flex items-center gap-1.5 rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:opacity-90"
+                        onClick={() => void handleConnectProvider(provider)}
+                        disabled={providerBusy !== "idle"}
+                        className="flex items-center gap-1.5 rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:opacity-90 disabled:opacity-60"
                       >
-                        <Zap className="h-3 w-3" />
-                        {t("settings.inference.connect")}
+                        {providerBusy !== "idle" && providerConfig.preset === provider.preset ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Zap className="h-3 w-3" />
+                        )}
+                        {providerBusy !== "idle" && providerConfig.preset === provider.preset
+                          ? t("settings.inference.connecting")
+                          : t("settings.inference.connect")}
                       </button>
                     )}
                   </div>
