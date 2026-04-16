@@ -1438,9 +1438,15 @@ pub async fn generate_ingest_proposals(
             })
             .map(|duplicate_of| duplicate_proposal(&item, duplicate_of))
             .unwrap_or_else(|| heuristic_proposal(&item));
-        if let Ok(inferred) = infer_proposal(&root, &item).await {
-            if !matches!(proposal.action, ProposalAction::Discard) {
-                proposal = inferred;
+        match infer_proposal(&root, &item).await {
+            Ok(inferred) => {
+                if !matches!(proposal.action, ProposalAction::Discard) {
+                    proposal = inferred;
+                }
+            }
+            Err(e) => {
+                eprintln!("[inference] Fallback to heuristic for '{}': {}", item.title, e);
+                let _ = app.emit("inference-error", format!("{}: {}", item.title, e));
             }
         }
         write_proposal(&root, &proposal)?;
