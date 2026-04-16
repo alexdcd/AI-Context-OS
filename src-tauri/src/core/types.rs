@@ -611,13 +611,21 @@ pub struct ChatMessage {
     pub content: String,
 }
 
+fn default_include_vault_context() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatCompletionRequest {
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub system_prompt: Option<String>,
+    #[serde(default = "default_include_vault_context")]
+    pub include_vault_context: bool,
     #[serde(default)]
     pub context_prompt: Option<String>,
+    #[serde(default)]
+    pub context_memory_ids: Vec<String>,
     #[serde(default)]
     pub model: Option<String>,
 }
@@ -627,6 +635,8 @@ pub struct ChatCompletionResponse {
     pub text: String,
     #[serde(default)]
     pub model: Option<String>,
+    #[serde(default)]
+    pub context_memory_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
