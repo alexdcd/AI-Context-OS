@@ -859,6 +859,34 @@ fn heuristic_proposal(item: &InboxItem) -> IngestProposal {
     }
 }
 
+fn duplicate_proposal(item: &InboxItem, duplicate_of: &InboxItem) -> IngestProposal {
+    let now = Utc::now();
+    IngestProposal {
+        id: format!("proposal-{}", Uuid::new_v4().simple()),
+        item_id: item.id.clone(),
+        item_path: item.path.clone(),
+        action: ProposalAction::Discard,
+        state: ProposalState::Pending,
+        confidence: 0.95,
+        rationale: format!(
+            "This inbox item appears to duplicate '{}' by content hash or source URL.",
+            duplicate_of.title
+        ),
+        created: now,
+        modified: now,
+        destination: None,
+        ontology: None,
+        l0: Some(item.title.clone()),
+        l1_content: Some(item.summary.clone()),
+        l2_content: Some(item.l2_content.clone()),
+        tags: item.tags.clone(),
+        derived_from: vec![item.id.clone(), duplicate_of.id.clone()],
+        inference_provider: None,
+        inference_preset: None,
+        origin: "heuristic".to_string(),
+    }
+}
+
 async fn infer_proposal(
     root: &Path,
     item: &InboxItem,
