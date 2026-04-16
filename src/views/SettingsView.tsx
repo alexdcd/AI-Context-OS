@@ -343,6 +343,132 @@ export function SettingsView() {
           )}
         </section>
 
+        <section className="obs-panel border border-[color:var(--border)] p-6">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-medium text-[color:var(--text-0)]">{t("settings.inference.title")}</h2>
+              <p className="mt-1 text-sm text-[color:var(--text-2)]">{t("settings.inference.desc")}</p>
+            </div>
+            <div className="rounded-full bg-[color:var(--bg-2)] px-3 py-1 text-[11px] font-medium text-[color:var(--text-1)]">
+              {providerStatus?.healthy ? t("settings.inference.healthy") : t("settings.inference.optional")}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.provider")}</span>
+              <select
+                value={providerConfig.kind}
+                onChange={(event) =>
+                  applyPresetDefaults(event.target.value as InferenceProviderKind, providerConfig.preset)
+                }
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
+              >
+                <option value="anthropic">Anthropic</option>
+                <option value="openai_compatible">{t("settings.inference.openaiCompatible")}</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.preset")}</span>
+              <select
+                value={providerConfig.preset}
+                onChange={(event) =>
+                  applyPresetDefaults(providerConfig.kind, event.target.value as InferenceProviderPreset)
+                }
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
+              >
+                <option value="openai">OpenAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="ollama">Ollama</option>
+                <option value="lm_studio">LM Studio</option>
+                <option value="custom">{t("settings.inference.custom")}</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.model")}</span>
+              <input
+                value={providerConfig.model}
+                onChange={(event) => setProviderConfig((current) => ({ ...current, model: event.target.value }))}
+                placeholder={t("settings.inference.modelPlaceholder")}
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.endpoint")}</span>
+              <input
+                value={providerConfig.base_url ?? ""}
+                onChange={(event) => setProviderConfig((current) => ({ ...current, base_url: event.target.value }))}
+                placeholder="https://..."
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
+              />
+            </label>
+
+            <label className="md:col-span-2 flex flex-col gap-2">
+              <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.apiKey")}</span>
+              <input
+                value={providerConfig.api_key ?? ""}
+                onChange={(event) => setProviderConfig((current) => ({ ...current, api_key: event.target.value }))}
+                placeholder={t("settings.inference.apiKeyPlaceholder")}
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
+              />
+            </label>
+          </div>
+
+          <button
+            onClick={() => setProviderConfig((current) => ({ ...current, enabled: !current.enabled }))}
+            className={clsx(
+              "mt-4 flex w-full items-start gap-3 rounded-md border p-4 text-left transition-colors",
+              providerConfig.enabled
+                ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]"
+                : "border-[color:var(--border)] bg-[color:var(--bg-0)] hover:border-[color:var(--border-active)]",
+            )}
+          >
+            <div className="mt-0.5">
+              {providerConfig.enabled ? (
+                <Sparkles className="h-5 w-5 text-[color:var(--accent)]" />
+              ) : (
+                <PlugZap className="h-5 w-5 text-[color:var(--text-2)]" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-[color:var(--text-0)]">{t("settings.inference.enable")}</span>
+                <span
+                  className={clsx(
+                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                    providerConfig.enabled
+                      ? "bg-[color:var(--accent)] text-white"
+                      : "bg-[color:var(--bg-2)] text-[color:var(--text-2)]",
+                  )}
+                >
+                  {providerConfig.enabled ? t("settings.inference.enabled") : t("settings.inference.disabled")}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-[color:var(--text-2)]">{providerStatus?.message ?? t("settings.inference.heuristicFallback")}</p>
+            </div>
+          </button>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => void handleSaveProvider()}
+              disabled={providerBusy !== "idle"}
+              className="rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              {providerBusy === "saving" ? t("settings.inference.saving") : t("settings.inference.save")}
+            </button>
+            <button
+              onClick={() => void handleTestProvider()}
+              disabled={providerBusy !== "idle"}
+              className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-4 py-2 text-sm font-medium text-[color:var(--text-1)] disabled:opacity-60"
+            >
+              {providerBusy === "testing" ? t("settings.inference.testing") : t("settings.inference.test")}
+            </button>
+          </div>
+        </section>
+
         {/* Updates */}
         <UpdateSection />
 
