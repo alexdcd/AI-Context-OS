@@ -190,6 +190,62 @@ export function SettingsView() {
     }
   }, [providerConfig]);
 
+  const handleDiscover = useCallback(async () => {
+    setProviderBusy("discovering");
+    try {
+      const providers = await discoverLocalProviders();
+      setDiscoveredProviders(providers);
+      // Auto-connect to first reachable provider if none is configured yet
+      const reachable = providers.find((p) => p.reachable && p.models.length > 0);
+      if (reachable && !providerConfig.model) {
+        setProviderConfig((current) => ({
+          ...current,
+          kind: "openai_compatible" as InferenceProviderKind,
+          preset: reachable.preset,
+          base_url: reachable.base_url,
+          model: reachable.models[0]?.id ?? "",
+          enabled: true,
+        }));
+        setAvailableModels(reachable.models);
+      }
+    } catch (error) {
+      console.error("Discovery failed", error);
+    } finally {
+      setProviderBusy("idle");
+    }
+  }, [providerConfig.model]);
+
+  const handleConnectProvider = useCallback((provider: DiscoveredProvider) => {
+    setProviderConfig((current) => ({
+      ...current,
+      kind: "openai_compatible" as InferenceProviderKind,
+      preset: provider.preset,
+      base_url: provider.base_url,
+      model: provider.models[0]?.id ?? current.model,
+      api_key: "",
+      enabled: true,
+    }));
+    setAvailableModels(provider.models);
+  }, []);
+
+  const handleLoadModels = useCallback(async () => {
+    setProviderBusy("loading_models");
+    try {
+      const models = await listProviderModels({
+        ...providerConfig,
+        base_url: providerConfig.base_url?.trim() || null,
+        api_key: providerConfig.api_key?.trim() || null,
+      });
+      setAvailableModels(models);
+      setShowModelDropdown(true);
+    } catch (error) {
+      console.error("Failed to list models", error);
+      setAvailableModels([]);
+    } finally {
+      setProviderBusy("idle");
+    }
+  }, [providerConfig]);
+
   return (
     <div className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-2xl space-y-6">
@@ -361,6 +417,66 @@ export function SettingsView() {
             </div>
           </div>
 
+          {/* Auto-detect local providers */}
+          <div className="mb-4">
+            <button
+              onClick={() => void handleDiscover()}
+              disabled={providerBusy !== "idle"}
+              className="flex items-center gap-2 rounded-md border border-dashed border-[color:var(--accent)] bg-[color:var(--accent-muted)] px-4 py-2.5 text-sm font-medium text-[color:var(--accent)] transition-colors hover:bg-[color:var(--accent)] hover:text-white disabled:opacity-60"
+            >
+              {providerBusy === "discovering" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              {providerBusy === "discovering"
+                ? t("settings.inference.discovering")
+                : t("settings.inference.autoDetect")}
+            </button>
+
+            {discoveredProviders.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2">
+                {discoveredProviders.map((provider) => (
+                  <div
+                    key={provider.preset}
+                    className={clsx(
+                      "flex items-center justify-between rounded-md border p-3 text-sm",
+                      provider.reachable
+                        ? "border-green-500/30 bg-green-500/5"
+                        : "border-[color:var(--border)] bg-[color:var(--bg-0)] opacity-50",
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={clsx(
+                          "h-2 w-2 rounded-full",
+                          provider.reachable ? "bg-green-500" : "bg-[color:var(--text-2)]",
+                        )}
+                      />
+                      <div>
+                        <span className="font-medium text-[color:var(--text-0)]">{provider.name}</span>
+                        {provider.reachable && (
+                          <span className="ml-2 text-xs text-[color:var(--text-2)]">
+                            {provider.models.length} {t("settings.inference.modelsAvailable")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {provider.reachable && (
+                      <button
+                        onClick={() => handleConnectProvider(provider)}
+                        className="flex items-center gap-1.5 rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:opacity-90"
+                      >
+                        <Zap className="h-3 w-3" />
+                        {t("settings.inference.connect")}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.provider")}</span>
@@ -393,15 +509,55 @@ export function SettingsView() {
               </select>
             </label>
 
-            <label className="flex flex-col gap-2">
+            {/* Model: dropdown if models loaded, otherwise input with load button */}
+            <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.model")}</span>
-              <input
-                value={providerConfig.model}
-                onChange={(event) => setProviderConfig((current) => ({ ...current, model: event.target.value }))}
-                placeholder={t("settings.inference.modelPlaceholder")}
-                className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
-              />
-            </label>
+              <div className="relative flex gap-1">
+                {availableModels.length > 0 ? (
+                  <div className="relative flex-1">
+                    <select
+                      value={providerConfig.model}
+                      onChange={(event) =>
+                        setProviderConfig((current) => ({ ...current, model: event.target.value }))
+                      }
+                      className="w-full appearance-none rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 pr-8 text-sm text-[color:var(--text-0)]"
+                    >
+                      {!availableModels.some((m) => m.id === providerConfig.model) && providerConfig.model && (
+                        <option value={providerConfig.model}>{providerConfig.model}</option>
+                      )}
+                      {availableModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.id}
+                          {model.family ? ` (${model.family})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-2)]" />
+                  </div>
+                ) : (
+                  <input
+                    value={providerConfig.model}
+                    onChange={(event) =>
+                      setProviderConfig((current) => ({ ...current, model: event.target.value }))
+                    }
+                    placeholder={t("settings.inference.modelPlaceholder")}
+                    className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-3 py-2 text-sm text-[color:var(--text-0)]"
+                  />
+                )}
+                <button
+                  onClick={() => void handleLoadModels()}
+                  disabled={providerBusy !== "idle"}
+                  title={t("settings.inference.loadModels")}
+                  className="shrink-0 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-2.5 py-2 text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)] disabled:opacity-60"
+                >
+                  {providerBusy === "loading_models" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
 
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-[color:var(--text-1)]">{t("settings.inference.endpoint")}</span>
@@ -445,13 +601,16 @@ export function SettingsView() {
                 <span className="font-medium text-[color:var(--text-0)]">{t("settings.inference.enable")}</span>
                 <span
                   className={clsx(
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    providerConfig.enabled
-                      ? "bg-[color:var(--accent)] text-white"
-                      : "bg-[color:var(--bg-2)] text-[color:var(--text-2)]",
+                    "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+                    providerConfig.enabled ? "bg-[color:var(--accent)]" : "bg-[color:var(--bg-3)]",
                   )}
                 >
-                  {providerConfig.enabled ? t("settings.inference.enabled") : t("settings.inference.disabled")}
+                  <span
+                    className={clsx(
+                      "inline-block h-4 w-4 rounded-full bg-white transition-transform",
+                      providerConfig.enabled ? "translate-x-6" : "translate-x-1",
+                    )}
+                  />
                 </span>
               </div>
               <p className="mt-2 text-sm text-[color:var(--text-2)]">{providerStatus?.message ?? t("settings.inference.heuristicFallback")}</p>
