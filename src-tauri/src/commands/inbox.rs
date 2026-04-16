@@ -1425,10 +1425,17 @@ pub async fn generate_ingest_proposals(
 
     let mut existing = load_proposals(&root)?;
     let mut out = Vec::new();
-    for item in all_items {
+    let total = all_items.len();
+    for (idx, item) in all_items.into_iter().enumerate() {
         if existing.iter().any(|proposal| proposal.item_id == item.id && proposal.state == ProposalState::Pending) {
             continue;
         }
+        let _ = app.emit("inference-progress", json!({
+            "phase": "inferring",
+            "item_title": item.title,
+            "current": idx + 1,
+            "total": total,
+        }));
         let mut proposal = items
             .iter()
             .find(|other| {
@@ -1454,6 +1461,7 @@ pub async fn generate_ingest_proposals(
         let _ = update_item_status(&root, &item.id, InboxItemStatus::ProposalReady, ProposalState::Pending);
         out.push(proposal);
     }
+    let _ = app.emit("inference-progress", json!({ "phase": "done", "current": total, "total": total }));
     let _ = app.emit("proposals-changed", ());
     Ok(out)
 }

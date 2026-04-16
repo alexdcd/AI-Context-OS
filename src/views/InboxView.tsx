@@ -496,8 +496,9 @@ export function InboxView() {
                       icon={RefreshCw}
                     />
                     <SecondaryButton
-                      label={t("inbox.actions.generateProposal")}
+                      label={busyAction === `proposal-${selectedItem.id}` ? t("inbox.ai.inferring") : t("inbox.actions.generateProposal")}
                       onClick={() => void handleGenerateProposal()}
+                      busy={busyAction === `proposal-${selectedItem.id}`}
                       icon={Sparkles}
                     />
                     <SecondaryButton
@@ -678,19 +679,22 @@ function PrimaryButton({
 function SecondaryButton({
   label,
   onClick,
+  busy = false,
   icon: Icon,
 }: {
   label: string;
   onClick: () => void;
+  busy?: boolean;
   icon?: typeof Check;
 }) {
   return (
     <button
       type="button"
+      disabled={busy}
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-1)] px-3 py-2 text-sm font-medium text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)] hover:text-[color:var(--text-0)]"
+      className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-1)] px-3 py-2 text-sm font-medium text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)] hover:text-[color:var(--text-0)] disabled:opacity-60"
     >
-      {Icon ? <Icon className="h-4 w-4" /> : null}
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : Icon ? <Icon className="h-4 w-4" /> : null}
       {label}
     </button>
   );
