@@ -17,11 +17,11 @@ use crate::core::memory::write_memory;
 use crate::core::paths::SystemPaths;
 use crate::core::types::{
     ApplyIngestProposalInput, ChatCompletionRequest, ChatCompletionResponse, ChatMessage,
-    CreateInboxLinkInput, CreateInboxTextInput, DailyEntry, InboxAttachment, InboxItem,
-    InboxItemKind, InboxItemStatus, InferenceCapability, InferenceProviderConfig,
+    CreateInboxLinkInput, CreateInboxTextInput, DailyEntry, DiscoveredProvider, InboxAttachment,
+    InboxItem, InboxItemKind, InboxItemStatus, InferenceCapability, InferenceProviderConfig,
     InferenceProviderKind, InferenceProviderPreset, InferenceProviderStatus, IngestProposal,
-    Memory, MemoryMeta, MemoryOntology, ProposalAction, ProposalState, RecentOperationalContext,
-    UpdateInboxItemInput,
+    Memory, MemoryMeta, MemoryOntology, ProposalAction, ProposalState, ProviderModel,
+    RecentOperationalContext, UpdateInboxItemInput,
 };
 use crate::state::AppState;
 

@@ -602,3 +602,22 @@ pub struct ChatCompletionResponse {
     #[serde(default)]
     pub model: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveredProvider {
+    pub preset: InferenceProviderPreset,
+    pub name: String,
+    pub base_url: String,
+    pub reachable: bool,
+    pub models: Vec<ProviderModel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderModel {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub size: Option<u64>,
+    #[serde(default)]
+    pub family: Option<String>,
+}
