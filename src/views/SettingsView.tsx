@@ -4,8 +4,10 @@ import { Monitor, Moon, Sun, Download, Upload, Check, Loader2, Eye, EyeOff, Spar
 import { clsx } from "clsx";
 import {
   backupWorkspace,
+  discoverLocalProviders,
   getInferenceProviderConfig,
   getInferenceProviderStatus,
+  listProviderModels,
   restoreWorkspace,
   saveInferenceProviderConfig,
   testInferenceProvider,
