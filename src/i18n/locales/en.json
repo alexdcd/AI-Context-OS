@@ -87,7 +87,12 @@
       "save": "Save provider",
       "saving": "Saving...",
       "test": "Test connection",
-      "testing": "Testing..."
+      "testing": "Testing...",
+      "autoDetect": "Auto-detect local providers",
+      "discovering": "Scanning...",
+      "modelsAvailable": "models",
+      "connect": "Connect",
+      "loadModels": "Load available models"
     }
   },
   "search": {

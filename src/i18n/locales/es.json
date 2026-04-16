@@ -87,7 +87,12 @@
       "save": "Guardar proveedor",
       "saving": "Guardando...",
       "test": "Probar conexión",
-      "testing": "Probando..."
+      "testing": "Probando...",
+      "autoDetect": "Auto-detectar proveedores locales",
+      "discovering": "Escaneando...",
+      "modelsAvailable": "modelos",
+      "connect": "Conectar",
+      "loadModels": "Cargar modelos disponibles"
     }
   },
   "search": {

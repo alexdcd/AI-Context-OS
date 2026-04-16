@@ -57,7 +57,6 @@ export function SettingsView() {
   const [providerBusy, setProviderBusy] = useState<"idle" | "saving" | "testing" | "discovering" | "loading_models">("idle");
   const [discoveredProviders, setDiscoveredProviders] = useState<DiscoveredProvider[]>([]);
   const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -237,7 +236,6 @@ export function SettingsView() {
         api_key: providerConfig.api_key?.trim() || null,
       });
       setAvailableModels(models);
-      setShowModelDropdown(true);
     } catch (error) {
       console.error("Failed to list models", error);
       setAvailableModels([]);
