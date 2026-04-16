@@ -91,6 +91,9 @@ impl MemoryMeta {
     }
 }
 
+fn default_ontology() -> MemoryOntology {
+    MemoryOntology::Unknown
+}
 fn default_importance() -> f64 {
     0.5
 }

@@ -193,6 +193,10 @@ fn ontology_bonus_score(query: &str, memory: &Memory) -> f64 {
             }
             MemoryOntology::Concept => 0.3,
             MemoryOntology::Source => 0.1,
+            // Unknown ontologies (legacy / UI-generated types not in the 4
+            // canonical variants) still participate in retrieval with a
+            // neutral weight so useful content is not silently dropped.
+            MemoryOntology::Unknown => 0.25,
         },
     }
 }

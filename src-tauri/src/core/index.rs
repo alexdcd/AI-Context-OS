@@ -77,9 +77,21 @@ fn scan_dir_recursive(
 
                         results.push((meta, path.to_string_lossy().to_string()));
                     }
-                    Err(_) => {
+                    Err(err) => {
                         // Bare markdown files are left untouched. They remain regular documents
                         // until the user explicitly converts them into canonical memories.
+                        // When frontmatter IS present but fails YAML validation, the memory is
+                        // silently dropped from the retrieval index — which historically masked
+                        // schema drift (e.g. new `type` variants emitted by the UI that the
+                        // parser didn't yet know about). Surface that case as a warning so the
+                        // user can see *why* their memories aren't showing up in chat context.
+                        if matches!(err, crate::core::frontmatter::FrontmatterError::YamlError(_)) {
+                            log::warn!(
+                                "scan_memories: rejected '{}' — frontmatter present but failed to parse: {}",
+                                path.display(),
+                                err
+                            );
+                        }
                     }
                 }
             }

@@ -420,6 +420,7 @@ fn ontology_label(ontology: &MemoryOntology) -> &str {
         MemoryOntology::Entity => "entity",
         MemoryOntology::Concept => "concept",
         MemoryOntology::Synthesis => "synthesis",
+        MemoryOntology::Unknown => "unknown",
     }
 }
 
@@ -434,6 +435,7 @@ fn status_label(status: &MemoryStatus) -> &str {
     match status {
         MemoryStatus::Unprocessed => "unprocessed",
         MemoryStatus::Processed => "processed",
+        MemoryStatus::Unknown => "unknown",
     }
 }
 
