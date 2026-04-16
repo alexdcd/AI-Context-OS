@@ -39,6 +39,7 @@ pub struct MemoryMeta {
     pub id: String,
     #[serde(rename = "type", default = "default_ontology")]
     pub ontology: MemoryOntology,
+    #[serde(default)]
     pub l0: String,
     #[serde(default = "default_importance")]
     pub importance: f64,
