@@ -94,26 +94,25 @@ export function ChatPanel() {
       let contextPrompt = "";
       let contextIds: string[] = [];
 
-      console.log("[chat] send start — useVaultContext:", useVaultContext);
-      if (useVaultContext) {
-        try {
-          const chatContext = await buildChatContext(text, DEFAULT_TOKEN_BUDGET);
-          console.log(
-            "[chat] buildChatContext OK — prompt_context.length:",
-            chatContext.prompt_context.length,
-            "memory_ids:",
-            chatContext.memory_ids.length,
-          );
-          if (chatContext.prompt_context.trim()) {
-            contextPrompt = chatContext.prompt_context;
-            contextIds = chatContext.memory_ids;
-          }
-        } catch (err) {
-          console.error("[chat] buildChatContext FAILED:", err);
-          // non-fatal — keep plain system prompt
+      console.log("[chat] send start — useVaultContext toggle:", useVaultContext);
+      // TEMP DIAGNOSTIC: always attempt to load vault context regardless of the
+      // toggle so we can confirm whether the backend path works for this user.
+      // If this resolves the "no context" issue, the root cause is the toggle
+      // being OFF (or its persisted state) and we'll restore the gate after.
+      try {
+        const chatContext = await buildChatContext(text, DEFAULT_TOKEN_BUDGET);
+        console.log(
+          "[chat] buildChatContext OK — prompt_context.length:",
+          chatContext.prompt_context.length,
+          "memory_ids:",
+          chatContext.memory_ids.length,
+        );
+        if (chatContext.prompt_context.trim()) {
+          contextPrompt = chatContext.prompt_context;
+          contextIds = chatContext.memory_ids;
         }
-      } else {
-        console.warn("[chat] useVaultContext is OFF — skipping vault lookup");
+      } catch (err) {
+        console.error("[chat] buildChatContext FAILED:", err);
       }
 
       // Build message history (excluding pending turn)
