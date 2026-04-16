@@ -261,8 +261,16 @@ function AppContent() {
           </button>
         </div>
 
-        {/* Chat toggle */}
-        <div data-tauri-drag-region className="flex items-center justify-center shrink-0 mb-[3px]">
+        {/* Health badge */}
+        <div data-tauri-drag-region className="flex items-center pr-3">
+          <HealthBadge />
+        </div>
+
+        {/* Remaining top window drag region */}
+        <div data-tauri-drag-region className="flex-1 h-full" />
+
+        {/* Chat toggle — at the far right, mirroring where the panel opens */}
+        <div data-tauri-drag-region className="flex items-center justify-center shrink-0 mb-[3px] pr-2">
           <button
             onClick={toggleChat}
             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
@@ -275,14 +283,6 @@ function AppContent() {
             <MessageSquare className="h-[15px] w-[15px]" pointerEvents="none" />
           </button>
         </div>
-
-        {/* Health badge */}
-        <div data-tauri-drag-region className="flex items-center pr-3">
-          <HealthBadge />
-        </div>
-
-        {/* Remaining top window drag region */}
-        <div data-tauri-drag-region className="flex-1 h-full" />
       </div>
 
       <div className="obs-app-shell flex flex-1 overflow-hidden">
