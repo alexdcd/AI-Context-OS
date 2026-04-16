@@ -12,7 +12,8 @@ import { useThemeEffect } from "./lib/settingsStore";
 import { useVaultStore } from "./lib/vaultStore";
 import { VaultConfirmDialog } from "./components/vault/VaultConfirmDialog";
 import { VaultSwitchScreen } from "./components/vault/VaultSwitchScreen";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, MessageSquare } from "lucide-react";
+import { ChatPanel } from "./components/chat/ChatPanel";
 
 const ExplorerView = lazy(() =>
   import("./views/ExplorerView").then((module) => ({ default: module.ExplorerView })),
@@ -89,6 +90,8 @@ function AppContent() {
   const toggleExplorer = useAppStore((s) => s.toggleExplorer);
   const explorerOpen = useAppStore((s) => s.explorerOpen);
   const setExplorerOpen = useAppStore((s) => s.setExplorerOpen);
+  const chatOpen = useAppStore((s) => s.chatOpen);
+  const toggleChat = useAppStore((s) => s.toggleChat);
 
   const navigate = useNavigate();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
