@@ -302,6 +302,33 @@ pub fn assemble_context_package(result: &ContextResult) -> String {
     out
 }
 
+pub fn assemble_chat_context_package(result: &ContextResult) -> String {
+    if result.loaded.is_empty() {
+        return String::new();
+    }
+
+    let mut out = String::with_capacity(result.tokens_used as usize * 4);
+    out.push_str("# RELEVANT VAULT CONTEXT\n\n");
+
+    for mem in &result.loaded {
+        let level_tag = match mem.load_level {
+            LoadLevel::L0 => "L0",
+            LoadLevel::L1 => "L1",
+            LoadLevel::L2 => "L2",
+        };
+
+        out.push_str(&format!("## [{}] {} — {}\n", mem.memory_id, mem.l0, level_tag));
+        if mem.content.trim().is_empty() {
+            out.push_str(&format!("Summary: {}\n\n", mem.l0));
+        } else {
+            out.push_str(&mem.content);
+            out.push_str("\n\n");
+        }
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

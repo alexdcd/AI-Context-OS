@@ -139,6 +139,7 @@ pub fn run() {
             commands::router::get_router_content,
             // Scoring
             commands::scoring::simulate_context,
+            commands::scoring::build_chat_context,
             // Graph
             commands::graph::get_graph_data,
             commands::graph::get_god_nodes,

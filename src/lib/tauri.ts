@@ -31,6 +31,7 @@ import type {
   UpdateInboxItemInput,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatContextPayload,
 } from "./types";
 
 // Config
@@ -83,6 +84,11 @@ export const getRouterContent = () => invoke<string>("get_router_content");
 // Scoring
 export const simulateContext = (query: string, tokenBudget: number) =>
   invoke<ScoredMemory[]>("simulate_context", {
+    query,
+    token_budget: tokenBudget,
+  });
+export const buildChatContext = (query: string, tokenBudget: number) =>
+  invoke<ChatContextPayload>("build_chat_context", {
     query,
     token_budget: tokenBudget,
   });

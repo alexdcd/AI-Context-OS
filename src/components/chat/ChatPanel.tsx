@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Send, X, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import {
+  buildChatContext,
   chatCompletion,
   getInferenceProviderConfig,
-  simulateContext,
 } from "../../lib/tauri";
 import { useAppStore } from "../../lib/store";
 import type { ChatMessage, InferenceProviderConfig } from "../../lib/types";
@@ -96,14 +96,10 @@ export function ChatPanel() {
 
       if (useVaultContext) {
         try {
-          const scored = await simulateContext(text, DEFAULT_TOKEN_BUDGET);
-          if (scored && scored.length > 0) {
-            const blocks = scored
-              .slice(0, 8)
-              .map((s) => `### [${s.memory_id}] ${s.l0}\n(level: ${s.load_level}, importance: ${s.score.importance.toFixed(2)})`)
-              .join("\n\n");
-            systemPrompt = `${SYSTEM_PROMPT}\n\n---\nRELEVANT VAULT CONTEXT (${scored.length} memories, ranked):\n${blocks}`;
-            contextIds = scored.slice(0, 8).map((s) => s.memory_id);
+          const chatContext = await buildChatContext(text, DEFAULT_TOKEN_BUDGET);
+          if (chatContext.prompt_context.trim()) {
+            systemPrompt = `${SYSTEM_PROMPT}\n\n---\n${chatContext.prompt_context}`;
+            contextIds = chatContext.memory_ids;
           }
         } catch {
           // non-fatal — keep plain system prompt

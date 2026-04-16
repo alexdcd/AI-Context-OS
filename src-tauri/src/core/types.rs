@@ -135,6 +135,13 @@ pub struct ScoredMemory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatContextPayload {
+    pub prompt_context: String,
+    #[serde(default)]
+    pub memory_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,
     pub label: String,

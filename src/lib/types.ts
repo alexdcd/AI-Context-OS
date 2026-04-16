@@ -68,6 +68,11 @@ export interface ScoredMemory {
   token_estimate: number;
 }
 
+export interface ChatContextPayload {
+  prompt_context: string;
+  memory_ids: string[];
+}
+
 export interface GraphNode {
   id: string;
   label: string;
