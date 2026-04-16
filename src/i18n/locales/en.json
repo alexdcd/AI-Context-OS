@@ -1,6 +1,7 @@
 {
   "sidebar": {
     "explorer": "Explorer",
+    "inbox": "Inbox",
     "journal": "Journal",
     "tasks": "Tasks",
     "graph": "Graph",
@@ -64,6 +65,29 @@
       "restoreSuccess": "Workspace restored successfully",
       "restoreError": "Error restoring backup",
       "restoreConfirm": "Restore backup? Current files will be overwritten."
+    },
+    "inference": {
+      "title": "Inference Provider",
+      "desc": "Configure optional BYO AI for inbox proposals today and local chat/runtime reuse later.",
+      "provider": "Provider kind",
+      "preset": "Preset",
+      "openaiCompatible": "OpenAI-compatible",
+      "custom": "Custom",
+      "model": "Model",
+      "modelPlaceholder": "e.g. gpt-4.1-mini, claude-sonnet, qwen2.5",
+      "endpoint": "Endpoint",
+      "apiKey": "API key",
+      "apiKeyPlaceholder": "Optional for Ollama / LM Studio",
+      "enable": "Enable provider",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "healthy": "Connected",
+      "optional": "Optional",
+      "heuristicFallback": "If no provider is active, Inbox will keep using heuristic proposals.",
+      "save": "Save provider",
+      "saving": "Saving...",
+      "test": "Test connection",
+      "testing": "Testing..."
     }
   },
   "search": {
@@ -159,6 +183,87 @@
     "errorCopyPath": "Could not copy path to clipboard",
     "folderColor": "Color",
     "clearColor": "No color"
+  },
+  "inbox": {
+    "subtitle": "Capture first, classify later, promote only when ready.",
+    "defaultTextTitle": "Quick capture",
+    "empty": "No inbox items yet. Capture text, links or files to start the pipeline.",
+    "emptySelection": "Select an inbox item to inspect or edit it.",
+    "noPreview": "No preview available yet.",
+    "yes": "Yes",
+    "no": "No",
+    "dropTitle": "Drop files here",
+    "dropDesc": "Desktop drops work when the OS exposes file paths. You can always use Import files.",
+    "dropUnavailable": "This drop source does not expose filesystem paths. Use Import files instead.",
+    "stats": {
+      "total": "Total",
+      "pending": "Pending",
+      "promoted": "Promoted"
+    },
+    "actions": {
+      "newText": "New text",
+      "newLink": "New link",
+      "importFiles": "Import files",
+      "cancel": "Cancel",
+      "capture": "Capture",
+      "normalize": "Normalize",
+      "generateProposal": "Generate proposal",
+      "approveProposal": "Approve proposal",
+      "rejectProposal": "Reject proposal",
+      "discard": "Discard",
+      "save": "Save"
+    },
+    "compose": {
+      "textTitle": "Title",
+      "textBody": "Paste notes, snippets or rough content here...",
+      "linkTitle": "Optional title override",
+      "linkNotes": "Optional notes for this link"
+    },
+    "filters": {
+      "allKinds": "All kinds",
+      "allStates": "All states"
+    },
+    "kinds": {
+      "text": "Text",
+      "link": "Link",
+      "file": "File"
+    },
+    "states": {
+      "new": "New",
+      "normalized": "Normalized",
+      "proposal_ready": "Proposal ready",
+      "processed": "Processed",
+      "promoted": "Promoted",
+      "discarded": "Discarded",
+      "error": "Error"
+    },
+    "editor": {
+      "title": "Item editor",
+      "l1": "L1 summary / normalized preview",
+      "l2": "L2 extended notes / extracted content"
+    },
+    "metadata": {
+      "title": "Metadata",
+      "created": "Created",
+      "modified": "Modified",
+      "captureState": "Capture state",
+      "proposalState": "Proposal state",
+      "extraction": "Needs extraction",
+      "inference": "Needs inference",
+      "attachments": "Attachments"
+    },
+    "proposal": {
+      "title": "Proposal",
+      "pending": "Pending",
+      "empty": "No pending proposal yet. You can normalize the item first or generate one now.",
+      "confidence": "Confidence",
+      "origin": "Origin"
+    },
+    "ai": {
+      "title": "Proposal engine",
+      "hint": "Works with heuristics or BYO AI",
+      "heuristic": "Heuristic mode"
+    }
   },
   "tasks": {
     "filterAllStatuses": "All statuses",
