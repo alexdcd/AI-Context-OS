@@ -19,10 +19,12 @@ import { type Language } from "../lib/settingsStore";
 import { VaultSettingsSection } from "../components/vault/VaultSettingsSection";
 import { UpdateSection } from "../components/settings/UpdateSection";
 import type {
+  DiscoveredProvider,
   InferenceProviderConfig,
   InferenceProviderKind,
   InferenceProviderPreset,
   InferenceProviderStatus,
+  ProviderModel,
 } from "../lib/types";
 
 export function SettingsView() {
@@ -52,7 +54,10 @@ export function SettingsView() {
     capabilities: ["proposal", "classification", "summary", "chat", "streaming"],
   });
   const [providerStatus, setProviderStatus] = useState<InferenceProviderStatus | null>(null);
-  const [providerBusy, setProviderBusy] = useState<"idle" | "saving" | "testing">("idle");
+  const [providerBusy, setProviderBusy] = useState<"idle" | "saving" | "testing" | "discovering" | "loading_models">("idle");
+  const [discoveredProviders, setDiscoveredProviders] = useState<DiscoveredProvider[]>([]);
+  const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   useEffect(() => {
     void (async () => {
