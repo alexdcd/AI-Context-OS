@@ -116,6 +116,73 @@ export function SettingsView() {
     { value: "dark",   label: t("settings.theme.dark"),   icon: Moon,    describe: t("settings.theme.darkDesc") },
   ];
 
+  const applyPresetDefaults = useCallback(
+    (kind: InferenceProviderKind, preset: InferenceProviderPreset) => {
+      const defaults: Record<InferenceProviderPreset, { base_url: string; requiresKey: boolean }> = {
+        custom: { base_url: "", requiresKey: false },
+        openai: { base_url: "https://api.openai.com/v1", requiresKey: true },
+        openrouter: { base_url: "https://openrouter.ai/api/v1", requiresKey: true },
+        ollama: { base_url: "http://127.0.0.1:11434/v1", requiresKey: false },
+        lm_studio: { base_url: "http://127.0.0.1:1234/v1", requiresKey: false },
+      };
+      const nextDefault = defaults[preset];
+      setProviderConfig((current) => ({
+        ...current,
+        kind,
+        preset,
+        base_url: current.base_url?.trim() ? current.base_url : nextDefault.base_url,
+        api_key: nextDefault.requiresKey ? current.api_key ?? "" : current.api_key ?? "",
+      }));
+    },
+    [],
+  );
+
+  const handleSaveProvider = useCallback(async () => {
+    setProviderBusy("saving");
+    try {
+      const saved = await saveInferenceProviderConfig({
+        ...providerConfig,
+        base_url: providerConfig.base_url?.trim() || null,
+        api_key: providerConfig.api_key?.trim() || null,
+      });
+      setProviderConfig({
+        ...saved,
+        base_url: saved.base_url ?? "",
+        api_key: saved.api_key ?? "",
+      });
+      setProviderStatus(await getInferenceProviderStatus());
+    } finally {
+      setProviderBusy("idle");
+    }
+  }, [providerConfig]);
+
+  const handleTestProvider = useCallback(async () => {
+    setProviderBusy("testing");
+    try {
+      const status = await testInferenceProvider({
+        ...providerConfig,
+        base_url: providerConfig.base_url?.trim() || null,
+        api_key: providerConfig.api_key?.trim() || null,
+      });
+      setProviderStatus(status);
+    } catch (error) {
+      setProviderStatus((current) => ({
+        configured: true,
+        enabled: providerConfig.enabled,
+        healthy: false,
+        kind: providerConfig.kind,
+        preset: providerConfig.preset,
+        base_url: providerConfig.base_url ?? null,
+        model: providerConfig.model || null,
+        capabilities: providerConfig.capabilities,
+        message: String(error),
+        ...(current ?? {}),
+      }));
+    } finally {
+      setProviderBusy("idle");
+    }
+  }, [providerConfig]);
+
   return (
     <div className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-2xl space-y-6">
