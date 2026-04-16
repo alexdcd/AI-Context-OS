@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Check,
   ChevronRight,
@@ -185,21 +186,30 @@ export function InboxView() {
     });
   };
 
-  const handleDrop: React.DragEventHandler<HTMLDivElement> = async (event) => {
-    event.preventDefault();
-    const maybePaths = Array.from(event.dataTransfer.files)
-      .map((file) => (file as File & { path?: string }).path)
-      .filter((value): value is string => Boolean(value));
-    if (maybePaths.length === 0) {
-      setStatusMessage(t("inbox.dropUnavailable"));
-      return;
-    }
-    await withBusy("drop", async () => {
-      await api.importInboxFiles(maybePaths);
-      await refresh();
-      await loadFileTree();
+  // Tauri v2 native drag-drop: listen for file drop events from the OS
+  const handleNativeDrop = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0) return;
+      await withBusy("drop", async () => {
+        await api.importInboxFiles(paths);
+        await refresh();
+        await loadFileTree();
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadFileTree],
+  );
+
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onDragDropEvent((event) => {
+      if (event.payload.type === "drop") {
+        void handleNativeDrop(event.payload.paths);
+      }
     });
-  };
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [handleNativeDrop]);
 
   const handleSaveSelected = async () => {
     if (!selectedItem) return;
@@ -342,8 +352,6 @@ export function InboxView() {
           )}
 
           <div
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => void handleDrop(event)}
             className="mt-4 rounded-xl border border-dashed border-[color:var(--border-active)] bg-[color:var(--accent-muted)]/30 px-4 py-4 text-center"
           >
             <Inbox className="mx-auto h-5 w-5 text-[color:var(--accent)]" />

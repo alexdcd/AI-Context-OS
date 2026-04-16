@@ -166,6 +166,30 @@ fn is_text_like(path: &Path) -> bool {
     )
 }
 
+/// Strip markdown code fences that LLMs often wrap around JSON responses.
+/// Handles ```json ... ```, ``` ... ```, and plain JSON.
+fn strip_markdown_json(raw: &str) -> String {
+    let trimmed = raw.trim();
+    // Try to extract content between ```json ... ``` or ``` ... ```
+    if let Some(rest) = trimmed.strip_prefix("```json") {
+        if let Some(inner) = rest.strip_suffix("```") {
+            return inner.trim().to_string();
+        }
+    }
+    if let Some(rest) = trimmed.strip_prefix("```") {
+        if let Some(inner) = rest.strip_suffix("```") {
+            return inner.trim().to_string();
+        }
+    }
+    // Fallback: find the first { and last } to extract JSON object
+    if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
+        if start < end {
+            return trimmed[start..=end].to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
 fn strip_html_tags(value: &str) -> String {
     Regex::new(r"<[^>]+>")
         .ok()
@@ -1028,8 +1052,9 @@ async fn infer_proposal(
     )
     .await?;
 
-    let parsed: ProposalModelResponse = serde_json::from_str(response.text.trim())
-        .map_err(|e| format!("Failed to parse proposal JSON: {}", e))?;
+    let raw_text = strip_markdown_json(&response.text);
+    let parsed: ProposalModelResponse = serde_json::from_str(&raw_text)
+        .map_err(|e| format!("Failed to parse proposal JSON: {} — raw response: {}", e, &response.text[..response.text.len().min(500)]))?;
     let now = Utc::now();
 
     Ok(IngestProposal {
