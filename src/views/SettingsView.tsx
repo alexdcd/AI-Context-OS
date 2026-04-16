@@ -1,14 +1,27 @@
 import { useState, useCallback } from "react";
 import { useSettingsStore, Theme } from "../lib/settingsStore";
-import { Monitor, Moon, Sun, Download, Upload, Check, Loader2, Eye, EyeOff } from "lucide-react";
+import { Monitor, Moon, Sun, Download, Upload, Check, Loader2, Eye, EyeOff, Sparkles, PlugZap } from "lucide-react";
 import { clsx } from "clsx";
-import { backupWorkspace, restoreWorkspace } from "../lib/tauri";
+import {
+  backupWorkspace,
+  getInferenceProviderConfig,
+  getInferenceProviderStatus,
+  restoreWorkspace,
+  saveInferenceProviderConfig,
+  testInferenceProvider,
+} from "../lib/tauri";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "../lib/store";
 import { useTranslation } from "react-i18next";
 import { type Language } from "../lib/settingsStore";
 import { VaultSettingsSection } from "../components/vault/VaultSettingsSection";
 import { UpdateSection } from "../components/settings/UpdateSection";
+import type {
+  InferenceProviderConfig,
+  InferenceProviderKind,
+  InferenceProviderPreset,
+  InferenceProviderStatus,
+} from "../lib/types";
 
 export function SettingsView() {
   const { t } = useTranslation();
