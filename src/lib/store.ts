@@ -21,6 +21,7 @@ interface AppStore {
   loading: boolean;
   error: string | null;
   explorerOpen: boolean;
+  chatOpen: boolean;
   isCreateMemoryOpen: boolean;
   pendingCreate: 'file' | 'folder' | null;
 
@@ -45,6 +46,8 @@ interface AppStore {
   setError: (error: string | null) => void;
   toggleExplorer: () => void;
   setExplorerOpen: (open: boolean) => void;
+  toggleChat: () => void;
+  setChatOpen: (open: boolean) => void;
   toggleCreateMemory: () => void;
   setCreateMemoryOpen: (v: boolean) => void;
   setPendingCreate: (mode: 'file' | 'folder' | null) => void;
@@ -61,6 +64,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   loading: false,
   error: null,
   explorerOpen: true,
+  chatOpen: false,
   isCreateMemoryOpen: false,
   pendingCreate: null,
 
@@ -231,6 +235,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setError: (error) => set({ error }),
   toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
   setExplorerOpen: (open) => set({ explorerOpen: open }),
+  toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
+  setChatOpen: (open) => set({ chatOpen: open }),
   toggleCreateMemory: () => set((s) => ({ isCreateMemoryOpen: !s.isCreateMemoryOpen })),
   setCreateMemoryOpen: (v) => set({ isCreateMemoryOpen: v }),
   setPendingCreate: (mode) => set({ pendingCreate: mode }),
