@@ -61,20 +61,38 @@ export function SettingsView() {
   useEffect(() => {
     void (async () => {
       try {
-        const [savedConfig, savedStatus] = await Promise.all([
-          getInferenceProviderConfig(),
-          getInferenceProviderStatus(),
-        ]);
+        const savedConfig = await getInferenceProviderConfig();
         if (savedConfig) {
           setProviderConfig({
             ...savedConfig,
             api_key: savedConfig.api_key ?? "",
             base_url: savedConfig.base_url ?? "",
           });
+          // Auto-load model list for local providers
+          if (
+            savedConfig.preset === "ollama" ||
+            savedConfig.preset === "lm_studio"
+          ) {
+            listProviderModels(savedConfig)
+              .then((models) => setAvailableModels(models))
+              .catch(() => {});
+          }
         }
+        const savedStatus = await getInferenceProviderStatus();
         setProviderStatus(savedStatus);
       } catch (error) {
         console.error("Failed to load inference settings", error);
+        setProviderStatus({
+          configured: false,
+          enabled: false,
+          healthy: false,
+          kind: null,
+          preset: null,
+          base_url: null,
+          model: null,
+          capabilities: [],
+          message: `Load error: ${String(error)}`,
+        });
       }
     })();
   }, []);
@@ -157,7 +175,19 @@ export function SettingsView() {
         base_url: saved.base_url ?? "",
         api_key: saved.api_key ?? "",
       });
-      // Auto-test after save so user sees immediate feedback
+      // Show saved status immediately
+      setProviderStatus({
+        configured: true,
+        enabled: saved.enabled,
+        healthy: false,
+        kind: saved.kind,
+        preset: saved.preset,
+        base_url: saved.base_url ?? null,
+        model: saved.model || null,
+        capabilities: saved.capabilities,
+        message: "Configuration saved. Testing connection...",
+      });
+      // Then test (don't block save feedback on test result)
       if (saved.enabled) {
         setProviderBusy("testing");
         try {
@@ -173,12 +203,22 @@ export function SettingsView() {
             base_url: saved.base_url ?? null,
             model: saved.model || null,
             capabilities: saved.capabilities,
-            message: String(error),
+            message: `Saved but test failed: ${String(error)}`,
           });
         }
-      } else {
-        setProviderStatus(await getInferenceProviderStatus());
       }
+    } catch (error) {
+      setProviderStatus((prev) => ({
+        configured: false,
+        enabled: false,
+        healthy: false,
+        kind: providerConfig.kind,
+        preset: providerConfig.preset,
+        base_url: providerConfig.base_url ?? null,
+        model: providerConfig.model || null,
+        capabilities: prev?.capabilities ?? [],
+        message: `Save failed: ${String(error)}`,
+      }));
     } finally {
       setProviderBusy("idle");
     }
@@ -242,13 +282,13 @@ export function SettingsView() {
       preset: provider.preset,
       model: provider.models[0]?.id ?? "",
       base_url: provider.base_url,
-      api_key: "",
+      api_key: null,
       capabilities: ["proposal", "classification", "summary", "chat", "streaming"],
     };
-    setProviderConfig(newConfig);
+    setProviderConfig({ ...newConfig, api_key: "", base_url: newConfig.base_url ?? "" });
     setAvailableModels(provider.models);
 
-    // Auto-save + test in one flow
+    // Save
     setProviderBusy("saving");
     try {
       const saved = await saveInferenceProviderConfig(newConfig);
@@ -257,8 +297,32 @@ export function SettingsView() {
         base_url: saved.base_url ?? "",
         api_key: saved.api_key ?? "",
       });
-      setProviderBusy("testing");
-      const status = await testInferenceProvider(saved);
+      setProviderStatus({
+        configured: true,
+        enabled: true,
+        healthy: false,
+        kind: saved.kind,
+        preset: saved.preset,
+        base_url: saved.base_url ?? null,
+        model: saved.model || null,
+        capabilities: saved.capabilities,
+        message: `${provider.name} configured with ${provider.models.length} models. Testing...`,
+      });
+    } catch (error) {
+      setProviderStatus({
+        configured: false, enabled: false, healthy: false,
+        kind: "openai_compatible", preset: provider.preset,
+        base_url: provider.base_url, model: null, capabilities: [],
+        message: `Save failed: ${String(error)}`,
+      });
+      setProviderBusy("idle");
+      return;
+    }
+
+    // Test (separate step, failure doesn't undo save)
+    setProviderBusy("testing");
+    try {
+      const status = await testInferenceProvider();
       setProviderStatus(status);
     } catch (error) {
       setProviderStatus({
@@ -269,8 +333,8 @@ export function SettingsView() {
         preset: provider.preset,
         base_url: provider.base_url,
         model: provider.models[0]?.id ?? null,
-        capabilities: [],
-        message: String(error),
+        capabilities: newConfig.capabilities,
+        message: `Saved OK, but connection test failed: ${String(error)}`,
       });
     } finally {
       setProviderBusy("idle");
