@@ -766,6 +766,33 @@ async fn provider_chat_completion(
     }
 }
 
+/// Builds the `messages` array to send to an OpenAI-compatible API.
+///
+/// Layout:
+///   1. `system` message — from `request.system_prompt` (if any)
+///   2. `user` message  — from `request.context_prompt`, injected as loaded
+///      memory / context so the model can answer questions about it (if any)
+///   3. All `request.messages` in order
+pub(super) fn build_openai_messages(request: &ChatCompletionRequest) -> Vec<Value> {
+    let mut messages: Vec<Value> = Vec::new();
+
+    if let Some(system_prompt) = &request.system_prompt {
+        messages.push(json!({ "role": "system", "content": system_prompt }));
+    }
+
+    // Inject loaded context as a conversation message so the model treats it
+    // as background knowledge for the current session.
+    if let Some(ctx) = &request.context_prompt {
+        messages.push(json!({ "role": "user", "content": ctx }));
+    }
+
+    messages.extend(request.messages.iter().map(|m| {
+        json!({ "role": m.role, "content": m.content })
+    }));
+
+    messages
+}
+
 async fn openai_compatible_chat(
     config: &InferenceProviderConfig,
     request: &ChatCompletionRequest,
@@ -785,13 +812,7 @@ async fn openai_compatible_chat(
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-    let mut messages = Vec::new();
-    if let Some(system_prompt) = &request.system_prompt {
-        messages.push(json!({ "role": "system", "content": system_prompt }));
-    }
-    messages.extend(request.messages.iter().map(|message| {
-        json!({ "role": message.role, "content": message.content })
-    }));
+    let messages = build_openai_messages(request);
 
     let payload = json!({
         "model": request.model.clone().unwrap_or_else(|| config.model.clone()),
