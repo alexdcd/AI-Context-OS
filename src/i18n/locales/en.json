@@ -675,7 +675,8 @@
     "source": "Source",
     "entity": "Entity",
     "concept": "Concept",
-    "synthesis": "Synthesis"
+    "synthesis": "Synthesis",
+    "unknown": "Unknown"
   },
   "systemRoles": {
     "rule": "Rule",

@@ -1,8 +1,8 @@
-export type MemoryOntology = "source" | "entity" | "concept" | "synthesis";
+export type MemoryOntology = "source" | "entity" | "concept" | "synthesis" | "unknown";
 
 export type SystemRole = "rule" | "skill";
 
-export type MemoryStatus = "unprocessed" | "processed";
+export type MemoryStatus = "unprocessed" | "processed" | "unknown";
 
 export interface MemoryMeta {
   id: string;
@@ -399,13 +399,16 @@ export interface ChatMessage {
 export interface ChatCompletionRequest {
   messages: ChatMessage[];
   system_prompt?: string | null;
+  include_vault_context?: boolean;
   context_prompt?: string | null;
+  context_memory_ids?: string[] | null;
   model?: string | null;
 }
 
 export interface ChatCompletionResponse {
   text: string;
   model?: string | null;
+  context_memory_ids: string[];
 }
 
 export interface ContextRequestRecord {
@@ -508,4 +511,5 @@ export const MEMORY_ONTOLOGY_COLORS: Record<MemoryOntology, string> = {
   entity: "#10b981",
   concept: "#8b5cf6",
   synthesis: "#f59e0b",
+  unknown: "#64748b",
 };

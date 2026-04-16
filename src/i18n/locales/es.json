@@ -675,7 +675,8 @@
     "source": "Fuente",
     "entity": "Entidad",
     "concept": "Concepto",
-    "synthesis": "Síntesis"
+    "synthesis": "Síntesis",
+    "unknown": "Desconocido"
   },
   "systemRoles": {
     "rule": "Regla",
