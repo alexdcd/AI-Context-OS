@@ -301,3 +301,52 @@ pub fn assemble_context_package(result: &ContextResult) -> String {
 
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::core::types::{LoadLevel, MemoryOntology, ScoreBreakdown};
+
+    fn sample_score(final_score: f64) -> ScoreBreakdown {
+        ScoreBreakdown {
+            semantic: final_score,
+            bm25: 0.0,
+            recency: 0.0,
+            importance: 0.0,
+            access_frequency: 0.0,
+            graph_proximity: 0.0,
+            final_score,
+        }
+    }
+
+    #[test]
+    fn assemble_chat_context_package_includes_loaded_memory_content() {
+        let result = ContextResult {
+            scored_memories: Vec::new(),
+            loaded: vec![LoadedMemory {
+                memory_id: "quien-soy-yo".to_string(),
+                l0: "Yo soy alex dc".to_string(),
+                ontology: MemoryOntology::Entity,
+                folder_category: Some("about-me".to_string()),
+                system_role: None,
+                load_level: LoadLevel::L2,
+                content: "Alex DC es indie hacker en Madrid.".to_string(),
+                token_estimate: 42,
+                score: sample_score(0.81),
+                was_force_loaded: false,
+            }],
+            unloaded: Vec::new(),
+            rules_content: "# MCP WORKSPACE RULES".to_string(),
+            tokens_used: 42,
+            tokens_budget: 100,
+            total_memories: 1,
+        };
+
+        let rendered = assemble_chat_context_package(&result);
+
+        assert!(rendered.contains("Yo soy alex dc"));
+        assert!(rendered.contains("Alex DC es indie hacker en Madrid."));
+        assert!(!rendered.contains("MCP WORKSPACE RULES"));
+    }
+}
