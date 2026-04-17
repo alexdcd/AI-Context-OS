@@ -18,6 +18,9 @@ Contains the core documentation, architecture specs, and whitepapers:
 - [Technical Whitepaper](./Memm%20wiki/whitepaper.md)
 - [Current Architecture Router](./Memm%20wiki/ARQUITECTURA-ACTUAL-ROUTER-CONTEXTO-Y-MEMORIAS.md)
 
+### Core Technical References In `docs/`
+- [Algorithms And Scoring](./algorithms-and-scoring.md)
+
 ### 2. `roadmap/`
 Contains development plans, technical reviews, and upcoming features:
 - [Current State, Implemented Changes, And Roadmap](./roadmap/current-state-and-roadmap.md)
