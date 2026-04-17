@@ -55,41 +55,26 @@ const customTheme = EditorView.theme({
     borderLeftColor: "var(--text-0)",
   },
   ".cm-line.cm-h1": {
-    fontSize: "1.9em",
+    fontSize: "1.85em",
     fontWeight: "700",
-    lineHeight: "1.25",
-    paddingTop: "0.8em",
-    paddingBottom: "0.3em",
-    marginBottom: "0.25em",
+    lineHeight: "1.3",
+    paddingTop: "0.5em",
+    paddingBottom: "0.2em",
     borderBottom: "2px solid var(--border)",
-    letterSpacing: "-0.01em",
   },
   ".cm-line.cm-h2": {
-    fontSize: "1.55em",
+    fontSize: "1.5em",
     fontWeight: "650",
     lineHeight: "1.3",
-    paddingTop: "0.7em",
-    paddingBottom: "0.25em",
-    marginBottom: "0.2em",
+    paddingTop: "0.4em",
+    paddingBottom: "0.15em",
     borderBottom: "1px solid var(--border)",
   },
-  ".cm-line.cm-h3": { fontSize: "1.28em", fontWeight: "600", lineHeight: "1.35", paddingTop: "0.6em", paddingBottom: "0.15em" },
-  ".cm-line.cm-h4": { fontSize: "1.12em", fontWeight: "600", paddingTop: "0.5em", paddingBottom: "0.1em" },
-  ".cm-line.cm-h5": { fontSize: "1em", fontWeight: "600", paddingTop: "0.4em" },
-  ".cm-line.cm-h6": { fontSize: "0.95em", fontWeight: "600", color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" },
+  ".cm-line.cm-h3": { fontSize: "1.25em", fontWeight: "600", lineHeight: "1.35", paddingTop: "0.3em", paddingBottom: "0.1em" },
+  ".cm-line.cm-h4": { fontSize: "1.1em", fontWeight: "600", paddingTop: "0.2em" },
+  ".cm-line.cm-h5": { fontSize: "1em", fontWeight: "600" },
+  ".cm-line.cm-h6": { fontSize: "1em", fontWeight: "600", color: "var(--text-2)" },
   ".cm-link-preview": { cursor: "pointer" },
-  ".cm-line.cm-quote": {
-    borderLeft: "3px solid var(--accent)",
-    paddingLeft: "0.85rem",
-    color: "var(--text-1)",
-    fontStyle: "italic",
-    backgroundColor: "color-mix(in srgb, var(--bg-2) 35%, transparent)",
-  },
-  ".cm-line.cm-hr-line": {
-    borderBottom: "1px solid var(--border)",
-    color: "transparent",
-    margin: "0.75em 0",
-  },
 });
 
 // A custom highlighting style to mimic Obsidian's markdown highlight 
@@ -106,9 +91,8 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: t.link, color: "var(--accent)", textDecoration: "underline" },
   { tag: t.url, color: "var(--text-2)" },
-  { tag: t.monospace, fontFamily: "\"JetBrains Mono\", ui-monospace, monospace", color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--bg-2) 80%, transparent)", borderRadius: "3px" },
+  { tag: t.monospace, fontFamily: "\"JetBrains Mono\", ui-monospace, monospace", color: "var(--text-0)", backgroundColor: "color-mix(in srgb, var(--bg-2) 60%, transparent)", borderRadius: "3px" },
   { tag: t.keyword, color: "var(--accent)" },
-  { tag: t.list, color: "var(--accent)" },
   { tag: [t.processingInstruction, t.meta, t.punctuation], color: "var(--text-2)" }, // markdown markup characters (#, **, etc)
 ]);
 
@@ -127,35 +111,23 @@ const headingDecorations = ViewPlugin.fromClass(class {
   }
 
   buildDecorations(view: EditorView) {
-    const state = view.state;
-    const decos: { pos: number; deco: Decoration }[] = [];
+    const builder = new RangeSetBuilder<Decoration>();
     for (const {from, to} of view.visibleRanges) {
-      syntaxTree(state).iterate({
+      syntaxTree(view.state).iterate({
         from, to,
         enter(node) {
           if (node.name.includes("Heading")) {
             const match = node.name.match(/Heading(\d)/);
             if (match) {
               const level = match[1];
-              decos.push({ pos: node.from, deco: Decoration.line({ class: `cm-h${level}` }) });
+              builder.add(node.from, node.from, Decoration.line({
+                class: `cm-h${level}`
+              }));
             }
-          } else if (node.name === "Blockquote") {
-            let lineStart = state.doc.lineAt(node.from).number;
-            const lineEnd = state.doc.lineAt(node.to).number;
-            while (lineStart <= lineEnd) {
-              const line = state.doc.line(lineStart);
-              decos.push({ pos: line.from, deco: Decoration.line({ class: "cm-quote" }) });
-              lineStart++;
-            }
-          } else if (node.name === "HorizontalRule") {
-            decos.push({ pos: node.from, deco: Decoration.line({ class: "cm-hr-line" }) });
           }
         }
       });
     }
-    decos.sort((a, b) => a.pos - b.pos);
-    const builder = new RangeSetBuilder<Decoration>();
-    for (const d of decos) builder.add(d.pos, d.pos, d.deco);
     return builder.finish();
   }
 }, {
