@@ -296,7 +296,11 @@ fn graph_proximity_score(
                     .map(|&c| c == mem_community)
                     .unwrap_or(false)
             });
-            if shares_community { 0.08 } else { 0.0 }
+            if shares_community {
+                0.08
+            } else {
+                0.0
+            }
         }
         None => 0.0,
     };

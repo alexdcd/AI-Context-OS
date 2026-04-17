@@ -124,7 +124,8 @@ pub fn save_journal_page(
                 // Add the journal date as a tag to this memory if not already present
                 let date_tag = date.clone();
                 if !meta.tags.contains(&date_tag) {
-                    if let Ok(mut mem) = memory::read_memory(&root, std::path::Path::new(file_path)) {
+                    if let Ok(mut mem) = memory::read_memory(&root, std::path::Path::new(file_path))
+                    {
                         if !mem.meta.tags.contains(&date_tag) {
                             mem.meta.tags.push(date_tag);
                             mem.meta.modified = now;

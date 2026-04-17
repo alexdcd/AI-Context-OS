@@ -93,8 +93,12 @@ fn resolve_memory_folder(root: &std::path::Path, folder: Option<&str>) -> Result
         }
     }
 
-    let mut parts = relative.iter().map(|part| part.to_string_lossy().to_string());
-    let first = parts.next().ok_or_else(|| "Folder cannot be empty".to_string())?;
+    let mut parts = relative
+        .iter()
+        .map(|part| part.to_string_lossy().to_string());
+    let first = parts
+        .next()
+        .ok_or_else(|| "Folder cannot be empty".to_string())?;
     let second = parts.next();
 
     if first == AI_DIR {
@@ -361,9 +365,9 @@ impl AiContextMcpServer {
         let mut loaded_ids: Vec<String> = Vec::new();
 
         // Find the skill
-        let skill_entry = all_entries
-            .iter()
-            .find(|(meta, _)| meta.id == params.skill_id && meta.system_role == Some(SystemRole::Skill));
+        let skill_entry = all_entries.iter().find(|(meta, _)| {
+            meta.id == params.skill_id && meta.system_role == Some(SystemRole::Skill)
+        });
 
         let (skill_meta, skill_path) = match skill_entry {
             Some(entry) => entry,

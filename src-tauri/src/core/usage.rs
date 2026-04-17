@@ -59,8 +59,13 @@ pub fn record_accesses(
 
     let paths = SystemPaths::new(root);
     if let Some(parent) = paths.usage_json().parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create usage state dir {}: {}", parent.display(), e))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Failed to create usage state dir {}: {}",
+                parent.display(),
+                e
+            )
+        })?;
     }
 
     let mut store = MemoryUsageStore {
@@ -81,6 +86,11 @@ pub fn record_accesses(
 
     let serialized = serde_json::to_string_pretty(&store)
         .map_err(|e| format!("Failed to serialize usage store: {}", e))?;
-    fs::write(paths.usage_json(), serialized)
-        .map_err(|e| format!("Failed to write usage store {}: {}", paths.usage_json().display(), e))
+    fs::write(paths.usage_json(), serialized).map_err(|e| {
+        format!(
+            "Failed to write usage store {}: {}",
+            paths.usage_json().display(),
+            e
+        )
+    })
 }

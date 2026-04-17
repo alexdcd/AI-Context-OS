@@ -142,7 +142,9 @@ pub fn render_static_router(manifest: &RouterManifest) -> String {
     out.push_str("1. Start from the compact L0 index in this file.\n");
     out.push_str("2. Open only the memories relevant to the current task.\n");
     out.push_str("3. Read L1 first. Open L2 only if L1 is insufficient.\n");
-    out.push_str("4. Use the path shown beside each memory to open the right canonical file directly.\n");
+    out.push_str(
+        "4. Use the path shown beside each memory to open the right canonical file directly.\n",
+    );
     out.push_str("5. If you need richer metadata (links, provenance, dependencies), open `.ai/catalog.md` or `.ai/index.yaml`.\n");
     out.push_str("6. If output gets too large, write scratch output to `.ai/scratch/`.\n\n");
 
@@ -275,7 +277,9 @@ pub fn render_mcp_prelude(manifest: &RouterManifest) -> String {
     out.push_str("You are already connected to AI Context OS via MCP.\n");
     out.push_str("Use `get_context` at the start of the task, `save_memory` for canonical memory writes, `get_skill` for skill dependency loading, and `log_session` for session events.\n");
     out.push_str("Canonical memories remain Markdown files with YAML frontmatter plus `<!-- L1 -->` / `<!-- L2 -->` markers.\n");
-    out.push_str("Protected memories and generated router artifacts must not be edited directly.\n\n");
+    out.push_str(
+        "Protected memories and generated router artifacts must not be edited directly.\n\n",
+    );
 
     if manifest.rules.is_empty() {
         out.push_str("## Active Rules\n\n_No rules defined yet._\n\n");
@@ -346,7 +350,10 @@ impl RouterMemoryEntry {
 }
 
 fn render_catalog_entry(out: &mut String, memory: &RouterMemoryEntry) {
-    out.push_str(&format!("- [{}] {} — `{}`\n", memory.id, memory.l0, memory.path));
+    out.push_str(&format!(
+        "- [{}] {} — `{}`\n",
+        memory.id, memory.l0, memory.path
+    ));
     out.push_str(&format!(
         "  - ontology: {} | importance: {:.2}\n",
         ontology_label(&memory.ontology),

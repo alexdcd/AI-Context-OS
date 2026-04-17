@@ -116,7 +116,8 @@ fn path_contains_protected_content(root: &Path, target: &Path) -> Option<String>
 
     for artifact in generated_artifact_paths(root) {
         let normalized_artifact = normalize_path(&artifact);
-        if normalized_artifact == normalized_target || normalized_artifact.starts_with(&normalized_target)
+        if normalized_artifact == normalized_target
+            || normalized_artifact.starts_with(&normalized_target)
         {
             return Some(format!(
                 "Generated artifact '{}' cannot be changed directly.",
@@ -168,7 +169,11 @@ pub fn create_directory(path: String) -> Result<String, String> {
 
 /// Rename or move a file or directory.
 #[tauri::command]
-pub fn rename_path(old_path: String, new_path: String, state: State<AppState>) -> Result<String, String> {
+pub fn rename_path(
+    old_path: String,
+    new_path: String,
+    state: State<AppState>,
+) -> Result<String, String> {
     let old = PathBuf::from(&old_path);
     let new = PathBuf::from(&new_path);
     let root = state.get_root();

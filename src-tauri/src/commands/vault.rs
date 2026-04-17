@@ -36,8 +36,8 @@ fn load_registry() -> VaultsFile {
 
 fn save_registry(vf: &VaultsFile) -> Result<(), String> {
     let path = vaults_file_path().ok_or_else(|| "Home directory not available".to_string())?;
-    let json =
-        serde_json::to_string_pretty(vf).map_err(|e| format!("Failed to serialize vaults: {}", e))?;
+    let json = serde_json::to_string_pretty(vf)
+        .map_err(|e| format!("Failed to serialize vaults: {}", e))?;
     fs::write(&path, json).map_err(|e| format!("Failed to write {}: {}", path.display(), e))
 }
 
@@ -85,7 +85,8 @@ pub fn list_vaults(state: State<AppState>) -> Result<Vec<VaultEntry>, String> {
     }
 
     // Sort by last_accessed descending
-    vf.vaults.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
+    vf.vaults
+        .sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
 
     Ok(vf.vaults)
 }
@@ -96,8 +97,7 @@ pub fn add_vault(path: String, name: Option<String>) -> Result<VaultEntry, Strin
     let expanded = expand_home(&path);
 
     if !expanded.exists() {
-        fs::create_dir_all(&expanded)
-            .map_err(|e| format!("Cannot create directory: {}", e))?;
+        fs::create_dir_all(&expanded).map_err(|e| format!("Cannot create directory: {}", e))?;
     }
 
     let display_name = name.unwrap_or_else(|| vault_name_from_path(&expanded));
@@ -147,11 +147,7 @@ pub fn remove_vault(path: String, state: State<AppState>) -> Result<(), String> 
 
 /// Switch the active vault. Initializes workspace structure if needed.
 #[tauri::command]
-pub fn switch_vault(
-    path: String,
-    app: AppHandle,
-    state: State<AppState>,
-) -> Result<(), String> {
+pub fn switch_vault(path: String, app: AppHandle, state: State<AppState>) -> Result<(), String> {
     let new_root = expand_home(&path);
 
     if !new_root.exists() {
@@ -169,7 +165,11 @@ pub fn switch_vault(
     let mut vf = load_registry();
     let now = Utc::now().to_rfc3339();
 
-    if let Some(entry) = vf.vaults.iter_mut().find(|v| expand_home(&v.path) == new_root) {
+    if let Some(entry) = vf
+        .vaults
+        .iter_mut()
+        .find(|v| expand_home(&v.path) == new_root)
+    {
         entry.last_accessed = now.clone();
         entry.memory_count = count_memories_in(&new_root);
     } else {
@@ -212,7 +212,11 @@ pub fn register_vault_with_template(root: &std::path::Path, template: &str) -> R
 pub fn rename_vault(path: String, name: String) -> Result<(), String> {
     let target = expand_home(&path);
     let mut vf = load_registry();
-    if let Some(entry) = vf.vaults.iter_mut().find(|v| expand_home(&v.path) == target) {
+    if let Some(entry) = vf
+        .vaults
+        .iter_mut()
+        .find(|v| expand_home(&v.path) == target)
+    {
         entry.name = name;
     }
     save_registry(&vf)

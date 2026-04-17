@@ -245,7 +245,6 @@ pub fn execute_context_query(
         });
     }
 
-
     let tokens_used = token_budget - remaining_budget;
 
     Ok(ContextResult {
@@ -317,7 +316,10 @@ pub fn assemble_chat_context_package(result: &ContextResult) -> String {
             LoadLevel::L2 => "L2",
         };
 
-        out.push_str(&format!("## [{}] {} — {}\n", mem.memory_id, mem.l0, level_tag));
+        out.push_str(&format!(
+            "## [{}] {} — {}\n",
+            mem.memory_id, mem.l0, level_tag
+        ));
         if mem.content.trim().is_empty() {
             out.push_str(&format!("Summary: {}\n\n", mem.l0));
         } else {

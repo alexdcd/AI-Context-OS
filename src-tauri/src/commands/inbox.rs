@@ -161,7 +161,10 @@ fn infer_mime_from_path(path: &Path) -> Option<String> {
 
 fn is_text_like(path: &Path) -> bool {
     matches!(
-        path.extension().and_then(|ext| ext.to_str()).map(|ext| ext.to_ascii_lowercase()).as_deref(),
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase())
+            .as_deref(),
         Some("md") | Some("txt") | Some("json") | Some("yaml") | Some("yml")
     )
 }
@@ -213,7 +216,11 @@ fn preview_text(value: &str) -> String {
     compact.chars().take(280).collect()
 }
 
-fn inbox_frontmatter_to_item(frontmatter: InboxFrontmatter, body: String, path: &Path) -> InboxItem {
+fn inbox_frontmatter_to_item(
+    frontmatter: InboxFrontmatter,
+    body: String,
+    path: &Path,
+) -> InboxItem {
     let (l1, l2) = crate::core::levels::split_levels(&body);
     let title = frontmatter
         .title
@@ -234,9 +241,13 @@ fn inbox_frontmatter_to_item(frontmatter: InboxFrontmatter, body: String, path: 
         },
         kind: frontmatter.kind.unwrap_or(InboxItemKind::Text),
         status: frontmatter.status.unwrap_or(InboxItemStatus::New),
-        capture_state: frontmatter.capture_state.unwrap_or_else(|| "raw".to_string()),
+        capture_state: frontmatter
+            .capture_state
+            .unwrap_or_else(|| "raw".to_string()),
         proposal_state: frontmatter.proposal_state.unwrap_or(ProposalState::Pending),
-        content_hash: frontmatter.content_hash.unwrap_or_else(|| hash_str(&(title.clone() + &body))),
+        content_hash: frontmatter
+            .content_hash
+            .unwrap_or_else(|| hash_str(&(title.clone() + &body))),
         created: frontmatter.created.unwrap_or_else(Utc::now),
         modified: frontmatter.modified.unwrap_or_else(Utc::now),
         path: path.to_string_lossy().to_string(),
@@ -256,7 +267,8 @@ fn inbox_frontmatter_to_item(frontmatter: InboxFrontmatter, body: String, path: 
 }
 
 fn serialize_frontmatter<T: Serialize>(frontmatter: &T, body: &str) -> Result<String, String> {
-    let yaml = serde_yaml::to_string(frontmatter).map_err(|e| format!("Failed to serialize frontmatter: {}", e))?;
+    let yaml = serde_yaml::to_string(frontmatter)
+        .map_err(|e| format!("Failed to serialize frontmatter: {}", e))?;
     Ok(format!("---\n{}---\n\n{}", yaml, body))
 }
 
@@ -286,7 +298,8 @@ fn build_frontmatter(item: &InboxItem) -> InboxFrontmatter {
 fn write_inbox_item(item: &InboxItem) -> Result<(), String> {
     let path = PathBuf::from(&item.path);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
     }
     let body = join_levels(&item.l1_content, &item.l2_content);
     let raw = serialize_frontmatter(&build_frontmatter(item), &body)?;
@@ -294,7 +307,8 @@ fn write_inbox_item(item: &InboxItem) -> Result<(), String> {
 }
 
 fn parse_inbox_markdown(path: &Path) -> Result<InboxItem, String> {
-    let raw = fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let raw = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
     let trimmed = raw.trim_start();
     if trimmed.starts_with("---") {
         let after_first = &trimmed[3..];
@@ -343,7 +357,9 @@ fn read_inbox_dir_recursive(dir: &Path, items: &mut Vec<InboxItem>) -> Result<()
     if !dir.exists() {
         return Ok(());
     }
-    for entry in fs::read_dir(dir).map_err(|e| format!("Failed to read {}: {}", dir.display(), e))? {
+    for entry in
+        fs::read_dir(dir).map_err(|e| format!("Failed to read {}: {}", dir.display(), e))?
+    {
         let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
@@ -394,7 +410,8 @@ fn persist_manifest(root: &Path, items: &[InboxItem]) -> Result<(), String> {
     };
 
     if let Some(parent) = paths.ingest_manifest().parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create ingest directory: {}", e))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create ingest directory: {}", e))?;
     }
     let content = serde_json::to_string_pretty(&manifest)
         .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
@@ -416,7 +433,8 @@ fn proposal_path(root: &Path, proposal_id: &str) -> PathBuf {
 fn write_proposal(root: &Path, proposal: &IngestProposal) -> Result<(), String> {
     let path = proposal_path(root, &proposal.id);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create proposals directory: {}", e))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create proposals directory: {}", e))?;
     }
     let content = serde_json::to_string_pretty(proposal)
         .map_err(|e| format!("Failed to serialize proposal: {}", e))?;
@@ -457,10 +475,14 @@ fn load_provider_config(root: &Path) -> Result<Option<InferenceProviderConfig>, 
     Ok(Some(normalize_provider_config(config)))
 }
 
-fn persist_provider_config(root: &Path, config: &InferenceProviderConfig) -> Result<InferenceProviderConfig, String> {
+fn persist_provider_config(
+    root: &Path,
+    config: &InferenceProviderConfig,
+) -> Result<InferenceProviderConfig, String> {
     let path = SystemPaths::new(root).inference_provider_json();
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create provider config directory: {}", e))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create provider config directory: {}", e))?;
     }
     let normalized = normalize_provider_config(config.clone());
     let content = serde_json::to_string_pretty(&normalized)
@@ -469,7 +491,10 @@ fn persist_provider_config(root: &Path, config: &InferenceProviderConfig) -> Res
     Ok(normalized)
 }
 
-fn default_capabilities(preset: &InferenceProviderPreset, kind: &InferenceProviderKind) -> Vec<InferenceCapability> {
+fn default_capabilities(
+    preset: &InferenceProviderPreset,
+    kind: &InferenceProviderKind,
+) -> Vec<InferenceCapability> {
     let mut caps = vec![
         InferenceCapability::Proposal,
         InferenceCapability::Classification,
@@ -488,7 +513,10 @@ fn default_capabilities(preset: &InferenceProviderPreset, kind: &InferenceProvid
     caps
 }
 
-fn default_base_url(kind: &InferenceProviderKind, preset: &InferenceProviderPreset) -> Option<String> {
+fn default_base_url(
+    kind: &InferenceProviderKind,
+    preset: &InferenceProviderPreset,
+) -> Option<String> {
     match (kind, preset) {
         (InferenceProviderKind::Anthropic, _) => Some(DEFAULT_ANTHROPIC_BASE_URL.to_string()),
         (InferenceProviderKind::OpenAiCompatible, InferenceProviderPreset::OpenAi) => {
@@ -508,7 +536,12 @@ fn default_base_url(kind: &InferenceProviderKind, preset: &InferenceProviderPres
 }
 
 fn normalize_provider_config(mut config: InferenceProviderConfig) -> InferenceProviderConfig {
-    if config.base_url.as_ref().map(|value| value.trim().is_empty()).unwrap_or(true) {
+    if config
+        .base_url
+        .as_ref()
+        .map(|value| value.trim().is_empty())
+        .unwrap_or(true)
+    {
         config.base_url = default_base_url(&config.kind, &config.preset);
     }
     if config.capabilities.is_empty() {
@@ -543,7 +576,8 @@ fn config_to_status(config: Option<&InferenceProviderConfig>) -> InferenceProvid
             base_url: None,
             model: None,
             capabilities: Vec::new(),
-            message: "No provider configured. Inbox uses deterministic heuristic proposals.".to_string(),
+            message: "No provider configured. Inbox uses deterministic heuristic proposals."
+                .to_string(),
         },
     }
 }
@@ -572,9 +606,13 @@ fn validate_public_http_url(raw: &str) -> Result<Url, String> {
         "http" | "https" => {}
         _ => return Err("Only http/https URLs are supported in inbox links".to_string()),
     }
-    let host = url.host_str().ok_or_else(|| "URL must include a host".to_string())?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| "URL must include a host".to_string())?;
     if is_private_host(host) {
-        return Err("Private or local network URLs are not allowed for inbox link ingestion".to_string());
+        return Err(
+            "Private or local network URLs are not allowed for inbox link ingestion".to_string(),
+        );
     }
     Ok(url)
 }
@@ -594,7 +632,10 @@ async fn fetch_link_preview(url: &Url) -> Result<(Option<String>, String), Strin
         .map_err(|e| format!("Failed to fetch link preview: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Link preview fetch failed with status {}", response.status()));
+        return Err(format!(
+            "Link preview fetch failed with status {}",
+            response.status()
+        ));
     }
 
     let bytes = response
@@ -619,8 +660,11 @@ fn lm_studio_api_base(base_url: &str, api_path: &str) -> String {
 }
 
 async fn lm_studio_model_state(base_url: &str, model: &str) -> Result<Option<String>, String> {
-    let mut endpoint = Url::parse(&format!("{}/models", lm_studio_api_base(base_url, "api/v0")))
-        .map_err(|e| format!("Invalid LM Studio base URL: {}", e))?;
+    let mut endpoint = Url::parse(&format!(
+        "{}/models",
+        lm_studio_api_base(base_url, "api/v0")
+    ))
+    .map_err(|e| format!("Invalid LM Studio base URL: {}", e))?;
     endpoint
         .path_segments_mut()
         .map_err(|_| "Invalid LM Studio model state endpoint".to_string())?
@@ -690,7 +734,10 @@ async fn probe_lm_studio_model_states(
     Ok(states)
 }
 
-async fn probe_lm_studio_models(base_url: &str, timeout_secs: u64) -> Result<Vec<ProviderModel>, String> {
+async fn probe_lm_studio_models(
+    base_url: &str,
+    timeout_secs: u64,
+) -> Result<Vec<ProviderModel>, String> {
     let mut models = probe_openai_compatible(base_url, timeout_secs).await?;
     let model_states = probe_lm_studio_model_states(base_url, timeout_secs)
         .await
@@ -721,7 +768,8 @@ async fn ensure_model_loaded(config: &InferenceProviderConfig) -> Result<(), Str
         .base_url
         .as_deref()
         .unwrap_or(DEFAULT_LM_STUDIO_BASE_URL);
-    if matches!(lm_studio_model_state(base_url, &config.model).await?, Some(state) if state == "loaded") {
+    if matches!(lm_studio_model_state(base_url, &config.model).await?, Some(state) if state == "loaded")
+    {
         return Ok(());
     }
 
@@ -761,7 +809,9 @@ async fn provider_chat_completion(
     // Ensure model is loaded (LM Studio needs explicit loading)
     ensure_model_loaded(&normalized).await?;
     match normalized.kind {
-        InferenceProviderKind::OpenAiCompatible => openai_compatible_chat(&normalized, request).await,
+        InferenceProviderKind::OpenAiCompatible => {
+            openai_compatible_chat(&normalized, request).await
+        }
         InferenceProviderKind::Anthropic => anthropic_chat(&normalized, request).await,
     }
 }
@@ -786,9 +836,12 @@ pub(super) fn build_openai_messages(request: &ChatCompletionRequest) -> Vec<Valu
         messages.push(json!({ "role": "user", "content": ctx }));
     }
 
-    messages.extend(request.messages.iter().map(|m| {
-        json!({ "role": m.role, "content": m.content })
-    }));
+    messages.extend(
+        request
+            .messages
+            .iter()
+            .map(|m| json!({ "role": m.role, "content": m.content })),
+    );
 
     messages
 }
@@ -858,7 +911,10 @@ async fn openai_compatible_chat(
         req = req.header("X-Title", "AI Context OS");
     }
 
-    let response = req.send().await.map_err(|e| format!("Chat request failed: {}", e))?;
+    let response = req
+        .send()
+        .await
+        .map_err(|e| format!("Chat request failed: {}", e))?;
     let status = response.status();
     let body: Value = response
         .json()
@@ -974,14 +1030,17 @@ async fn health_check(config: &InferenceProviderConfig) -> Result<String, String
                     req = req.bearer_auth(api_key);
                 }
             }
-            let response = req.send().await.map_err(|e| format!("Health check failed: {}", e))?;
-            if !response.status().is_success() {
-                return Err(format!("Health check returned status {}", response.status()));
-            }
-            let body: Value = response
-                .json()
+            let response = req
+                .send()
                 .await
-                .unwrap_or(json!({}));
+                .map_err(|e| format!("Health check failed: {}", e))?;
+            if !response.status().is_success() {
+                return Err(format!(
+                    "Health check returned status {}",
+                    response.status()
+                ));
+            }
+            let body: Value = response.json().await.unwrap_or(json!({}));
             let model_count = body
                 .get("data")
                 .and_then(|d| d.as_array())
@@ -1026,7 +1085,10 @@ async fn health_check(config: &InferenceProviderConfig) -> Result<String, String
     }
 }
 
-async fn probe_openai_compatible(base_url: &str, timeout_secs: u64) -> Result<Vec<ProviderModel>, String> {
+async fn probe_openai_compatible(
+    base_url: &str,
+    timeout_secs: u64,
+) -> Result<Vec<ProviderModel>, String> {
     let endpoint = format!("{}/models", base_url.trim_end_matches('/'));
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(timeout_secs))
@@ -1081,8 +1143,16 @@ async fn probe_openai_compatible(base_url: &str, timeout_secs: u64) -> Result<Ve
 
 async fn discover_providers() -> Vec<DiscoveredProvider> {
     let probes = vec![
-        (InferenceProviderPreset::Ollama, "Ollama", DEFAULT_OLLAMA_BASE_URL),
-        (InferenceProviderPreset::LmStudio, "LM Studio", DEFAULT_LM_STUDIO_BASE_URL),
+        (
+            InferenceProviderPreset::Ollama,
+            "Ollama",
+            DEFAULT_OLLAMA_BASE_URL,
+        ),
+        (
+            InferenceProviderPreset::LmStudio,
+            "LM Studio",
+            DEFAULT_LM_STUDIO_BASE_URL,
+        ),
     ];
     let mut results = Vec::new();
     for (preset, name, base_url) in probes {
@@ -1110,7 +1180,9 @@ async fn discover_providers() -> Vec<DiscoveredProvider> {
     results
 }
 
-async fn fetch_models_for_config(config: &InferenceProviderConfig) -> Result<Vec<ProviderModel>, String> {
+async fn fetch_models_for_config(
+    config: &InferenceProviderConfig,
+) -> Result<Vec<ProviderModel>, String> {
     let normalized = normalize_provider_config(config.clone());
     let base_url = normalized
         .base_url
@@ -1124,9 +1196,27 @@ async fn fetch_models_for_config(config: &InferenceProviderConfig) -> Result<Vec
             // Anthropic doesn't have a public models list endpoint;
             // return a curated list of common models.
             Ok(vec![
-                ProviderModel { id: "claude-sonnet-4-20250514".to_string(), name: "Claude Sonnet 4".to_string(), size: None, family: Some("claude-4".to_string()), loaded: None },
-                ProviderModel { id: "claude-haiku-4-20250414".to_string(), name: "Claude Haiku 4".to_string(), size: None, family: Some("claude-4".to_string()), loaded: None },
-                ProviderModel { id: "claude-3-5-haiku-20241022".to_string(), name: "Claude 3.5 Haiku".to_string(), size: None, family: Some("claude-3.5".to_string()), loaded: None },
+                ProviderModel {
+                    id: "claude-sonnet-4-20250514".to_string(),
+                    name: "Claude Sonnet 4".to_string(),
+                    size: None,
+                    family: Some("claude-4".to_string()),
+                    loaded: None,
+                },
+                ProviderModel {
+                    id: "claude-haiku-4-20250414".to_string(),
+                    name: "Claude Haiku 4".to_string(),
+                    size: None,
+                    family: Some("claude-4".to_string()),
+                    loaded: None,
+                },
+                ProviderModel {
+                    id: "claude-3-5-haiku-20241022".to_string(),
+                    name: "Claude 3.5 Haiku".to_string(),
+                    size: None,
+                    family: Some("claude-3.5".to_string()),
+                    loaded: None,
+                },
             ])
         }
     }
@@ -1138,7 +1228,8 @@ fn heuristic_proposal(item: &InboxItem) -> IngestProposal {
         InboxItemKind::Link => (
             ProposalAction::RouteToSources,
             Some(MemoryOntology::Source),
-            "Link captures usually belong in sources/ first so they stay protected and traceable.".to_string(),
+            "Link captures usually belong in sources/ first so they stay protected and traceable."
+                .to_string(),
             Some(item.title.clone()),
             Some(item.summary.clone()),
             Some(item.l2_content.clone()),
@@ -1156,7 +1247,8 @@ fn heuristic_proposal(item: &InboxItem) -> IngestProposal {
         InboxItemKind::File => (
             ProposalAction::RouteToSources,
             Some(MemoryOntology::Source),
-            "Reference files are routed to sources/ by default to preserve the original artifact.".to_string(),
+            "Reference files are routed to sources/ by default to preserve the original artifact."
+                .to_string(),
             Some(item.title.clone()),
             Some(item.summary.clone()),
             Some(item.l2_content.clone()),
@@ -1239,10 +1331,7 @@ fn duplicate_proposal(item: &InboxItem, duplicate_of: &InboxItem) -> IngestPropo
     }
 }
 
-async fn infer_proposal(
-    root: &Path,
-    item: &InboxItem,
-) -> Result<IngestProposal, String> {
+async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal, String> {
     let config = load_provider_config(root)?.ok_or_else(|| "No provider configured".to_string())?;
     if !config.enabled {
         return Err("Provider is disabled".to_string());
@@ -1291,8 +1380,13 @@ async fn infer_proposal(
     .await?;
 
     let raw_text = strip_markdown_json(&response.text);
-    let parsed: ProposalModelResponse = serde_json::from_str(&raw_text)
-        .map_err(|e| format!("Failed to parse proposal JSON: {} — raw response: {}", e, &response.text[..response.text.len().min(500)]))?;
+    let parsed: ProposalModelResponse = serde_json::from_str(&raw_text).map_err(|e| {
+        format!(
+            "Failed to parse proposal JSON: {} — raw response: {}",
+            e,
+            &response.text[..response.text.len().min(500)]
+        )
+    })?;
     let now = Utc::now();
 
     Ok(IngestProposal {
@@ -1310,7 +1404,11 @@ async fn infer_proposal(
         l0: parsed.l0.or_else(|| Some(item.title.clone())),
         l1_content: parsed.l1_content.or_else(|| Some(item.summary.clone())),
         l2_content: parsed.l2_content.or_else(|| Some(item.l2_content.clone())),
-        tags: if parsed.tags.is_empty() { item.tags.clone() } else { parsed.tags },
+        tags: if parsed.tags.is_empty() {
+            item.tags.clone()
+        } else {
+            parsed.tags
+        },
         derived_from: vec![item.id.clone()],
         inference_provider: Some(config.kind.clone()),
         inference_preset: Some(config.preset.clone()),
@@ -1318,9 +1416,16 @@ async fn infer_proposal(
     })
 }
 
-fn update_item_status(root: &Path, item_id: &str, status: InboxItemStatus, proposal_state: ProposalState) -> Result<InboxItem, String> {
+fn update_item_status(
+    root: &Path,
+    item_id: &str,
+    status: InboxItemStatus,
+    proposal_state: ProposalState,
+) -> Result<InboxItem, String> {
     let mut items = load_inbox_items(root)?;
-    let item = items.iter_mut().find(|item| item.id == item_id)
+    let item = items
+        .iter_mut()
+        .find(|item| item.id == item_id)
         .ok_or_else(|| format!("Inbox item not found: {}", item_id))?;
     item.status = status;
     item.proposal_state = proposal_state;
@@ -1332,7 +1437,13 @@ fn update_item_status(root: &Path, item_id: &str, status: InboxItemStatus, propo
     Ok(updated)
 }
 
-fn append_daily_log(root: &Path, entry_type: &str, summary: String, tags: Vec<String>, source: String) -> Result<(), String> {
+fn append_daily_log(
+    root: &Path,
+    entry_type: &str,
+    summary: String,
+    tags: Vec<String>,
+    source: String,
+) -> Result<(), String> {
     let paths = SystemPaths::new(root);
     crate::core::jsonl::append_jsonl(
         &paths.daily_log(),
@@ -1371,14 +1482,19 @@ pub fn create_inbox_text(
 ) -> Result<InboxItem, String> {
     let root = state.get_root();
     let paths = SystemPaths::new(&root);
-    fs::create_dir_all(paths.inbox_dir()).map_err(|e| format!("Failed to create inbox dir: {}", e))?;
+    fs::create_dir_all(paths.inbox_dir())
+        .map_err(|e| format!("Failed to create inbox dir: {}", e))?;
 
     let title = if input.title.trim().is_empty() {
         "Inbox note".to_string()
     } else {
         input.title.trim().to_string()
     };
-    let id = format!("{}-{}", slugify(&title), &Uuid::new_v4().simple().to_string()[..8]);
+    let id = format!(
+        "{}-{}",
+        slugify(&title),
+        &Uuid::new_v4().simple().to_string()[..8]
+    );
     let path = paths.inbox_dir().join(format!("{}.md", id));
     let now = Utc::now();
     let l1 = if input.content.trim().is_empty() {
@@ -1411,7 +1527,13 @@ pub fn create_inbox_text(
     };
     write_inbox_item(&item)?;
     update_manifest_from_disk(&root)?;
-    append_daily_log(&root, "inbox_created", format!("Created inbox text '{}'", item.title), item.tags.clone(), item.id.clone())?;
+    append_daily_log(
+        &root,
+        "inbox_created",
+        format!("Created inbox text '{}'", item.title),
+        item.tags.clone(),
+        item.id.clone(),
+    )?;
     state.mark_recent_write(Path::new(&item.path));
     let _ = app.emit("inbox-changed", &item.id);
     Ok(item)
@@ -1425,23 +1547,32 @@ pub async fn create_inbox_link(
 ) -> Result<InboxItem, String> {
     let root = state.get_root();
     let paths = SystemPaths::new(&root);
-    fs::create_dir_all(paths.inbox_dir()).map_err(|e| format!("Failed to create inbox dir: {}", e))?;
+    fs::create_dir_all(paths.inbox_dir())
+        .map_err(|e| format!("Failed to create inbox dir: {}", e))?;
 
     let url = validate_public_http_url(&input.url)?;
-    let (fetched_title, fetched_preview) = fetch_link_preview(&url).await.unwrap_or((None, String::new()));
+    let (fetched_title, fetched_preview) = fetch_link_preview(&url)
+        .await
+        .unwrap_or((None, String::new()));
     let title = input
         .title
         .clone()
         .filter(|value| !value.trim().is_empty())
         .or(fetched_title)
         .unwrap_or_else(|| url.host_str().unwrap_or("Link").to_string());
-    let id = format!("{}-{}", slugify(&title), &Uuid::new_v4().simple().to_string()[..8]);
+    let id = format!(
+        "{}-{}",
+        slugify(&title),
+        &Uuid::new_v4().simple().to_string()[..8]
+    );
     let path = paths.inbox_dir().join(format!("{}.md", id));
     let notes = input.notes.unwrap_or_default();
     let l1 = if fetched_preview.is_empty() {
         format!("{}\n\n{}", url.as_str(), notes).trim().to_string()
     } else {
-        format!("{}\n\n{}", fetched_preview, notes).trim().to_string()
+        format!("{}\n\n{}", fetched_preview, notes)
+            .trim()
+            .to_string()
     };
     let now = Utc::now();
     let item = InboxItem {
@@ -1455,7 +1586,11 @@ pub async fn create_inbox_link(
         modified: now,
         path: path.to_string_lossy().to_string(),
         title: title.clone(),
-        summary: if fetched_preview.is_empty() { url.to_string() } else { fetched_preview.clone() },
+        summary: if fetched_preview.is_empty() {
+            url.to_string()
+        } else {
+            fetched_preview.clone()
+        },
         l1_content: l1,
         l2_content: format!("Source URL: {}", url),
         source_url: Some(url.to_string()),
@@ -1469,7 +1604,13 @@ pub async fn create_inbox_link(
     };
     write_inbox_item(&item)?;
     update_manifest_from_disk(&root)?;
-    append_daily_log(&root, "inbox_created", format!("Captured inbox link '{}'", item.title), item.tags.clone(), item.id.clone())?;
+    append_daily_log(
+        &root,
+        "inbox_created",
+        format!("Captured inbox link '{}'", item.title),
+        item.tags.clone(),
+        item.id.clone(),
+    )?;
     state.mark_recent_write(Path::new(&item.path));
     let _ = app.emit("inbox-changed", &item.id);
     Ok(item)
@@ -1497,15 +1638,25 @@ pub fn import_inbox_files(
             .and_then(|name| name.to_str())
             .unwrap_or("file")
             .to_string();
-        let stem = slugify(source.file_stem().and_then(|value| value.to_str()).unwrap_or("file"));
+        let stem = slugify(
+            source
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("file"),
+        );
         let suffix = &Uuid::new_v4().simple().to_string()[..8];
         let attachment_name = format!("{}-{}-{}", stem, suffix, original_name);
         let attachment_path = paths.inbox_attachments_dir().join(&attachment_name);
         fs::copy(&source, &attachment_path)
             .map_err(|e| format!("Failed to import {}: {}", source.display(), e))?;
 
-        let bytes = fs::read(&attachment_path)
-            .map_err(|e| format!("Failed to read imported file {}: {}", attachment_path.display(), e))?;
+        let bytes = fs::read(&attachment_path).map_err(|e| {
+            format!(
+                "Failed to read imported file {}: {}",
+                attachment_path.display(),
+                e
+            )
+        })?;
         let text_preview = if is_text_like(&source) {
             String::from_utf8_lossy(&bytes).to_string()
         } else {
@@ -1522,7 +1673,11 @@ pub fn import_inbox_files(
         let item = InboxItem {
             id: id.clone(),
             kind: InboxItemKind::File,
-            status: if needs_extraction { InboxItemStatus::New } else { InboxItemStatus::Normalized },
+            status: if needs_extraction {
+                InboxItemStatus::New
+            } else {
+                InboxItemStatus::Normalized
+            },
             capture_state: "imported".to_string(),
             proposal_state: ProposalState::Pending,
             content_hash: hash_bytes(&bytes),
@@ -1532,7 +1687,11 @@ pub fn import_inbox_files(
             title: fallback_title_from_path(&source),
             summary: preview_text(&l1),
             l1_content: l1,
-            l2_content: if text_preview.trim().is_empty() { String::new() } else { text_preview },
+            l2_content: if text_preview.trim().is_empty() {
+                String::new()
+            } else {
+                text_preview
+            },
             source_url: None,
             original_file: Some(source.to_string_lossy().to_string()),
             mime: infer_mime_from_path(&source),
@@ -1551,7 +1710,13 @@ pub fn import_inbox_files(
         write_inbox_item(&item)?;
         state.mark_recent_write(Path::new(&item.path));
         created.push(item.clone());
-        append_daily_log(&root, "inbox_created", format!("Imported file '{}' into inbox", item.title), vec![], item.id.clone())?;
+        append_daily_log(
+            &root,
+            "inbox_created",
+            format!("Imported file '{}' into inbox", item.title),
+            vec![],
+            item.id.clone(),
+        )?;
     }
 
     update_manifest_from_disk(&root)?;
@@ -1586,7 +1751,11 @@ pub fn update_inbox_item(
     if let Some(status) = input.status {
         item.status = status;
     }
-    item.summary = preview_text(if item.l1_content.trim().is_empty() { &item.l2_content } else { &item.l1_content });
+    item.summary = preview_text(if item.l1_content.trim().is_empty() {
+        &item.l2_content
+    } else {
+        &item.l1_content
+    });
     item.modified = Utc::now();
     item.content_hash = hash_str(&(item.title.clone() + &item.l1_content + &item.l2_content));
     write_inbox_item(&item)?;
@@ -1597,7 +1766,11 @@ pub fn update_inbox_item(
 }
 
 #[tauri::command]
-pub fn normalize_inbox_item(id: String, app: AppHandle, state: State<AppState>) -> Result<InboxItem, String> {
+pub fn normalize_inbox_item(
+    id: String,
+    app: AppHandle,
+    state: State<AppState>,
+) -> Result<InboxItem, String> {
     let root = state.get_root();
     let mut item = load_inbox_items(&root)?
         .into_iter()
@@ -1607,7 +1780,11 @@ pub fn normalize_inbox_item(id: String, app: AppHandle, state: State<AppState>) 
     item.capture_state = "normalized".to_string();
     item.modified = Utc::now();
     if item.summary.trim().is_empty() {
-        item.summary = preview_text(if item.l1_content.trim().is_empty() { &item.l2_content } else { &item.l1_content });
+        item.summary = preview_text(if item.l1_content.trim().is_empty() {
+            &item.l2_content
+        } else {
+            &item.l1_content
+        });
     }
     write_inbox_item(&item)?;
     update_manifest_from_disk(&root)?;
@@ -1616,7 +1793,11 @@ pub fn normalize_inbox_item(id: String, app: AppHandle, state: State<AppState>) 
 }
 
 #[tauri::command]
-pub fn normalize_inbox_batch(ids: Vec<String>, app: AppHandle, state: State<AppState>) -> Result<Vec<InboxItem>, String> {
+pub fn normalize_inbox_batch(
+    ids: Vec<String>,
+    app: AppHandle,
+    state: State<AppState>,
+) -> Result<Vec<InboxItem>, String> {
     let mut out = Vec::new();
     let root = state.get_root();
     for id in ids {
@@ -1628,7 +1809,11 @@ pub fn normalize_inbox_batch(ids: Vec<String>, app: AppHandle, state: State<AppS
         item.capture_state = "normalized".to_string();
         item.modified = Utc::now();
         if item.summary.trim().is_empty() {
-            item.summary = preview_text(if item.l1_content.trim().is_empty() { &item.l2_content } else { &item.l1_content });
+            item.summary = preview_text(if item.l1_content.trim().is_empty() {
+                &item.l2_content
+            } else {
+                &item.l1_content
+            });
         }
         write_inbox_item(&item)?;
         out.push(item);
@@ -1665,15 +1850,21 @@ pub async fn generate_ingest_proposals(
     let mut out = Vec::new();
     let total = all_items.len();
     for (idx, item) in all_items.into_iter().enumerate() {
-        if existing.iter().any(|proposal| proposal.item_id == item.id && proposal.state == ProposalState::Pending) {
+        if existing
+            .iter()
+            .any(|proposal| proposal.item_id == item.id && proposal.state == ProposalState::Pending)
+        {
             continue;
         }
-        let _ = app.emit("inference-progress", json!({
-            "phase": "inferring",
-            "item_title": item.title,
-            "current": idx + 1,
-            "total": total,
-        }));
+        let _ = app.emit(
+            "inference-progress",
+            json!({
+                "phase": "inferring",
+                "item_title": item.title,
+                "current": idx + 1,
+                "total": total,
+            }),
+        );
         let mut proposal = items
             .iter()
             .find(|other| {
@@ -1690,16 +1881,27 @@ pub async fn generate_ingest_proposals(
                 }
             }
             Err(e) => {
-                eprintln!("[inference] Fallback to heuristic for '{}': {}", item.title, e);
+                eprintln!(
+                    "[inference] Fallback to heuristic for '{}': {}",
+                    item.title, e
+                );
                 let _ = app.emit("inference-error", format!("{}: {}", item.title, e));
             }
         }
         write_proposal(&root, &proposal)?;
         existing.push(proposal.clone());
-        let _ = update_item_status(&root, &item.id, InboxItemStatus::ProposalReady, ProposalState::Pending);
+        let _ = update_item_status(
+            &root,
+            &item.id,
+            InboxItemStatus::ProposalReady,
+            ProposalState::Pending,
+        );
         out.push(proposal);
     }
-    let _ = app.emit("inference-progress", json!({ "phase": "done", "current": total, "total": total }));
+    let _ = app.emit(
+        "inference-progress",
+        json!({ "phase": "done", "current": total, "total": total }),
+    );
     let _ = app.emit("proposals-changed", ());
     Ok(out)
 }
@@ -1718,8 +1920,19 @@ pub fn reject_ingest_proposal(
     proposal.state = ProposalState::Rejected;
     proposal.modified = Utc::now();
     write_proposal(&root, &proposal)?;
-    let _ = update_item_status(&root, &proposal.item_id, InboxItemStatus::Processed, ProposalState::Rejected);
-    append_daily_log(&root, "inbox_proposal_rejected", format!("Rejected proposal {} for {}", proposal.id, proposal.item_id), vec![], proposal.item_id.clone())?;
+    let _ = update_item_status(
+        &root,
+        &proposal.item_id,
+        InboxItemStatus::Processed,
+        ProposalState::Rejected,
+    );
+    append_daily_log(
+        &root,
+        "inbox_proposal_rejected",
+        format!("Rejected proposal {} for {}", proposal.id, proposal.item_id),
+        vec![],
+        proposal.item_id.clone(),
+    )?;
     let _ = app.emit("proposals-changed", &proposal.id);
     Ok(proposal)
 }
@@ -1747,16 +1960,31 @@ fn ensure_valid_destination(root: &Path, destination: Option<String>) -> Result<
         default_memory_destination(root)?
     };
     if !candidate.exists() {
-        fs::create_dir_all(&candidate)
-            .map_err(|e| format!("Failed to create destination {}: {}", candidate.display(), e))?;
+        fs::create_dir_all(&candidate).map_err(|e| {
+            format!(
+                "Failed to create destination {}: {}",
+                candidate.display(),
+                e
+            )
+        })?;
     }
     let normalized_root = fs::canonicalize(root)
         .map_err(|e| format!("Failed to resolve workspace root {}: {}", root.display(), e))?;
-    let normalized_destination = fs::canonicalize(&candidate)
-        .map_err(|e| format!("Failed to resolve destination {}: {}", candidate.display(), e))?;
+    let normalized_destination = fs::canonicalize(&candidate).map_err(|e| {
+        format!(
+            "Failed to resolve destination {}: {}",
+            candidate.display(),
+            e
+        )
+    })?;
     let paths = SystemPaths::new(&normalized_root);
-    if normalized_destination == paths.inbox_dir() || normalized_destination == paths.sources_dir() || normalized_destination == paths.ai_dir() {
-        return Err("Destination must be a user directory outside inbox/, sources/ and .ai/".to_string());
+    if normalized_destination == paths.inbox_dir()
+        || normalized_destination == paths.sources_dir()
+        || normalized_destination == paths.ai_dir()
+    {
+        return Err(
+            "Destination must be a user directory outside inbox/, sources/ and .ai/".to_string(),
+        );
     }
     if !normalized_destination.starts_with(&normalized_root) {
         return Err("Destination must stay inside the workspace".to_string());
@@ -1764,8 +1992,14 @@ fn ensure_valid_destination(root: &Path, destination: Option<String>) -> Result<
     Ok(normalized_destination)
 }
 
-fn build_memory_from_proposal(item: &InboxItem, proposal: &IngestProposal, destination: &Path, memory_id_override: Option<String>) -> Result<Memory, String> {
-    let memory_id = memory_id_override.unwrap_or_else(|| slugify(proposal.l0.as_deref().unwrap_or(&item.title)));
+fn build_memory_from_proposal(
+    item: &InboxItem,
+    proposal: &IngestProposal,
+    destination: &Path,
+    memory_id_override: Option<String>,
+) -> Result<Memory, String> {
+    let memory_id = memory_id_override
+        .unwrap_or_else(|| slugify(proposal.l0.as_deref().unwrap_or(&item.title)));
     let l0 = proposal.l0.clone().unwrap_or_else(|| item.title.clone());
     let ontology = proposal.ontology.clone().unwrap_or(MemoryOntology::Concept);
     let path = destination.join(format!("{}.md", memory_id));
@@ -1779,7 +2013,11 @@ fn build_memory_from_proposal(item: &InboxItem, proposal: &IngestProposal, desti
             last_access: Utc::now(),
             access_count: 0,
             confidence: proposal.confidence,
-            tags: if proposal.tags.is_empty() { item.tags.clone() } else { proposal.tags.clone() },
+            tags: if proposal.tags.is_empty() {
+                item.tags.clone()
+            } else {
+                proposal.tags.clone()
+            },
             related: Vec::new(),
             created: Utc::now(),
             modified: Utc::now(),
@@ -1794,8 +2032,14 @@ fn build_memory_from_proposal(item: &InboxItem, proposal: &IngestProposal, desti
             folder_category: None,
             system_role: None,
         },
-        l1_content: proposal.l1_content.clone().unwrap_or_else(|| item.summary.clone()),
-        l2_content: proposal.l2_content.clone().unwrap_or_else(|| item.l2_content.clone()),
+        l1_content: proposal
+            .l1_content
+            .clone()
+            .unwrap_or_else(|| item.summary.clone()),
+        l2_content: proposal
+            .l2_content
+            .clone()
+            .unwrap_or_else(|| item.l2_content.clone()),
         raw_content: String::new(),
         file_path: path.to_string_lossy().to_string(),
     })
@@ -1803,8 +2047,13 @@ fn build_memory_from_proposal(item: &InboxItem, proposal: &IngestProposal, desti
 
 fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path) -> Memory {
     let source_id = slugify(proposal.l0.as_deref().unwrap_or(&item.title));
-    let target_path = SystemPaths::new(root).sources_dir().join(format!("{}.md", source_id));
-    let mut l2 = proposal.l2_content.clone().unwrap_or_else(|| item.l2_content.clone());
+    let target_path = SystemPaths::new(root)
+        .sources_dir()
+        .join(format!("{}.md", source_id));
+    let mut l2 = proposal
+        .l2_content
+        .clone()
+        .unwrap_or_else(|| item.l2_content.clone());
     if let Some(url) = &item.source_url {
         if !l2.is_empty() {
             l2.push_str("\n\n");
@@ -1827,7 +2076,11 @@ fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path)
             last_access: Utc::now(),
             access_count: 0,
             confidence: proposal.confidence,
-            tags: if proposal.tags.is_empty() { item.tags.clone() } else { proposal.tags.clone() },
+            tags: if proposal.tags.is_empty() {
+                item.tags.clone()
+            } else {
+                proposal.tags.clone()
+            },
             related: Vec::new(),
             created: Utc::now(),
             modified: Utc::now(),
@@ -1842,7 +2095,10 @@ fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path)
             folder_category: None,
             system_role: None,
         },
-        l1_content: proposal.l1_content.clone().unwrap_or_else(|| item.summary.clone()),
+        l1_content: proposal
+            .l1_content
+            .clone()
+            .unwrap_or_else(|| item.summary.clone()),
         l2_content: l2,
         raw_content: String::new(),
         file_path: target_path.to_string_lossy().to_string(),
@@ -1868,7 +2124,12 @@ pub fn apply_ingest_proposal(
     match proposal.action {
         ProposalAction::PromoteMemory => {
             let destination = ensure_valid_destination(&root, input.destination_dir.clone())?;
-            let memory = build_memory_from_proposal(&item, &proposal, &destination, input.memory_id_override)?;
+            let memory = build_memory_from_proposal(
+                &item,
+                &proposal,
+                &destination,
+                input.memory_id_override,
+            )?;
             write_memory(Path::new(&memory.file_path), &memory)?;
         }
         ProposalAction::RouteToSources => {
@@ -1877,20 +2138,36 @@ pub fn apply_ingest_proposal(
             for attachment in &item.attachments {
                 let source_path = PathBuf::from(&attachment.path);
                 if source_path.exists() {
-                    let dest_name = format!("{}--{}", slugify(&item.title), attachment.original_name);
+                    let dest_name =
+                        format!("{}--{}", slugify(&item.title), attachment.original_name);
                     let dest_path = SystemPaths::new(&root).sources_dir().join(dest_name);
                     if !dest_path.exists() {
-                        fs::copy(&source_path, &dest_path)
-                            .map_err(|e| format!("Failed to copy source attachment {}: {}", source_path.display(), e))?;
+                        fs::copy(&source_path, &dest_path).map_err(|e| {
+                            format!(
+                                "Failed to copy source attachment {}: {}",
+                                source_path.display(),
+                                e
+                            )
+                        })?;
                     }
                 }
             }
         }
         ProposalAction::Discard => {
-            let _ = update_item_status(&root, &item.id, InboxItemStatus::Discarded, ProposalState::Applied)?;
+            let _ = update_item_status(
+                &root,
+                &item.id,
+                InboxItemStatus::Discarded,
+                ProposalState::Applied,
+            )?;
         }
         ProposalAction::NeedsReview | ProposalAction::UpdateMemory => {
-            let _ = update_item_status(&root, &item.id, InboxItemStatus::Processed, ProposalState::Applied)?;
+            let _ = update_item_status(
+                &root,
+                &item.id,
+                InboxItemStatus::Processed,
+                ProposalState::Applied,
+            )?;
         }
     }
 
@@ -1898,20 +2175,36 @@ pub fn apply_ingest_proposal(
     proposal.modified = Utc::now();
     write_proposal(&root, &proposal)?;
 
-    if matches!(proposal.action, ProposalAction::PromoteMemory | ProposalAction::RouteToSources) {
-        let _ = update_item_status(&root, &item.id, InboxItemStatus::Promoted, ProposalState::Applied)?;
+    if matches!(
+        proposal.action,
+        ProposalAction::PromoteMemory | ProposalAction::RouteToSources
+    ) {
+        let _ = update_item_status(
+            &root,
+            &item.id,
+            InboxItemStatus::Promoted,
+            ProposalState::Applied,
+        )?;
         state.refresh_memory_index();
         let _ = crate::commands::router::regenerate_router_internal(&app, &state);
     }
 
-    append_daily_log(&root, "inbox_proposal_applied", format!("Applied proposal {} for {}", proposal.id, item.title), proposal.tags.clone(), item.id.clone())?;
+    append_daily_log(
+        &root,
+        "inbox_proposal_applied",
+        format!("Applied proposal {} for {}", proposal.id, item.title),
+        proposal.tags.clone(),
+        item.id.clone(),
+    )?;
     let _ = app.emit("proposals-changed", &proposal.id);
     let _ = app.emit("inbox-changed", &item.id);
     Ok(proposal)
 }
 
 #[tauri::command]
-pub fn get_recent_operational_context(state: State<AppState>) -> Result<RecentOperationalContext, String> {
+pub fn get_recent_operational_context(
+    state: State<AppState>,
+) -> Result<RecentOperationalContext, String> {
     let root = state.get_root();
     let daily_path = SystemPaths::new(&root).daily_log();
     let mut daily_entries: Vec<DailyEntry> = read_jsonl(&daily_path)?;
@@ -1938,7 +2231,9 @@ pub fn get_recent_operational_context(state: State<AppState>) -> Result<RecentOp
 }
 
 #[tauri::command]
-pub fn get_inference_provider_config(state: State<AppState>) -> Result<Option<InferenceProviderConfig>, String> {
+pub fn get_inference_provider_config(
+    state: State<AppState>,
+) -> Result<Option<InferenceProviderConfig>, String> {
     load_provider_config(&state.get_root())
 }
 
@@ -1951,7 +2246,9 @@ pub fn save_inference_provider_config(
 }
 
 #[tauri::command]
-pub fn get_inference_provider_status(state: State<AppState>) -> Result<InferenceProviderStatus, String> {
+pub fn get_inference_provider_status(
+    state: State<AppState>,
+) -> Result<InferenceProviderStatus, String> {
     let root = state.get_root();
     let config = load_provider_config(&root)?;
     Ok(config_to_status(config.as_ref()))
@@ -1987,8 +2284,8 @@ pub async fn chat_completion(
     state: State<'_, AppState>,
 ) -> Result<ChatCompletionResponse, String> {
     let root = state.get_root();
-    let config = load_provider_config(&root)?
-        .ok_or_else(|| "No provider configured".to_string())?;
+    let config =
+        load_provider_config(&root)?.ok_or_else(|| "No provider configured".to_string())?;
 
     let mut context_memory_ids = if request.include_vault_context {
         request.context_memory_ids.clone()
@@ -2001,9 +2298,8 @@ pub async fn chat_completion(
         request.context_memory_ids.clear();
     }
 
-    // Fallback: if the frontend didn't pre-assemble vault context, do it here.
-    // This is the authoritative path — it guarantees the LLM receives grounding
-    // regardless of frontend toggle state or HMR/bundle staleness.
+    // Fallback: when vault context is enabled but the frontend did not
+    // pre-assemble it, do it here so the provider still receives grounding.
     let incoming_ctx_len = request
         .context_prompt
         .as_deref()
@@ -2028,8 +2324,7 @@ pub async fn chat_completion(
                     &scoring_config,
                 ) {
                     Ok(result) => {
-                        let assembled =
-                            crate::core::engine::assemble_chat_context_package(&result);
+                        let assembled = crate::core::engine::assemble_chat_context_package(&result);
                         log::info!(
                             "chat_completion auto-assembled vault context — query={:?} budget={} loaded={} total={} assembled_len={}",
                             trimmed,
@@ -2100,8 +2395,7 @@ pub async fn list_provider_models(
         Some(c) => normalize_provider_config(c),
         None => {
             let root = state.get_root();
-            load_provider_config(&root)?
-                .ok_or_else(|| "No provider configured".to_string())?
+            load_provider_config(&root)?.ok_or_else(|| "No provider configured".to_string())?
         }
     };
     fetch_models_for_config(&config).await
@@ -2121,7 +2415,10 @@ pub async fn pull_ollama_model(model_name: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to pull model: {}", e))?;
     if !response.status().is_success() {
         let body: Value = response.json().await.unwrap_or(json!({}));
-        let msg = body.get("error").and_then(|e| e.as_str()).unwrap_or("Unknown error");
+        let msg = body
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown error");
         return Err(format!("Ollama pull failed: {}", msg));
     }
     Ok(format!("Model '{}' pulled successfully", model_name))
@@ -2141,7 +2438,10 @@ pub async fn delete_ollama_model(model_name: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to delete model: {}", e))?;
     if !response.status().is_success() {
         let body: Value = response.json().await.unwrap_or(json!({}));
-        let msg = body.get("error").and_then(|e| e.as_str()).unwrap_or("Unknown error");
+        let msg = body
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown error");
         return Err(format!("Ollama delete failed: {}", msg));
     }
     Ok(())
@@ -2179,9 +2479,7 @@ mod tests {
         }))
     }
 
-    async fn lm_studio_load_model(
-        AxumState(state): AxumState<TestLmStudioState>,
-    ) -> Json<Value> {
+    async fn lm_studio_load_model(AxumState(state): AxumState<TestLmStudioState>) -> Json<Value> {
         state.load_calls.fetch_add(1, Ordering::SeqCst);
         Json(json!({ "status": "loaded" }))
     }
@@ -2201,7 +2499,9 @@ mod tests {
             .expect("bind test server");
         let addr = listener.local_addr().expect("test server addr");
         tokio::spawn(async move {
-            axum::serve(listener, app).await.expect("serve test lm studio");
+            axum::serve(listener, app)
+                .await
+                .expect("serve test lm studio");
         });
 
         (format!("http://{}", addr), load_calls)
@@ -2256,14 +2556,23 @@ mod tests {
         });
 
         assert_eq!(messages.len(), 3);
-        assert_eq!(messages[0].get("role").and_then(|v| v.as_str()), Some("system"));
-        assert_eq!(messages[1].get("role").and_then(|v| v.as_str()), Some("user"));
+        assert_eq!(
+            messages[0].get("role").and_then(|v| v.as_str()),
+            Some("system")
+        );
+        assert_eq!(
+            messages[1].get("role").and_then(|v| v.as_str()),
+            Some("user")
+        );
         assert!(messages[1]
             .get("content")
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .contains("Yo soy alex dc"));
-        assert_eq!(messages[2].get("content").and_then(|v| v.as_str()), Some("como me llamo?"));
+        assert_eq!(
+            messages[2].get("content").and_then(|v| v.as_str()),
+            Some("como me llamo?")
+        );
     }
 
     #[test]
@@ -2281,14 +2590,20 @@ mod tests {
         });
 
         assert_eq!(messages.len(), 2);
-        assert_eq!(messages[0].get("role").and_then(|v| v.as_str()), Some("user"));
+        assert_eq!(
+            messages[0].get("role").and_then(|v| v.as_str()),
+            Some("user")
+        );
         let ctx_text = messages[0]
             .pointer("/content/0/text")
             .and_then(|v| v.as_str())
             .unwrap_or_default();
         assert!(ctx_text.contains("Yo soy alex dc"));
 
-        assert_eq!(messages[1].get("role").and_then(|v| v.as_str()), Some("user"));
+        assert_eq!(
+            messages[1].get("role").and_then(|v| v.as_str()),
+            Some("user")
+        );
         let user_text = messages[1]
             .pointer("/content/0/text")
             .and_then(|v| v.as_str())
@@ -2300,8 +2615,14 @@ mod tests {
     fn build_anthropic_messages_without_context_only_emits_history() {
         let messages = build_anthropic_messages(&ChatCompletionRequest {
             messages: vec![
-                ChatMessage { role: "user".to_string(), content: "hola".to_string() },
-                ChatMessage { role: "assistant".to_string(), content: "hey".to_string() },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: "hola".to_string(),
+                },
+                ChatMessage {
+                    role: "assistant".to_string(),
+                    content: "hey".to_string(),
+                },
             ],
             system_prompt: None,
             include_vault_context: true,
@@ -2311,7 +2632,13 @@ mod tests {
         });
 
         assert_eq!(messages.len(), 2);
-        assert_eq!(messages[0].get("role").and_then(|v| v.as_str()), Some("user"));
-        assert_eq!(messages[1].get("role").and_then(|v| v.as_str()), Some("assistant"));
+        assert_eq!(
+            messages[0].get("role").and_then(|v| v.as_str()),
+            Some("user")
+        );
+        assert_eq!(
+            messages[1].get("role").and_then(|v| v.as_str()),
+            Some("assistant")
+        );
     }
 }

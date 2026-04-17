@@ -85,7 +85,10 @@ fn scan_dir_recursive(
                         // schema drift (e.g. new `type` variants emitted by the UI that the
                         // parser didn't yet know about). Surface that case as a warning so the
                         // user can see *why* their memories aren't showing up in chat context.
-                        if matches!(err, crate::core::frontmatter::FrontmatterError::YamlError(_)) {
+                        if matches!(
+                            err,
+                            crate::core::frontmatter::FrontmatterError::YamlError(_)
+                        ) {
                             log::warn!(
                                 "scan_memories: rejected '{}' — frontmatter present but failed to parse: {}",
                                 path.display(),

@@ -9,7 +9,9 @@ use crate::core::types::{JournalBlock, JournalDateInfo, JournalPage, TaskPriorit
 
 /// Get the path for a journal date file.
 pub fn journal_path(root: &Path, date: &str) -> PathBuf {
-    SystemPaths::new(root).journal_dir().join(format!("{}.md", date))
+    SystemPaths::new(root)
+        .journal_dir()
+        .join(format!("{}.md", date))
 }
 
 /// Read a journal page from disk.

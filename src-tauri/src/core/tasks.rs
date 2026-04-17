@@ -150,7 +150,9 @@ pub fn create_task(root: &Path, task: &TaskItem) -> Result<String, String> {
 
 /// Update an existing task.
 pub fn update_task(root: &Path, task: &TaskItem) -> Result<String, String> {
-    let file_path = SystemPaths::new(root).tasks_dir().join(format!("{}.md", &task.id));
+    let file_path = SystemPaths::new(root)
+        .tasks_dir()
+        .join(format!("{}.md", &task.id));
     let content = serialize_task(task);
 
     fs::write(&file_path, &content).map_err(|e| format!("Failed to write task: {}", e))?;
@@ -160,7 +162,9 @@ pub fn update_task(root: &Path, task: &TaskItem) -> Result<String, String> {
 
 /// Delete a task file.
 pub fn delete_task(root: &Path, id: &str) -> Result<(), String> {
-    let file_path = SystemPaths::new(root).tasks_dir().join(format!("{}.md", id));
+    let file_path = SystemPaths::new(root)
+        .tasks_dir()
+        .join(format!("{}.md", id));
     if file_path.exists() {
         fs::remove_file(&file_path).map_err(|e| format!("Failed to delete task: {}", e))?;
     }

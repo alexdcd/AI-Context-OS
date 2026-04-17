@@ -4,7 +4,9 @@ use std::path::Path;
 
 use crate::core::decay::should_archive;
 use crate::core::search::tokenize;
-use crate::core::types::{Conflict, ConsolidationSuggestion, DailyEntry, Memory, MemoryMeta, MemoryOntology};
+use crate::core::types::{
+    Conflict, ConsolidationSuggestion, DailyEntry, Memory, MemoryMeta, MemoryOntology,
+};
 
 /// Detect potential conflicts between related memories.
 /// Heuristic: if two related memories share tags but their L1 content contains
@@ -197,12 +199,18 @@ mod tests {
     #[test]
     fn detects_conflict_between_related_memories() {
         let a = make_memory("mem-a", vec!["mem-b"], "We use React for the frontend.");
-        let b = make_memory("mem-b", vec![], "The team prefers Vue for all new projects.");
+        let b = make_memory(
+            "mem-b",
+            vec![],
+            "The team prefers Vue for all new projects.",
+        );
         let conflicts = detect_conflicts(&[a, b]);
         assert_eq!(conflicts.len(), 1);
         assert_eq!(conflicts[0].memory_a, "mem-a");
         assert_eq!(conflicts[0].memory_b, "mem-b");
-        assert!(conflicts[0].conflicting_terms.contains(&"react".to_string()));
+        assert!(conflicts[0]
+            .conflicting_terms
+            .contains(&"react".to_string()));
         assert!(conflicts[0].conflicting_terms.contains(&"vue".to_string()));
     }
 
@@ -210,7 +218,11 @@ mod tests {
     fn no_conflict_when_memories_are_not_related() {
         // Same tech conflict, but no `related` link between them → no conflict detected
         let a = make_memory("mem-a", vec![], "We use React for the frontend.");
-        let b = make_memory("mem-b", vec![], "The team prefers Vue for all new projects.");
+        let b = make_memory(
+            "mem-b",
+            vec![],
+            "The team prefers Vue for all new projects.",
+        );
         let conflicts = detect_conflicts(&[a, b]);
         assert!(conflicts.is_empty());
     }
@@ -227,7 +239,11 @@ mod tests {
     fn deduplicates_ab_and_ba_conflicts() {
         // Both memories reference each other → would generate A-B and B-A without dedup
         let a = make_memory("mem-a", vec!["mem-b"], "We use Tauri for the desktop app.");
-        let b = make_memory("mem-b", vec!["mem-a"], "Electron is the chosen desktop framework.");
+        let b = make_memory(
+            "mem-b",
+            vec!["mem-a"],
+            "Electron is the chosen desktop framework.",
+        );
         let conflicts = detect_conflicts(&[a, b]);
         assert_eq!(conflicts.len(), 1);
     }

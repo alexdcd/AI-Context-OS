@@ -69,7 +69,10 @@ fn diagnose_chat_context_for_query() {
     println!("scored         : {}", result.scored_memories.len());
     println!("loaded         : {}", result.loaded.len());
     println!("unloaded       : {}", result.unloaded.len());
-    println!("tokens_used    : {}/{}", result.tokens_used, result.tokens_budget);
+    println!(
+        "tokens_used    : {}/{}",
+        result.tokens_used, result.tokens_budget
+    );
     println!();
 
     println!("-- Top 10 scored memories --");
@@ -114,7 +117,10 @@ fn diagnose_chat_context_for_query() {
     let prompt_context = assemble_chat_context_package(&result);
     println!("-- assemble_chat_context_package --");
     println!("prompt_context_len   : {}", prompt_context.len());
-    println!("prompt_context_empty : {}", prompt_context.trim().is_empty());
+    println!(
+        "prompt_context_empty : {}",
+        prompt_context.trim().is_empty()
+    );
     println!();
     println!("-- Prompt context (first 2000 chars) --");
     let preview: String = prompt_context.chars().take(2000).collect();
@@ -144,9 +150,16 @@ fn diagnose_frontmatter_parse_failures() {
     fn walk(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
         for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
             let path = entry.path();
-            let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             if path.is_dir() {
-                if matches!(name.as_str(), ".git" | ".cache" | "node_modules" | "target" | ".obsidian") {
+                if matches!(
+                    name.as_str(),
+                    ".git" | ".cache" | "node_modules" | "target" | ".obsidian"
+                ) {
                     continue;
                 }
                 walk(&path, out);
@@ -160,7 +173,9 @@ fn diagnose_frontmatter_parse_failures() {
     walk(&root, &mut md_files);
 
     for path in &md_files {
-        let Ok(raw) = std::fs::read_to_string(path) else { continue };
+        let Ok(raw) = std::fs::read_to_string(path) else {
+            continue;
+        };
         match parse_frontmatter(&raw) {
             Ok((meta, _body)) => {
                 ok += 1;

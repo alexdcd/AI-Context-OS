@@ -107,10 +107,8 @@ pub fn run() {
     // `log::error!` in the crate silently drops. `default_filter_or("info")`
     // makes chat-context diagnostics visible out of the box; users can override
     // with e.g. `RUST_LOG=ai_context_os=debug`.
-    let _ = env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info"),
-    )
-    .try_init();
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .try_init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

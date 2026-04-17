@@ -12,12 +12,12 @@ use crate::core::types::{GodNode, GraphData, GraphEdge, GraphNode, Memory};
 
 /// Semantic weight of each edge kind.
 /// Higher weight = stronger affinity for community detection and graph layout.
-const WEIGHT_REQUIRES: f64 = 1.0;  // hard dependency
-const WEIGHT_RELATED:  f64 = 0.7;  // explicit semantic link
-const WEIGHT_WIKILINK: f64 = 0.5;  // inline reference, intentional
-const WEIGHT_OPTIONAL: f64 = 0.4;  // weak explicit link
+const WEIGHT_REQUIRES: f64 = 1.0; // hard dependency
+const WEIGHT_RELATED: f64 = 0.7; // explicit semantic link
+const WEIGHT_WIKILINK: f64 = 0.5; // inline reference, intentional
+const WEIGHT_OPTIONAL: f64 = 0.4; // weak explicit link
 const WEIGHT_TAG_STRONG: f64 = 0.3; // ≥2 shared tags
-const WEIGHT_TAG_WEAK:   f64 = 0.1; // exactly 1 shared tag
+const WEIGHT_TAG_WEAK: f64 = 0.1; // exactly 1 shared tag
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum EdgeKind {
@@ -32,23 +32,23 @@ enum EdgeKind {
 impl EdgeKind {
     fn weight(self) -> f64 {
         match self {
-            EdgeKind::Requires  => WEIGHT_REQUIRES,
-            EdgeKind::Related   => WEIGHT_RELATED,
-            EdgeKind::Wikilink  => WEIGHT_WIKILINK,
-            EdgeKind::Optional  => WEIGHT_OPTIONAL,
+            EdgeKind::Requires => WEIGHT_REQUIRES,
+            EdgeKind::Related => WEIGHT_RELATED,
+            EdgeKind::Wikilink => WEIGHT_WIKILINK,
+            EdgeKind::Optional => WEIGHT_OPTIONAL,
             EdgeKind::TagStrong => WEIGHT_TAG_STRONG,
-            EdgeKind::TagWeak   => WEIGHT_TAG_WEAK,
+            EdgeKind::TagWeak => WEIGHT_TAG_WEAK,
         }
     }
 
     fn label(self) -> &'static str {
         match self {
-            EdgeKind::Requires  => "requires",
-            EdgeKind::Related   => "related",
-            EdgeKind::Optional  => "optional",
-            EdgeKind::Wikilink  => "wikilink",
+            EdgeKind::Requires => "requires",
+            EdgeKind::Related => "related",
+            EdgeKind::Optional => "optional",
+            EdgeKind::Wikilink => "wikilink",
             EdgeKind::TagStrong => "tag",
-            EdgeKind::TagWeak   => "tag",
+            EdgeKind::TagWeak => "tag",
         }
     }
 }
@@ -308,12 +308,7 @@ pub fn compute_god_nodes(memories: &[Memory]) -> Vec<GodNode> {
     }
 
     let degrees = explicit_degree_counts(memories);
-    let max_degree = degrees
-        .iter()
-        .copied()
-        .max()
-        .unwrap_or(1)
-        .max(1);
+    let max_degree = degrees.iter().copied().max().unwrap_or(1).max(1);
 
     let mut god_nodes: Vec<GodNode> = Vec::new();
 
@@ -447,7 +442,10 @@ mod tests {
 
     #[test]
     fn extracts_single_wikilink() {
-        assert_eq!(extract_wikilinks("See [[mem-b]] for details."), vec!["mem-b"]);
+        assert_eq!(
+            extract_wikilinks("See [[mem-b]] for details."),
+            vec!["mem-b"]
+        );
     }
 
     #[test]
@@ -561,8 +559,14 @@ mod tests {
         let y = make_memory("y", vec![], vec![], "");
         let z = make_memory("z", vec![], vec![], "");
         let god_nodes = compute_god_nodes(&[hub_a, hub_b, x, y, z]);
-        let pos_a = god_nodes.iter().position(|g| g.memory_id == "hub-a").unwrap();
-        let pos_b = god_nodes.iter().position(|g| g.memory_id == "hub-b").unwrap();
+        let pos_a = god_nodes
+            .iter()
+            .position(|g| g.memory_id == "hub-a")
+            .unwrap();
+        let pos_b = god_nodes
+            .iter()
+            .position(|g| g.memory_id == "hub-b")
+            .unwrap();
         assert!(pos_a < pos_b);
     }
 
@@ -680,8 +684,5 @@ pub fn connection_count(memory_id: &str, memories: &[Memory]) -> usize {
         .map(|(i, memory)| (memory.meta.id.as_str(), i))
         .collect();
 
-    idx_map
-        .get(memory_id)
-        .map(|&i| degrees[i])
-        .unwrap_or(0)
+    idx_map.get(memory_id).map(|&i| degrees[i]).unwrap_or(0)
 }

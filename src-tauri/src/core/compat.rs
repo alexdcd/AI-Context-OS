@@ -1,7 +1,9 @@
 /// Render adapter output for Claude Desktop / Claude Code / Co-Work (writes to claude.md).
 pub fn render_claude_adapter(data: &str) -> String {
     let mut out = String::from("# AI Context OS — Master Router\n");
-    out.push_str("# Auto-generated. Do not edit — changes are overwritten on every memory operation.\n");
+    out.push_str(
+        "# Auto-generated. Do not edit — changes are overwritten on every memory operation.\n",
+    );
     out.push_str("# This file is your operating manual for this workspace.\n\n");
     out.push_str(data);
     out

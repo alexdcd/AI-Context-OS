@@ -99,7 +99,6 @@ pub fn start_watcher(
                                     continue;
                                 }
 
-
                                 let _ = app_handle.emit("memory-changed", &path_str);
                             }
                         } else {

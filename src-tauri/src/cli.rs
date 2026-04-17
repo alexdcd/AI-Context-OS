@@ -1,5 +1,5 @@
 use std::path::PathBuf;
- 
+
 use ai_context_os::core;
 use chrono::Utc;
 use clap::{Parser, Subcommand};
@@ -10,7 +10,9 @@ use core::compat::{render_claude_adapter, render_cursor_adapter, render_windsurf
 use core::graph::get_community_map_for_scoring;
 use core::index::scan_memories;
 use core::memory::read_memory;
-use core::router::{build_router_manifest, generate_index_yaml, render_catalog_markdown, render_static_router};
+use core::router::{
+    build_router_manifest, generate_index_yaml, render_catalog_markdown, render_static_router,
+};
 use core::scoring::compute_score;
 use core::types::{Config, Memory};
 
@@ -129,9 +131,13 @@ fn main() {
                 return;
             }
 
-            match core::paths::SystemPaths::new(&root).system_dirs().iter().try_for_each(|dir| {
-                std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create {}: {}", dir.display(), e))
-            }) {
+            match core::paths::SystemPaths::new(&root)
+                .system_dirs()
+                .iter()
+                .try_for_each(|dir| {
+                    std::fs::create_dir_all(dir)
+                        .map_err(|e| format!("Failed to create {}: {}", dir.display(), e))
+                }) {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("Error creating workspace: {}", e);
