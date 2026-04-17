@@ -399,6 +399,128 @@ pub fn get_community_map_for_scoring(memories: &[Memory]) -> HashMap<String, u32
     compute_community_map(memories)
 }
 
+/// Personalized PageRank scores from a seed set.
+///
+/// Propagates relevance from `seeds` through the graph following edge weights.
+/// `alpha` is the teleport probability (0.15 recommended): at each step the
+/// random walker jumps back to the uniform seed distribution with probability
+/// `alpha`, or follows a weighted edge with probability `1-alpha`.
+///
+/// Scores are normalized so the highest-scoring non-seed node = 1.0, giving
+/// a [0, 1] proximity value usable directly as the `graph_proximity` component.
+/// Seed nodes receive 0.0 because they already define the active context and
+/// should not get extra graph bonus. Returns an empty map when seeds is empty.
+fn personalized_pagerank_raw(
+    memories: &[Memory],
+    seeds: &[String],
+    alpha: f64,
+) -> HashMap<String, f64> {
+    let n = memories.len();
+    if n == 0 || seeds.is_empty() {
+        return HashMap::new();
+    }
+
+    let id_to_idx: HashMap<&str, usize> = memories
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.meta.id.as_str(), i))
+        .collect();
+
+    let typed_edges = collect_typed_edges(memories);
+    let mut adj: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
+    for edge in &typed_edges {
+        let w = edge.weight();
+        adj[edge.source].push((edge.target, w));
+        adj[edge.target].push((edge.source, w));
+    }
+    let strength: Vec<f64> = adj
+        .iter()
+        .map(|nbrs| nbrs.iter().map(|(_, w)| w).sum())
+        .collect();
+
+    let seed_indices: Vec<usize> = seeds
+        .iter()
+        .filter_map(|s| id_to_idx.get(s.as_str()).copied())
+        .collect();
+    if seed_indices.is_empty() {
+        return HashMap::new();
+    }
+
+    let seed_weight = 1.0 / seed_indices.len() as f64;
+    let mut seed_dist = vec![0.0f64; n];
+    for &idx in &seed_indices {
+        seed_dist[idx] = seed_weight;
+    }
+
+    let mut ppr = seed_dist.clone();
+    for _ in 0..30 {
+        let mut next = vec![0.0f64; n];
+        let mut dangling_mass = 0.0f64;
+
+        for u in 0..n {
+            if ppr[u] == 0.0 {
+                continue;
+            }
+            if strength[u] == 0.0 {
+                dangling_mass += (1.0 - alpha) * ppr[u];
+                continue;
+            }
+            for &(v, w) in &adj[u] {
+                next[v] += (1.0 - alpha) * (w / strength[u]) * ppr[u];
+            }
+        }
+
+        for v in 0..n {
+            next[v] += (alpha + dangling_mass) * seed_dist[v];
+        }
+        ppr = next;
+    }
+
+    memories
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.meta.id.clone(), ppr[i]))
+        .collect()
+}
+
+pub(crate) fn personalized_pagerank(
+    memories: &[Memory],
+    seeds: &[String],
+    alpha: f64,
+) -> HashMap<String, f64> {
+    if memories.is_empty() || seeds.is_empty() {
+        return HashMap::new();
+    }
+
+    let raw = personalized_pagerank_raw(memories, seeds, alpha);
+    if raw.is_empty() {
+        return HashMap::new();
+    }
+
+    let seed_ids: HashSet<&str> = seeds.iter().map(|s| s.as_str()).collect();
+    let max_non_seed = memories
+        .iter()
+        .filter(|m| !seed_ids.contains(m.meta.id.as_str()))
+        .filter_map(|m| raw.get(&m.meta.id).copied())
+        .fold(0.0f64, f64::max);
+
+    if max_non_seed == 0.0 {
+        return HashMap::new();
+    }
+
+    memories
+        .iter()
+        .map(|m| {
+            let score = if seed_ids.contains(m.meta.id.as_str()) {
+                0.0
+            } else {
+                raw.get(&m.meta.id).copied().unwrap_or(0.0) / max_non_seed
+            };
+            (m.meta.id.clone(), score.min(1.0))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,6 +652,83 @@ mod tests {
     #[test]
     fn empty_input_returns_empty_community_map() {
         assert!(compute_community_map(&[]).is_empty());
+    }
+
+    // --- personalized_pagerank ---
+
+    #[test]
+    fn ppr_empty_seeds_returns_empty() {
+        let a = make_memory("mem-a", vec![], vec![], "");
+        assert!(personalized_pagerank(&[a], &[], 0.15).is_empty());
+    }
+
+    #[test]
+    fn ppr_seed_not_in_corpus_returns_empty() {
+        let a = make_memory("mem-a", vec![], vec![], "");
+        let seeds = vec!["nonexistent".to_string()];
+        assert!(personalized_pagerank(&[a], &seeds, 0.15).is_empty());
+    }
+
+    #[test]
+    fn ppr_direct_neighbor_scores_higher_than_isolated() {
+        // a --related--> b (seed); c is isolated
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let c = make_memory("mem-c", vec![], vec![], "");
+        let seeds = vec!["mem-b".to_string()];
+        let scores = personalized_pagerank(&[a, b, c], &seeds, 0.15);
+        let sa = scores["mem-a"];
+        let sc = scores.get("mem-c").copied().unwrap_or(0.0);
+        assert!(sa > sc, "direct neighbor {sa} should outscore isolated {sc}");
+        assert!((scores["mem-b"] - 0.0).abs() < 1e-9, "seed should not receive graph bonus");
+    }
+
+    #[test]
+    fn ppr_raw_preserves_probability_mass_with_isolated_seed() {
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let isolated_seed = make_memory("seed-isolated", vec![], vec![], "");
+        let seeds = vec!["mem-b".to_string(), "seed-isolated".to_string()];
+        let raw = personalized_pagerank_raw(&[a, b, isolated_seed], &seeds, 0.15);
+        let total: f64 = raw.values().sum();
+        assert!(
+            (total - 1.0).abs() < 1e-9,
+            "raw personalized pagerank should preserve total probability mass, got {total}"
+        );
+    }
+
+    #[test]
+    fn ppr_stronger_edge_gives_higher_score() {
+        // a --requires--> seed (1.0) vs c --optional--> seed (0.4)
+        let mut a = make_memory("mem-a", vec![], vec![], "");
+        a.meta.requires = vec!["seed".to_string()];
+        let mut c = make_memory("mem-c", vec![], vec![], "");
+        c.meta.optional = vec!["seed".to_string()];
+        let seed = make_memory("seed", vec![], vec![], "");
+        let seeds = vec!["seed".to_string()];
+        let scores = personalized_pagerank(&[a, c, seed], &seeds, 0.15);
+        assert!(
+            scores["mem-a"] > scores["mem-c"],
+            "requires ({}) should outscore optional ({})",
+            scores["mem-a"],
+            scores["mem-c"]
+        );
+    }
+
+    #[test]
+    fn ppr_two_hop_scores_lower_than_one_hop() {
+        // a --> b --> seed; a is 2-hop, b is 1-hop
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec!["seed"], vec![], "");
+        let seed = make_memory("seed", vec![], vec![], "");
+        let seeds = vec!["seed".to_string()];
+        let scores = personalized_pagerank(&[a, b, seed], &seeds, 0.15);
+        assert!(
+            scores["mem-b"] > scores["mem-a"],
+            "1-hop ({}) should outscore 2-hop ({})",
+            scores["mem-b"],
+            scores["mem-a"]
+        );
     }
 
     // --- compute_god_nodes ---

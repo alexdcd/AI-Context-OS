@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use rust_stemmers::{Algorithm, Stemmer};
+
 /// Common Spanish and English stopwords to exclude from matching.
 const STOPWORDS: &[&str] = &[
     "el", "la", "los", "las", "un", "una", "de", "del", "en", "con", "por", "para", "que", "es",
@@ -8,13 +10,60 @@ const STOPWORDS: &[&str] = &[
     "had", "do", "does", "did",
 ];
 
-/// Tokenize text into lowercase words, filtering stopwords.
+/// Apply Snowball stemming to a single lowercase token.
+///
+/// Tries both English and Spanish stemmers. When only one actually reduces
+/// the token (i.e. the stem differs from the original), that result is used.
+/// When both reduce it, the shorter stem wins — more normalization means better
+/// cross-form recall. A floor of 3 characters prevents over-stemming short words.
+///
+/// This two-stemmer approach handles the mixed ES/EN content in the corpus
+/// without requiring per-document language detection.
+fn stem_token(token: &str) -> String {
+    let en_stem = Stemmer::create(Algorithm::English).stem(token);
+    let es_stem = Stemmer::create(Algorithm::Spanish).stem(token);
+
+    let en_changed = en_stem.as_ref() != token;
+    let es_changed = es_stem.as_ref() != token;
+
+    match (en_changed, es_changed) {
+        (true, true) => {
+            // Both stemmers reduced the token; prefer the shorter (more normalized)
+            // but never truncate below 3 chars to avoid false positives.
+            if es_stem.len() < en_stem.len() && es_stem.len() >= 3 {
+                es_stem.into_owned()
+            } else {
+                en_stem.into_owned()
+            }
+        }
+        (true, false) => en_stem.into_owned(),
+        (false, true) => {
+            // EN left the token unchanged. Only accept the Spanish stem if it
+            // reduced the token by ≥ 2 characters; a reduction of just 1 char
+            // is almost always the Spanish suffix rules mis-firing on an English
+            // word (e.g. "hello"→"hell", "write"→"writ").
+            if token.len() >= es_stem.len() + 2 && es_stem.len() >= 3 {
+                es_stem.into_owned()
+            } else {
+                token.to_owned()
+            }
+        }
+        (false, false) => token.to_owned(),
+    }
+}
+
+/// Tokenize text into lowercase, stemmed words, filtering stopwords.
+///
+/// Pipeline: lowercase → split on non-alphanumeric → filter stopwords → stem.
+/// Stemming is applied after stopword removal so common function words never
+/// consume stemmer cycles. Both query strings and documents go through this
+/// same pipeline, guaranteeing consistent term forms for matching.
 pub fn tokenize(text: &str) -> Vec<String> {
     let stopwords: HashSet<&str> = STOPWORDS.iter().copied().collect();
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
         .filter(|w| w.len() > 1 && !stopwords.contains(w))
-        .map(|w| w.to_string())
+        .map(|w| stem_token(w))
         .collect()
 }
 
@@ -96,12 +145,49 @@ pub fn build_doc_freq(documents: &[&str]) -> HashMap<String, usize> {
     doc_freq
 }
 
+/// Precomputed BM25 corpus statistics. Build once per query and share across
+/// all per-document scoring calls to avoid recomputing doc_freq N times.
+#[derive(Debug, Clone)]
+pub struct Bm25Corpus {
+    pub doc_freq: HashMap<String, usize>,
+    pub avg_doc_len: f64,
+    pub total_docs: usize,
+}
+
+impl Bm25Corpus {
+    pub fn empty() -> Self {
+        Self {
+            doc_freq: HashMap::new(),
+            avg_doc_len: 0.0,
+            total_docs: 0,
+        }
+    }
+
+    pub fn from_documents(documents: &[&str]) -> Self {
+        if documents.is_empty() {
+            return Self::empty();
+        }
+        let total_docs = documents.len();
+        let avg_doc_len = documents
+            .iter()
+            .map(|d| d.split_whitespace().count())
+            .sum::<usize>() as f64
+            / total_docs as f64;
+        let doc_freq = build_doc_freq(documents);
+        Self {
+            doc_freq,
+            avg_doc_len,
+            total_docs,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_tokenize() {
+    fn tokenize_base_forms_unchanged() {
         let tokens = tokenize("Hello World! This is a test.");
         assert!(tokens.contains(&"hello".to_string()));
         assert!(tokens.contains(&"world".to_string()));
@@ -110,7 +196,35 @@ mod tests {
     }
 
     #[test]
-    fn test_tag_match() {
+    fn tokenize_en_morphological_variants_normalize_to_same_stem() {
+        // "deploying", "deployed", "deployment" must all yield the same stem
+        // so BM25/tag queries on "deploy" match all three forms in documents.
+        let t_ing = tokenize("deploying");
+        let t_ed = tokenize("deployed");
+        let t_ment = tokenize("deployment");
+        assert_eq!(t_ing, t_ed, "deploying and deployed should share stem");
+        assert_eq!(t_ing, t_ment, "deploying and deployment should share stem");
+    }
+
+    #[test]
+    fn tokenize_es_morphological_variants_normalize_to_same_stem() {
+        // Spanish verb forms that differ only in conjugation suffix should collapse.
+        let t1 = tokenize("desplegar");
+        let t2 = tokenize("desplegando");
+        assert_eq!(t1, t2, "desplegar and desplegando should share stem");
+    }
+
+    #[test]
+    fn tokenize_no_false_stem_on_short_english_words() {
+        // Spanish stemmer would turn "hello" into "hell" (1-char reduction).
+        // The ≥2 char threshold must reject this.
+        let tokens = tokenize("hello");
+        assert_eq!(tokens, vec!["hello".to_string()]);
+    }
+
+    #[test]
+    fn tag_match_cross_morphology() {
+        // Query "writing" should match tag "write" (and vice-versa) via shared stem.
         let score = tag_match_score(
             "write linkedin post",
             &["linkedin".into(), "writing".into()],

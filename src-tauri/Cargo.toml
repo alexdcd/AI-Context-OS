@@ -32,6 +32,9 @@ petgraph = "0.7"
 # Regex for search
 regex = "1"
 
+# Multilingual stemming (Snowball: English + Spanish)
+rust-stemmers = "1"
+
 # UUID generation
 uuid = { version = "1", features = ["v4"] }
 

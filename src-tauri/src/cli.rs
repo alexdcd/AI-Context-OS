@@ -7,7 +7,6 @@ use clap::{Parser, Subcommand};
 use std::sync::Arc;
 
 use core::compat::{render_claude_adapter, render_cursor_adapter, render_windsurf_adapter};
-use core::graph::get_community_map_for_scoring;
 use core::index::scan_memories;
 use core::memory::read_memory;
 use core::router::{
@@ -174,11 +173,13 @@ fn main() {
             }
 
             let now = Utc::now();
-            let community_map = get_community_map_for_scoring(&memories);
+            let documents: Vec<&str> = memories.iter().map(|m| m.raw_content.as_str()).collect();
+            let bm25_corpus = core::search::Bm25Corpus::from_documents(&documents);
+            let empty_ppr = std::collections::HashMap::new();
             let mut scored: Vec<(f64, &Memory)> = memories
                 .iter()
                 .map(|m| {
-                    let sb = compute_score(&query, m, &memories, &[], &community_map, now);
+                    let sb = compute_score(&query, m, &memories, &bm25_corpus, &empty_ppr, now);
                     (sb.final_score, m)
                 })
                 .collect();
@@ -200,11 +201,13 @@ fn main() {
             }
 
             let now = Utc::now();
-            let community_map = get_community_map_for_scoring(&memories);
+            let documents: Vec<&str> = memories.iter().map(|m| m.raw_content.as_str()).collect();
+            let bm25_corpus = core::search::Bm25Corpus::from_documents(&documents);
+            let empty_ppr = std::collections::HashMap::new();
             let mut scored: Vec<(f64, &Memory, u32)> = memories
                 .iter()
                 .map(|m| {
-                    let sb = compute_score(&query, m, &memories, &[], &community_map, now);
+                    let sb = compute_score(&query, m, &memories, &bm25_corpus, &empty_ppr, now);
                     let tokens = core::levels::estimate_tokens(&m.l2_content);
                     (sb.final_score, m, tokens)
                 })
