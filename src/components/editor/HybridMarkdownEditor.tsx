@@ -25,12 +25,12 @@ interface Props {
   placeholder?: string;
   className?: string;
   editable?: boolean;
-  themeVariant?: "logseq" | "clean";
+  themeVariant?: "classic" | "clean";
   viewRef?: React.MutableRefObject<EditorView | null>;
 }
 
 const editorThemePresets = {
-  logseq: {
+  classic: {
     baseFontSize: "1rem",
     lineHeight: "1.72",
     heading1Size: "1.95em",
@@ -411,7 +411,7 @@ export function HybridMarkdownEditor({
   placeholder,
   className,
   editable = true,
-  themeVariant = "logseq",
+  themeVariant = "classic",
   viewRef,
 }: Props) {
   const localRef = useRef<EditorView | null>(null);

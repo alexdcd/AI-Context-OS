@@ -243,6 +243,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
       <button
         type="button"
         disabled={disabled}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => setOpen((value) => !value)}
         className={clsx(
           "flex items-center gap-1 rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] px-2 py-1 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-0)] disabled:opacity-50",
@@ -255,7 +256,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+0.4rem)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)] shadow-2xl">
+        <div className="absolute right-0 top-[calc(100%+0.4rem)] z-[80] w-72 overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)] shadow-2xl">
           <div className="border-b border-[var(--border)] p-2">
             <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[color:var(--bg-0)] px-2 py-1.5">
               <Search className="h-3.5 w-3.5 text-[color:var(--text-2)]" />
@@ -278,6 +279,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
                 <button
                   key={item.key}
                   type="button"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => run(item)}
                   className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-0)]"
                 >

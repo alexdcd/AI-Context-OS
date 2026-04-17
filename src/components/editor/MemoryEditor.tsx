@@ -13,7 +13,7 @@ import type { Memory, MemoryMeta, MemoryOntology, RawFileDocument } from "../../
 type InspectorTab = "properties" | "links" | "history";
 type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
-const AUTO_SAVE_DELAY_MS = 300;
+const AUTO_SAVE_DELAY_MS = 700;
 
 interface OutgoingLink {
   id: string;
@@ -69,7 +69,10 @@ export function MemoryEditor() {
   const editorViewRef = useRef<EditorView | null>(null);
 
   useEffect(() => {
-    if (activeMemory) {
+    if (!activeMemory) return;
+
+    // Only reset local editor state when switching to a different document.
+    if (sourceId !== activeMemory.meta.id) {
       setMeta(activeMemory.meta);
       setL1(activeMemory.l1_content);
       setL2(activeMemory.l2_content);
@@ -77,8 +80,17 @@ export function MemoryEditor() {
       setDirty(false);
       setSaveStatus("saved");
       setInspectorTab("properties");
+      return;
     }
-  }, [activeMemory]);
+
+    // Same document: keep the user's local typing/cursor stable.
+    if (!dirty && !isSavingRef.current) {
+      setMeta(activeMemory.meta);
+      setL1(activeMemory.l1_content);
+      setL2(activeMemory.l2_content);
+      setSaveStatus("saved");
+    }
+  }, [activeMemory, sourceId, dirty]);
 
   const handleMetaChange = useCallback((updated: MemoryMeta) => {
     setMeta(updated);
@@ -314,7 +326,7 @@ export function MemoryEditor() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-1.5">
+      <div className="relative z-40 flex items-center gap-2 border-b border-[var(--border)] px-4 py-1.5">
         <div className="min-w-0 flex-1">
           <div className="font-mono text-[11px] text-[color:var(--text-2)]">{meta.id}.md</div>
         </div>
@@ -370,7 +382,6 @@ export function MemoryEditor() {
                 setDirty(true);
                 setSaveStatus("dirty");
               }}
-              onBlur={() => void handleSave()}
               className="min-h-[520px]"
               placeholder={t("memoryEditor.placeholders.typeHere")}
               editable={!isProtected}
@@ -663,7 +674,7 @@ function RawFileEditor({
   useEffect(() => {
     setContent(file.content);
     setSaveStatus("saved");
-  }, [file.path, file.content]);
+  }, [file.path]);
 
   const dirty = content !== file.content;
   const lineCount = content.length === 0 ? 0 : content.split(/\r?\n/).length;
@@ -811,7 +822,6 @@ function RawFileEditor({
             setContent(value);
             setSaveStatus("dirty");
           }}
-          onBlur={() => void handleSave()}
         />
 
         {file.kind === "jsonl" && (
