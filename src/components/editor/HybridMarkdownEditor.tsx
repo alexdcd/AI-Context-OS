@@ -463,6 +463,7 @@ export function HybridMarkdownEditor({
           bracketMatching: true,
           autocompletion: false,
           closeBrackets: true,
+          highlightSelectionMatches: false,
         }}
       />
     </div>

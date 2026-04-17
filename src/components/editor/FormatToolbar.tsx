@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { EditorView } from "@codemirror/view";
 import { EditorSelection } from "@codemirror/state";
 import {
@@ -192,19 +193,33 @@ const items: Item[] = [
 
 export function FormatToolbar({ viewRef, disabled }: Props) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target)) return;
+      if (popRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onScroll = () => setOpen(false);
     window.addEventListener("mousedown", handler);
     window.addEventListener("keydown", esc);
+    window.addEventListener("resize", onScroll);
     return () => {
       window.removeEventListener("mousedown", handler);
       window.removeEventListener("keydown", esc);
+      window.removeEventListener("resize", onScroll);
     };
   }, [open]);
 
@@ -216,8 +231,9 @@ export function FormatToolbar({ viewRef, disabled }: Props) {
   };
 
   return (
-    <div ref={ref} className="relative z-50">
+    <>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((p) => !p)}
         disabled={disabled}
@@ -230,8 +246,12 @@ export function FormatToolbar({ viewRef, disabled }: Props) {
       >
         <Type className="h-3.5 w-3.5" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-[100] mt-1 w-64 overflow-hidden rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] shadow-lg">
+      {open && coords && createPortal(
+        <div
+          ref={popRef}
+          style={{ position: "fixed", top: coords.top, right: coords.right, zIndex: 9999 }}
+          className="w-64 overflow-hidden rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] shadow-lg"
+        >
           {items.map((item, i) => {
             const addDivider = ["image", "h3", "task", "table"].includes(item.key);
             return (
@@ -255,8 +275,9 @@ export function FormatToolbar({ viewRef, disabled }: Props) {
               </div>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }

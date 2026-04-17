@@ -315,7 +315,7 @@ export function MemoryEditor() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Minimal top bar — actions only */}
-      <div className="relative z-40 flex items-center gap-1.5 border-b border-[var(--border)] px-4 py-1.5">
+      <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-4 py-1.5">
         <span className="flex-1 font-mono text-[11px] text-[color:var(--text-2)]">{meta.id}.md</span>
         <SaveStateBadge status={saveStatus} />
         <FormatToolbar viewRef={editorViewRef} disabled={isProtected} />
