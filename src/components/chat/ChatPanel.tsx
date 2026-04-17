@@ -8,6 +8,7 @@ import {
   simulateContext,
 } from "../../lib/tauri";
 import { useAppStore } from "../../lib/store";
+import { HybridMarkdownEditor } from "../editor/HybridMarkdownEditor";
 import type {
   ChatContextDebug,
   ChatMessage,
@@ -421,8 +422,16 @@ function MessageBubble({ turn }: { turn: ChatTurn }) {
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span className="text-xs">…</span>
           </div>
-        ) : (
+        ) : isUser ? (
           <p className="whitespace-pre-wrap break-words">{turn.content}</p>
+        ) : (
+          <div className="chat-md break-words">
+            <HybridMarkdownEditor
+              content={turn.content}
+              onChange={() => {}}
+              editable={false}
+            />
+          </div>
         )}
       </div>
       {!isUser && ((turn.contextIds && turn.contextIds.length > 0) || turn.contextDebug) && (
