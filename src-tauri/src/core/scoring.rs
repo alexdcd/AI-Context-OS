@@ -248,10 +248,37 @@ fn max_access_count(memories: &[Memory]) -> u32 {
         .unwrap_or(1)
 }
 
-/// Graph proximity with two-level spreading activation plus community membership boost.
+/// Edge-kind weights mirroring `core::graph` so spreading activation respects
+/// the same semantics used by community detection and the visualization layer.
+/// `requires` (hard dep) pulls harder than `related`, which pulls harder than
+/// `optional`. Kept in sync with `graph::WEIGHT_*`.
+const SCORING_EDGE_REQUIRES: f64 = 1.0;
+const SCORING_EDGE_RELATED: f64 = 0.7;
+const SCORING_EDGE_OPTIONAL: f64 = 0.4;
+
+/// Weight of the explicit edge from `meta` to `target_id`, based on which
+/// outgoing list it appears in. Returns 0.0 if no such edge exists.
+/// Priority follows the same order as `graph::collect_typed_edges`
+/// (strongest kind wins when duplicated).
+fn explicit_edge_weight(meta: &crate::core::types::MemoryMeta, target_id: &str) -> f64 {
+    if meta.requires.iter().any(|x| x == target_id) {
+        SCORING_EDGE_REQUIRES
+    } else if meta.related.iter().any(|x| x == target_id) {
+        SCORING_EDGE_RELATED
+    } else if meta.optional.iter().any(|x| x == target_id) {
+        SCORING_EDGE_OPTIONAL
+    } else {
+        0.0
+    }
+}
+
+/// Graph proximity with two-level weighted spreading activation plus community
+/// membership boost.
 ///
-/// L1 (direct connection via related/requires/optional in selected_ids): +0.10 per match.
-/// L2 (connection-of-connection in selected_ids): +0.03 per match.
+/// L1 (direct explicit link in selected_ids): +0.10 × edge_weight per match,
+/// where edge_weight is 1.0 (requires), 0.7 (related), or 0.4 (optional).
+/// L2 (connection-of-connection in selected_ids): +0.03 × edge_weight of the
+/// second hop per match.
 /// Community bonus: +0.08 if memory shares a community with any selected memory.
 ///
 /// Result is capped at 1.0.
@@ -267,22 +294,28 @@ fn graph_proximity_score(
 
     let all_links: Vec<&String> = memory.meta.explicit_links().collect();
 
-    // Level 1: direct links that appear in selected_ids
-    let l1_ids: Vec<&String> = all_links
+    // Level 1: direct links that appear in selected_ids, weighted by edge kind
+    let l1_hits: Vec<(&String, f64)> = all_links
         .iter()
         .copied()
         .filter(|id| selected_ids.contains(id))
+        .map(|id| (id, explicit_edge_weight(&memory.meta, id)))
         .collect();
-    let l1_score = l1_ids.len() as f64 * 0.10;
+    let l1_score: f64 = l1_hits.iter().map(|(_, w)| 0.10 * w).sum();
+    let l1_ids: Vec<&String> = l1_hits.iter().map(|(id, _)| *id).collect();
 
-    // Level 2: IDs referenced by L1 memories that also appear in selected_ids
-    let l2_count = all_memories
+    // Level 2: IDs referenced by L1 memories that also appear in selected_ids,
+    // weighted by the kind of the second hop.
+    let l2_score: f64 = all_memories
         .iter()
         .filter(|m| l1_ids.contains(&&m.meta.id))
-        .flat_map(|m| m.meta.explicit_links())
-        .filter(|id| selected_ids.contains(id) && !all_links.contains(id))
-        .count();
-    let l2_score = l2_count as f64 * 0.03;
+        .flat_map(|m| {
+            m.meta
+                .explicit_links()
+                .filter(|id| selected_ids.contains(*id) && !all_links.contains(id))
+                .map(move |id| 0.03 * explicit_edge_weight(&m.meta, id))
+        })
+        .sum();
 
     // Community bonus: +0.08 if this memory is in the same topical cluster
     // as any of the top-scored selected memories (covers implicit tag-based proximity)
