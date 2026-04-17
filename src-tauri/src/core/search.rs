@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use rust_stemmers::{Algorithm, Stemmer};
+
 /// Common Spanish and English stopwords to exclude from matching.
 const STOPWORDS: &[&str] = &[
     "el", "la", "los", "las", "un", "una", "de", "del", "en", "con", "por", "para", "que", "es",
@@ -8,13 +10,50 @@ const STOPWORDS: &[&str] = &[
     "had", "do", "does", "did",
 ];
 
-/// Tokenize text into lowercase words, filtering stopwords.
+/// Apply Snowball stemming to a single lowercase token.
+///
+/// Tries both English and Spanish stemmers. When only one actually reduces
+/// the token (i.e. the stem differs from the original), that result is used.
+/// When both reduce it, the shorter stem wins — more normalization means better
+/// cross-form recall. A floor of 3 characters prevents over-stemming short words.
+///
+/// This two-stemmer approach handles the mixed ES/EN content in the corpus
+/// without requiring per-document language detection.
+fn stem_token(token: &str) -> String {
+    let en_stem = Stemmer::create(Algorithm::English).stem(token);
+    let es_stem = Stemmer::create(Algorithm::Spanish).stem(token);
+
+    let en_changed = en_stem.as_ref() != token;
+    let es_changed = es_stem.as_ref() != token;
+
+    match (en_changed, es_changed) {
+        (true, true) => {
+            // Both stemmers reduced the token; prefer the shorter (more normalized)
+            // but never truncate below 3 chars to avoid false positives.
+            if es_stem.len() < en_stem.len() && es_stem.len() >= 3 {
+                es_stem.into_owned()
+            } else {
+                en_stem.into_owned()
+            }
+        }
+        (true, false) => en_stem.into_owned(),
+        (false, true) => es_stem.into_owned(),
+        (false, false) => token.to_owned(),
+    }
+}
+
+/// Tokenize text into lowercase, stemmed words, filtering stopwords.
+///
+/// Pipeline: lowercase → split on non-alphanumeric → filter stopwords → stem.
+/// Stemming is applied after stopword removal so common function words never
+/// consume stemmer cycles. Both query strings and documents go through this
+/// same pipeline, guaranteeing consistent term forms for matching.
 pub fn tokenize(text: &str) -> Vec<String> {
     let stopwords: HashSet<&str> = STOPWORDS.iter().copied().collect();
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
         .filter(|w| w.len() > 1 && !stopwords.contains(w))
-        .map(|w| w.to_string())
+        .map(|w| stem_token(w))
         .collect()
 }
 
