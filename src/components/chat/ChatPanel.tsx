@@ -78,6 +78,12 @@ function buildContextDebug(
   };
 }
 
+function fallbackContextMemories(
+  contextIds: string[],
+): NonNullable<ChatTurn["contextDebug"]>["memories"] {
+  return contextIds.map((id) => ({ id }));
+}
+
 export function ChatPanel() {
   const { t } = useTranslation();
   const setChatOpen = useAppStore((s) => s.setChatOpen);
@@ -395,7 +401,7 @@ function MessageBubble({ turn }: { turn: ChatTurn }) {
             </div>
           )}
           <div className="flex flex-wrap gap-1">
-          {(turn.contextDebug?.memories ?? turn.contextIds.map((id) => ({ id }))).map((memory) => (
+          {(turn.contextDebug?.memories ?? fallbackContextMemories(turn.contextIds)).map((memory) => (
             <span
               key={memory.id}
               className="rounded bg-[color:var(--bg-2)] px-1.5 py-0.5 font-mono text-[9px]"
