@@ -50,6 +50,37 @@ pub struct ContextResult {
     pub total_memories: u32,
 }
 
+fn select_load_level(
+    score: f64,
+    top_score: f64,
+    l2_loaded_count: usize,
+    is_force_loaded: bool,
+    remaining_budget: u32,
+    l0_tokens: u32,
+    l1_tokens: u32,
+    l2_tokens: u32,
+) -> Option<(LoadLevel, u32)> {
+    let l2_threshold = top_score.mul_add(0.9, 0.0).max(0.3);
+    let l1_threshold = top_score.mul_add(0.65, 0.0).max(0.15);
+
+    if l2_loaded_count < 3
+        && remaining_budget >= l0_tokens + l1_tokens + l2_tokens
+        && score >= l2_threshold
+    {
+        return Some((LoadLevel::L2, l0_tokens + l1_tokens + l2_tokens));
+    }
+
+    if remaining_budget >= l0_tokens + l1_tokens && (score >= l1_threshold || is_force_loaded) {
+        return Some((LoadLevel::L1, l0_tokens + l1_tokens));
+    }
+
+    if remaining_budget >= l0_tokens {
+        return Some((LoadLevel::L0, l0_tokens));
+    }
+
+    None
+}
+
 /// Execute a context query: score all memories, select the best ones within
 /// the token budget, and return both the scored list and actual content.
 ///
@@ -158,12 +189,14 @@ pub fn execute_context_query(
             .partial_cmp(&a.1.final_score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+    let top_score = scored.first().map(|(_, s)| s.final_score).unwrap_or(0.0);
 
     // Greedy allocation within token budget
     let mut remaining_budget = token_budget;
     let mut scored_results = Vec::new();
     let mut loaded = Vec::new();
     let mut unloaded = Vec::new();
+    let mut l2_loaded_count = 0usize;
 
     for (idx, score) in scored {
         let mem = &memories[idx];
@@ -173,30 +206,33 @@ pub fn execute_context_query(
         let l1_tokens = estimate_tokens(&mem.l1_content);
         let l2_tokens = estimate_tokens(&mem.l2_content);
 
-        let (level, tokens) =
-            if remaining_budget >= l0_tokens + l1_tokens + l2_tokens && score.final_score > 0.3 {
-                (LoadLevel::L2, l0_tokens + l1_tokens + l2_tokens)
-            } else if remaining_budget >= l0_tokens + l1_tokens
-                && (score.final_score > 0.15 || is_force_loaded)
-            {
-                (LoadLevel::L1, l0_tokens + l1_tokens)
-            } else if remaining_budget >= l0_tokens {
-                (LoadLevel::L0, l0_tokens)
-            } else {
-                // Budget exhausted — add to unloaded
-                unloaded.push(UnloadedMemory {
-                    memory_id: mem.meta.id.clone(),
-                    l0: mem.meta.l0.clone(),
-                    ontology: mem.meta.ontology.clone(),
-                    folder_category: mem.meta.folder_category.clone(),
-                    system_role: mem.meta.system_role.clone(),
-                    score: score.final_score,
-                    reason: "budget_exhausted".to_string(),
-                });
-                continue;
-            };
+        let Some((level, tokens)) = select_load_level(
+            score.final_score,
+            top_score,
+            l2_loaded_count,
+            is_force_loaded,
+            remaining_budget,
+            l0_tokens,
+            l1_tokens,
+            l2_tokens,
+        ) else {
+            // Budget exhausted — add to unloaded
+            unloaded.push(UnloadedMemory {
+                memory_id: mem.meta.id.clone(),
+                l0: mem.meta.l0.clone(),
+                ontology: mem.meta.ontology.clone(),
+                folder_category: mem.meta.folder_category.clone(),
+                system_role: mem.meta.system_role.clone(),
+                score: score.final_score,
+                reason: "budget_exhausted".to_string(),
+            });
+            continue;
+        };
 
         remaining_budget = remaining_budget.saturating_sub(tokens);
+        if level == LoadLevel::L2 {
+            l2_loaded_count += 1;
+        }
 
         // Build content string based on level
         let content = match level {
@@ -347,6 +383,22 @@ mod tests {
             graph_proximity: 0.0,
             final_score,
         }
+    }
+
+    #[test]
+    fn select_load_level_limits_l2_to_top_cluster() {
+        let high = select_load_level(0.82, 0.9, 0, false, 1_000, 10, 20, 30);
+        let mid = select_load_level(0.61, 0.9, 1, false, 1_000, 10, 20, 30);
+
+        assert!(matches!(high, Some((LoadLevel::L2, _))));
+        assert!(matches!(mid, Some((LoadLevel::L1, _))));
+    }
+
+    #[test]
+    fn select_load_level_caps_number_of_l2_memories() {
+        let capped = select_load_level(0.88, 0.9, 3, false, 1_000, 10, 20, 30);
+
+        assert!(matches!(capped, Some((LoadLevel::L1, _))));
     }
 
     #[test]
