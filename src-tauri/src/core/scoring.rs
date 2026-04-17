@@ -259,17 +259,76 @@ fn max_access_count(memories: &[Memory]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::expand_query;
+    use super::{compute_score, expand_query, semantic_score_free};
+    use crate::core::search::Bm25Corpus;
+    use crate::core::types::{Memory, MemoryMeta, MemoryOntology};
+    use chrono::Utc;
+    use std::collections::HashMap;
 
-    #[test]
-    fn expand_query_only_uses_original_terms() {
-        let expanded = expand_query("bug");
-        assert_eq!(expanded, "bug error fix excepcion fallo");
+    fn make_mem(id: &str, l0: &str, tags: Vec<&str>) -> Memory {
+        Memory {
+            meta: MemoryMeta {
+                id: id.to_string(),
+                ontology: MemoryOntology::Concept,
+                l0: l0.to_string(),
+                importance: 0.5,
+                decay_rate: 0.998,
+                last_access: Utc::now(),
+                access_count: 0,
+                confidence: 0.9,
+                tags: tags.into_iter().map(|s| s.to_string()).collect(),
+                related: vec![],
+                created: Utc::now(),
+                modified: Utc::now(),
+                version: 1,
+                triggers: vec![],
+                requires: vec![],
+                optional: vec![],
+                output_format: None,
+                status: None,
+                protected: false,
+                derived_from: vec![],
+                folder_category: None,
+                system_role: None,
+            },
+            l1_content: String::new(),
+            l2_content: String::new(),
+            raw_content: String::new(),
+            file_path: format!("{}.md", id),
+        }
     }
 
     #[test]
-    fn expand_query_deduplicates_added_terms() {
+    fn expand_query_adds_matching_cluster_terms() {
+        let expanded = expand_query("bug");
+        assert_eq!(
+            expanded,
+            "bug bug bugs error errores fallo fallar excepcion excepciones panic crash"
+        );
+    }
+
+    #[test]
+    fn expand_query_appends_each_cluster_once() {
         let expanded = expand_query("error bug");
-        assert_eq!(expanded, "error bug fix excepcion fallo panic");
+        assert_eq!(
+            expanded,
+            "error bug bug bugs error errores fallo fallar excepcion excepciones panic crash"
+        );
+    }
+
+    #[test]
+    fn compute_score_semantic_uses_original_query_not_expanded_query() {
+        let memory = make_mem("mem-a", "bug", vec!["bug"]);
+        let memories = vec![memory.clone()];
+        let score = compute_score(
+            "bug",
+            &memory,
+            &memories,
+            &Bm25Corpus::empty(),
+            &HashMap::new(),
+            Utc::now(),
+        );
+
+        assert_eq!(score.semantic, semantic_score_free("bug", &memory));
     }
 }
