@@ -117,13 +117,22 @@ pub fn compute_score(
     let access_frequency =
         access_frequency_score(memory.meta.access_count, max_access_count(all_memories));
     let graph_proximity = graph_proximity_score(memory, all_memories, selected_ids, community_map);
-
-    let final_score = weights.semantic * semantic
+    let evidence_strength = semantic.max(bm25).max(graph_proximity);
+    let direct_evidence = weights.semantic * semantic
         + weights.bm25 * bm25
-        + weights.recency * recency
-        + weights.importance * importance
-        + weights.access_frequency * access_frequency
         + weights.graph * graph_proximity;
+    let contextual_priors = weights.recency * recency
+        + weights.importance * importance
+        + weights.access_frequency * access_frequency;
+
+    // Retrieval must be anchored in actual query evidence. Recency, importance
+    // and prior access only rerank memories that already have some lexical,
+    // semantic or graph-backed signal for the current query.
+    let final_score = if evidence_strength < 0.08 {
+        0.0
+    } else {
+        direct_evidence + contextual_priors * evidence_strength.clamp(0.35, 1.0)
+    };
 
     ScoreBreakdown {
         semantic,
@@ -151,6 +160,27 @@ fn semantic_score_free(query: &str, memory: &Memory) -> f64 {
 /// Heuristic ontology bonus — if query seems to match the knowledge shape, boost it.
 fn ontology_bonus_score(query: &str, memory: &Memory) -> f64 {
     let q = query.to_lowercase();
+    let generic_context_terms = [
+        "vault",
+        "boveda",
+        "bóveda",
+        "memoria",
+        "memorias",
+        "contexto",
+        "context",
+    ];
+    let identity_terms = [
+        "quien",
+        "quién",
+        "nombre",
+        "llamo",
+        "perfil",
+        "bio",
+        "identidad",
+        "identity",
+        "about me",
+        "sobre mi",
+    ];
     let code_terms = [
         "code", "coding", "debug", "function", "api", "bug", "test", "programa", "código",
     ];
@@ -172,6 +202,16 @@ fn ontology_bonus_score(query: &str, memory: &Memory) -> f64 {
         "investig",
         "tendencia",
     ];
+    let source_terms = [
+        "source",
+        "fuente",
+        "document",
+        "documento",
+        "pdf",
+        "link",
+        "referencia",
+        "reference",
+    ];
 
     match memory.meta.system_role {
         Some(SystemRole::Skill) | Some(SystemRole::Rule) => {
@@ -181,24 +221,95 @@ fn ontology_bonus_score(query: &str, memory: &Memory) -> f64 {
             if writing_terms.iter().any(|t| q.contains(t)) {
                 return 0.8;
             }
-            0.3
+            0.0
         }
         None => match memory.meta.ontology {
-            MemoryOntology::Entity => 0.4,
-            MemoryOntology::Synthesis => {
-                if analysis_terms.iter().any(|t| q.contains(t)) {
+            MemoryOntology::Entity => {
+                if contains_any(&q, &identity_terms)
+                    && memory_metadata_matches(
+                        memory,
+                        &[
+                            "perfil",
+                            "profile",
+                            "bio",
+                            "about",
+                            "identidad",
+                            "identity",
+                            "quien",
+                            "quién",
+                            "nombre",
+                            "yo",
+                            "self",
+                        ],
+                    )
+                {
                     return 0.9;
                 }
-                0.2
+                if contains_any(&q, &generic_context_terms)
+                    && memory_metadata_matches(memory, &["perfil", "profile", "bio", "about", "identity"])
+                {
+                    return 0.5;
+                }
+                0.0
             }
-            MemoryOntology::Concept => 0.3,
-            MemoryOntology::Source => 0.1,
+            MemoryOntology::Synthesis => {
+                if contains_any(&q, &analysis_terms)
+                    && memory_metadata_matches(
+                        memory,
+                        &[
+                            "brief",
+                            "overview",
+                            "roadmap",
+                            "resumen",
+                            "synthesis",
+                            "sintesis",
+                            "síntesis",
+                            "strategy",
+                            "estrategia",
+                            "plan",
+                        ],
+                    )
+                {
+                    return 0.9;
+                }
+                if contains_any(&q, &generic_context_terms)
+                    && memory_metadata_matches(memory, &["brief", "overview", "roadmap", "resumen", "plan"])
+                {
+                    return 0.45;
+                }
+                0.0
+            }
+            MemoryOntology::Concept => 0.0,
+            MemoryOntology::Source => {
+                if contains_any(&q, &source_terms)
+                    && memory_metadata_matches(memory, &["source", "fuente", "document", "pdf", "link"])
+                {
+                    return 0.6;
+                }
+                0.0
+            }
             // Unknown ontologies (legacy / UI-generated types not in the 4
             // canonical variants) still participate in retrieval with a
             // neutral weight so useful content is not silently dropped.
-            MemoryOntology::Unknown => 0.25,
+            MemoryOntology::Unknown => 0.0,
         },
     }
+}
+
+fn contains_any(query: &str, terms: &[&str]) -> bool {
+    terms.iter().any(|term| query.contains(term))
+}
+
+fn memory_metadata_matches(memory: &Memory, terms: &[&str]) -> bool {
+    let haystack = format!(
+        "{} {} {}",
+        memory.meta.id,
+        memory.meta.l0,
+        memory.meta.tags.join(" ")
+    )
+    .to_lowercase();
+
+    contains_any(&haystack, terms)
 }
 
 /// BM25 score using all memories as corpus.
@@ -310,7 +421,11 @@ fn graph_proximity_score(
 
 #[cfg(test)]
 mod tests {
-    use super::expand_query;
+    use chrono::Utc;
+
+    use super::{compute_score, expand_query};
+    use crate::core::types::{Memory, MemoryMeta, MemoryOntology};
+    use std::collections::HashMap;
 
     #[test]
     fn expand_query_only_uses_original_terms() {
@@ -322,5 +437,92 @@ mod tests {
     fn expand_query_deduplicates_added_terms() {
         let expanded = expand_query("error bug");
         assert_eq!(expanded, "error bug fix excepcion fallo panic");
+    }
+
+    fn sample_memory(id: &str, ontology: MemoryOntology, l0: &str, tags: &[&str]) -> Memory {
+        let now = Utc::now();
+        Memory {
+            meta: MemoryMeta {
+                id: id.to_string(),
+                ontology,
+                l0: l0.to_string(),
+                importance: 0.8,
+                decay_rate: 0.998,
+                last_access: now,
+                access_count: 5,
+                confidence: 0.9,
+                tags: tags.iter().map(|tag| tag.to_string()).collect(),
+                related: Vec::new(),
+                created: now,
+                modified: now,
+                version: 1,
+                triggers: Vec::new(),
+                requires: Vec::new(),
+                optional: Vec::new(),
+                output_format: None,
+                status: None,
+                protected: false,
+                derived_from: Vec::new(),
+                folder_category: None,
+                system_role: None,
+            },
+            l1_content: String::new(),
+            l2_content: String::new(),
+            raw_content: String::new(),
+            file_path: format!("{id}.md"),
+        }
+    }
+
+    #[test]
+    fn irrelevant_query_does_not_score_memories_from_priors_alone() {
+        let memory = sample_memory(
+            "perfil-alex",
+            MemoryOntology::Entity,
+            "Perfil personal de Alex",
+            &["perfil", "identity"],
+        );
+        let all_memories = vec![memory.clone()];
+
+        let score = compute_score("hola", &memory, &all_memories, &[], &HashMap::new(), Utc::now());
+
+        assert_eq!(score.final_score, 0.0);
+    }
+
+    #[test]
+    fn identity_query_prefers_identity_memory_over_unrelated_entity() {
+        let identity = sample_memory(
+            "perfil-alex",
+            MemoryOntology::Entity,
+            "Perfil personal de Alex",
+            &["perfil", "identity"],
+        );
+        let unrelated = sample_memory(
+            "cliente-acme",
+            MemoryOntology::Entity,
+            "Cliente ACME",
+            &["cliente", "crm"],
+        );
+        let all_memories = vec![identity.clone(), unrelated.clone()];
+
+        let identity_score = compute_score(
+            "como me llamo",
+            &identity,
+            &all_memories,
+            &[],
+            &HashMap::new(),
+            Utc::now(),
+        );
+        let unrelated_score = compute_score(
+            "como me llamo",
+            &unrelated,
+            &all_memories,
+            &[],
+            &HashMap::new(),
+            Utc::now(),
+        );
+
+        assert!(identity_score.final_score > unrelated_score.final_score);
+        assert!(identity_score.final_score > 0.0);
+        assert_eq!(unrelated_score.final_score, 0.0);
     }
 }
