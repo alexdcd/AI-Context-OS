@@ -50,50 +50,6 @@ pub struct ContextResult {
     pub total_memories: u32,
 }
 
-/// Trivial greetings / acknowledgements do not benefit from vault retrieval.
-/// Keeping these out of the scoring path avoids noisy memory chips and reduces
-/// prompt size for local models.
-pub fn is_trivial_chat_query(query: &str) -> bool {
-    let tokens: Vec<String> = query
-        .trim()
-        .to_lowercase()
-        .split_whitespace()
-        .map(|token| {
-            token
-                .trim_matches(|ch: char| !ch.is_alphanumeric() && ch != 'ñ')
-                .to_string()
-        })
-        .filter(|token| !token.is_empty())
-        .collect();
-
-    if tokens.is_empty() || tokens.len() > 4 {
-        return false;
-    }
-
-    matches!(
-        tokens.join(" ").as_str(),
-        "hola"
-            | "hi"
-            | "hey"
-            | "hello"
-            | "buenas"
-            | "buenos dias"
-            | "buenas tardes"
-            | "buenas noches"
-            | "gracias"
-            | "muchas gracias"
-            | "thanks"
-            | "thank you"
-            | "ok"
-            | "okay"
-            | "okey"
-            | "vale"
-            | "perfecto"
-            | "genial"
-            | "de acuerdo"
-    )
-}
-
 /// Execute a context query: score all memories, select the best ones within
 /// the token budget, and return both the scored list and actual content.
 ///

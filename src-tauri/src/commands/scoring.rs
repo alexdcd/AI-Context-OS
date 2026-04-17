@@ -1,8 +1,6 @@
 use tauri::State;
 
-use crate::core::engine::{
-    assemble_chat_context_package, execute_context_query, is_trivial_chat_query,
-};
+use crate::core::engine::{assemble_chat_context_package, execute_context_query};
 use crate::core::types::{ChatContextPayload, ScoredMemory};
 use crate::state::AppState;
 
@@ -26,17 +24,6 @@ pub fn build_chat_context(
     token_budget: u32,
     state: State<AppState>,
 ) -> Result<ChatContextPayload, String> {
-    if is_trivial_chat_query(&query) {
-        log::info!(
-            "build_chat_context skipped vault retrieval for trivial chat query {:?}",
-            query
-        );
-        return Ok(ChatContextPayload {
-            prompt_context: String::new(),
-            memory_ids: Vec::new(),
-        });
-    }
-
     let root = state.get_root();
     let config = state.config.read().unwrap().clone();
 
