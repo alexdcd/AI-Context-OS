@@ -216,7 +216,7 @@ export function FormatToolbar({ viewRef, disabled }: Props) {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative z-50">
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
@@ -231,7 +231,7 @@ export function FormatToolbar({ viewRef, disabled }: Props) {
         <Type className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] shadow-lg">
+        <div className="absolute right-0 top-full z-[100] mt-1 w-64 overflow-hidden rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] shadow-lg">
           {items.map((item, i) => {
             const addDivider = ["image", "h3", "task", "table"].includes(item.key);
             return (
