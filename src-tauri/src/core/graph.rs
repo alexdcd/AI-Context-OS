@@ -626,6 +626,69 @@ mod tests {
         assert!(compute_community_map(&[]).is_empty());
     }
 
+    // --- personalized_pagerank ---
+
+    #[test]
+    fn ppr_empty_seeds_returns_empty() {
+        let a = make_memory("mem-a", vec![], vec![], "");
+        assert!(personalized_pagerank(&[a], &[], 0.15).is_empty());
+    }
+
+    #[test]
+    fn ppr_seed_not_in_corpus_returns_empty() {
+        let a = make_memory("mem-a", vec![], vec![], "");
+        let seeds = vec!["nonexistent".to_string()];
+        assert!(personalized_pagerank(&[a], &seeds, 0.15).is_empty());
+    }
+
+    #[test]
+    fn ppr_direct_neighbor_scores_higher_than_isolated() {
+        // a --related--> b (seed); c is isolated
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec![], vec![], "");
+        let c = make_memory("mem-c", vec![], vec![], "");
+        let seeds = vec!["mem-b".to_string()];
+        let scores = personalized_pagerank(&[a, b, c], &seeds, 0.15);
+        let sa = scores["mem-a"];
+        let sc = scores.get("mem-c").copied().unwrap_or(0.0);
+        assert!(sa > sc, "direct neighbor {sa} should outscore isolated {sc}");
+        assert!((scores["mem-b"] - 1.0).abs() < 1e-9, "seed should be 1.0");
+    }
+
+    #[test]
+    fn ppr_stronger_edge_gives_higher_score() {
+        // a --requires--> seed (1.0) vs c --optional--> seed (0.4)
+        let mut a = make_memory("mem-a", vec![], vec![], "");
+        a.meta.requires = vec!["seed".to_string()];
+        let mut c = make_memory("mem-c", vec![], vec![], "");
+        c.meta.optional = vec!["seed".to_string()];
+        let seed = make_memory("seed", vec![], vec![], "");
+        let seeds = vec!["seed".to_string()];
+        let scores = personalized_pagerank(&[a, c, seed], &seeds, 0.15);
+        assert!(
+            scores["mem-a"] > scores["mem-c"],
+            "requires ({}) should outscore optional ({})",
+            scores["mem-a"],
+            scores["mem-c"]
+        );
+    }
+
+    #[test]
+    fn ppr_two_hop_scores_lower_than_one_hop() {
+        // a --> b --> seed; a is 2-hop, b is 1-hop
+        let a = make_memory("mem-a", vec!["mem-b"], vec![], "");
+        let b = make_memory("mem-b", vec!["seed"], vec![], "");
+        let seed = make_memory("seed", vec![], vec![], "");
+        let seeds = vec!["seed".to_string()];
+        let scores = personalized_pagerank(&[a, b, seed], &seeds, 0.15);
+        assert!(
+            scores["mem-b"] > scores["mem-a"],
+            "1-hop ({}) should outscore 2-hop ({})",
+            scores["mem-b"],
+            scores["mem-a"]
+        );
+    }
+
     // --- compute_god_nodes ---
 
     #[test]
