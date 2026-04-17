@@ -341,7 +341,10 @@ fn graph_proximity_score(
 
 #[cfg(test)]
 mod tests {
-    use super::expand_query;
+    use super::{expand_query, graph_proximity_score};
+    use crate::core::types::{Memory, MemoryMeta, MemoryOntology};
+    use chrono::Utc;
+    use std::collections::HashMap;
 
     #[test]
     fn expand_query_only_uses_original_terms() {
@@ -353,5 +356,95 @@ mod tests {
     fn expand_query_deduplicates_added_terms() {
         let expanded = expand_query("error bug");
         assert_eq!(expanded, "error bug fix excepcion fallo panic");
+    }
+
+    fn make_mem(id: &str) -> Memory {
+        Memory {
+            meta: MemoryMeta {
+                id: id.to_string(),
+                ontology: MemoryOntology::Concept,
+                l0: String::new(),
+                importance: 0.5,
+                decay_rate: 0.998,
+                last_access: Utc::now(),
+                access_count: 0,
+                confidence: 0.9,
+                tags: vec![],
+                related: vec![],
+                created: Utc::now(),
+                modified: Utc::now(),
+                version: 1,
+                triggers: vec![],
+                requires: vec![],
+                optional: vec![],
+                output_format: None,
+                status: None,
+                protected: false,
+                derived_from: vec![],
+                folder_category: None,
+                system_role: None,
+            },
+            l1_content: String::new(),
+            l2_content: String::new(),
+            raw_content: String::new(),
+            file_path: format!("{}.md", id),
+        }
+    }
+
+    #[test]
+    fn l1_bonus_scales_with_edge_kind_weight() {
+        // mem-a --requires--> mem-b (weight 1.0) ⇒ L1 bonus = 0.10
+        // mem-c --optional--> mem-b (weight 0.4) ⇒ L1 bonus = 0.04
+        let mut a = make_mem("mem-a");
+        a.meta.requires = vec!["mem-b".to_string()];
+        let b = make_mem("mem-b");
+        let mut c = make_mem("mem-c");
+        c.meta.optional = vec!["mem-b".to_string()];
+
+        let mems = vec![a.clone(), b.clone(), c.clone()];
+        let selected = vec!["mem-b".to_string()];
+        let empty: HashMap<String, u32> = HashMap::new();
+
+        let sa = graph_proximity_score(&a, &mems, &selected, &empty);
+        let sc = graph_proximity_score(&c, &mems, &selected, &empty);
+        assert!((sa - 0.10).abs() < 1e-9, "requires should give 0.10, got {}", sa);
+        assert!((sc - 0.04).abs() < 1e-9, "optional should give 0.04, got {}", sc);
+    }
+
+    #[test]
+    fn related_edge_gives_intermediate_bonus() {
+        // mem-a --related--> mem-b (weight 0.7) ⇒ L1 bonus = 0.07
+        let mut a = make_mem("mem-a");
+        a.meta.related = vec!["mem-b".to_string()];
+        let b = make_mem("mem-b");
+        let mems = vec![a.clone(), b];
+        let selected = vec!["mem-b".to_string()];
+        let empty: HashMap<String, u32> = HashMap::new();
+        let s = graph_proximity_score(&a, &mems, &selected, &empty);
+        assert!((s - 0.07).abs() < 1e-9, "related should give 0.07, got {}", s);
+    }
+
+    #[test]
+    fn l2_bonus_uses_second_hop_weight() {
+        // a --requires--> b --related--> c ; selected = {b, c}
+        // L1(a→b, requires): 0.10 × 1.0 = 0.10
+        // L2(b→c, related):  0.03 × 0.7 = 0.021
+        let mut a = make_mem("mem-a");
+        a.meta.requires = vec!["mem-b".to_string()];
+        let mut b = make_mem("mem-b");
+        b.meta.related = vec!["mem-c".to_string()];
+        let c = make_mem("mem-c");
+        let mems = vec![a.clone(), b, c];
+        let selected = vec!["mem-b".to_string(), "mem-c".to_string()];
+        let empty: HashMap<String, u32> = HashMap::new();
+        let s = graph_proximity_score(&a, &mems, &selected, &empty);
+        assert!((s - (0.10 + 0.021)).abs() < 1e-9, "got {}", s);
+    }
+
+    #[test]
+    fn empty_selected_returns_zero() {
+        let a = make_mem("mem-a");
+        let empty: HashMap<String, u32> = HashMap::new();
+        assert_eq!(graph_proximity_score(&a, &[a.clone()], &[], &empty), 0.0);
     }
 }
