@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "ai-context-os"
-version = "0.1.24-beta"
+version = "0.1.25-beta"
 dependencies = [
  "axum",
  "chrono",

@@ -1,7 +1,7 @@
 {
   "name": "ai-context-os",
   "private": true,
-  "version": "0.1.24-beta",
+  "version": "0.1.25-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",
