@@ -17,10 +17,6 @@ export default defineConfig(async () => ({
             return "xyflow-vendor";
           }
 
-          if (id.includes("@tiptap")) {
-            return "editor-vendor";
-          }
-
           if (id.includes("@tauri-apps")) {
             return "tauri-vendor";
           }
