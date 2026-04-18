@@ -129,7 +129,7 @@ function HealthBanner({ health, history, hasUsageData, highImpactCount, onNaviga
           <p style={{ fontSize: 11, color: "var(--text-2)", margin: 0 }}>
             {!hasUsageData
               ? t("observability.health.needsUsageData")
-              : health.summary}
+              : t(`observability.health.summary.${health.status}`)}
           </p>
         </div>
 

@@ -601,6 +601,12 @@
       "needsUsageData": "Some scores need usage data — connect an AI tool and send a few requests to calibrate.",
       "fixIssue": "Fix {{count}} issue",
       "fixIssue_plural": "Fix {{count}} issues",
+      "summary": {
+        "empty": "No memories in the workspace.",
+        "healthy": "Workspace is healthy.",
+        "needs_attention": "Workspace needs attention. Review the pending optimizations.",
+        "critical": "Workspace is in poor shape. Critical optimizations pending."
+      },
       "dimensions": {
         "coverage": "Coverage",
         "coverageDesc": "% of memories ever surfaced by the router",

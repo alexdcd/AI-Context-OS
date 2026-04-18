@@ -1,8 +1,10 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useObservabilityStore } from "../../lib/observabilityStore";
 
 export function HealthBadge() {
   const { healthScore, loadHealthScore } = useObservabilityStore();
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadHealthScore();
@@ -19,10 +21,20 @@ export function HealthBadge() {
         ? "#f59e0b"
         : "#ef4444";
 
+  const tooltipLines = [
+    `${t("observability.health.dimensions.coverage")}: ${healthScore.breakdown.coverage.toFixed(0)}%`,
+    `${t("observability.health.dimensions.efficiency")}: ${healthScore.breakdown.efficiency.toFixed(0)}%`,
+    `${t("observability.health.dimensions.freshness")}: ${healthScore.breakdown.freshness.toFixed(0)}%`,
+    `${t("observability.health.dimensions.balance")}: ${healthScore.breakdown.balance.toFixed(0)}%`,
+    `${t("observability.health.dimensions.cleanliness")}: ${healthScore.breakdown.cleanliness.toFixed(0)}%`,
+    "",
+    t(`observability.health.summary.${healthScore.status}`),
+  ].join("\n");
+
   return (
     <div
       className="health-badge"
-      title={`Cobertura: ${healthScore.breakdown.coverage.toFixed(0)}%\nEficiencia: ${healthScore.breakdown.efficiency.toFixed(0)}%\nFrescura: ${healthScore.breakdown.freshness.toFixed(0)}%\nBalance: ${healthScore.breakdown.balance.toFixed(0)}%\nLimpieza: ${healthScore.breakdown.cleanliness.toFixed(0)}%\n\n${healthScore.summary}`}
+      title={tooltipLines}
       style={{
         display: "inline-flex",
         alignItems: "center",
