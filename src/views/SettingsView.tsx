@@ -4,10 +4,11 @@ import { clsx } from "clsx";
 import { getInferenceProviderConfig } from "../lib/tauri";
 import type { InferenceProviderConfig } from "../lib/types";
 import { GeneralTab } from "../components/settings/tabs/GeneralTab";
+import { AppearanceTab } from "../components/settings/tabs/AppearanceTab";
 import { LocalLLMTab } from "../components/settings/tabs/LocalLLMTab";
 import { CloudLLMTab } from "../components/settings/tabs/CloudLLMTab";
 
-type SettingsTab = "general" | "localLLM" | "cloudLLM";
+type SettingsTab = "general" | "appearance" | "localLLM" | "cloudLLM";
 
 export function SettingsView() {
   const { t } = useTranslation();
@@ -21,9 +22,10 @@ export function SettingsView() {
   }, []);
 
   const tabs: { id: SettingsTab; label: string }[] = [
-    { id: "general",  label: t("settings.tabs.general")  },
-    { id: "localLLM", label: t("settings.tabs.localLLM") },
-    { id: "cloudLLM", label: t("settings.tabs.cloudLLM") },
+    { id: "general",    label: t("settings.tabs.general")    },
+    { id: "appearance", label: t("settings.tabs.appearance") },
+    { id: "localLLM",   label: t("settings.tabs.localLLM")   },
+    { id: "cloudLLM",   label: t("settings.tabs.cloudLLM")   },
   ];
 
   return (
@@ -57,6 +59,7 @@ export function SettingsView() {
       <div className="flex-1 overflow-y-auto p-8">
         <div className="mx-auto max-w-2xl">
           {activeTab === "general" && <GeneralTab />}
+          {activeTab === "appearance" && <AppearanceTab />}
           {activeTab === "localLLM" && (
             <LocalLLMTab
               config={providerConfig}
