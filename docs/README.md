@@ -27,6 +27,10 @@ Contains development plans, technical reviews, and upcoming features:
 - [Pending Features](./roadmap/FEATURES-PENDIENTES.md)
 - [Technical Alignment Review](./roadmap/REVISION-TECNICA-ALINEACION-2026-03-29.md)
 
+### 3. Top-level guides
+Focused guides for specific product capabilities:
+- [Custom Themes](./themes.md)
+
 ## Scope of this folder
 
 These docs intentionally go deeper than the root README:

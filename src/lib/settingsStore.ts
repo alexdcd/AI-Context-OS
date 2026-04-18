@@ -1,17 +1,26 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useEffect } from "react";
+import { applyCustomThemeCss, clearCustomTheme, loadCustomThemeById } from "./themeLoader";
 
 export type Theme = "dark" | "light" | "system";
 export type Language = "en" | "es";
+export type AppearanceMode = "modern" | "classic";
 
 export interface SettingsStore {
   theme: Theme;
+  appearanceMode: AppearanceMode;
+  showMarkdownSyntax: boolean;
+  customThemeId: string | null;
   expertModeEnabled: boolean;
   showSystemFiles: boolean;
   language: Language;
   folderColors: Record<string, string>;
   setTheme: (theme: Theme) => void;
+  setAppearanceMode: (mode: AppearanceMode) => void;
+  setShowMarkdownSyntax: (show: boolean) => void;
+  toggleShowMarkdownSyntax: () => void;
+  setCustomThemeId: (id: string | null) => void;
   setExpertModeEnabled: (enabled: boolean) => void;
   toggleExpertModeEnabled: () => void;
   setShowSystemFiles: (show: boolean) => void;
@@ -25,11 +34,19 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       theme: "system",
+      appearanceMode: "modern",
+      showMarkdownSyntax: false,
+      customThemeId: null,
       expertModeEnabled: false,
       showSystemFiles: false,
       language: "en",
       folderColors: {},
       setTheme: (theme) => set({ theme }),
+      setAppearanceMode: (appearanceMode) => set({ appearanceMode }),
+      setShowMarkdownSyntax: (showMarkdownSyntax) => set({ showMarkdownSyntax }),
+      toggleShowMarkdownSyntax: () =>
+        set((state) => ({ showMarkdownSyntax: !state.showMarkdownSyntax })),
+      setCustomThemeId: (customThemeId) => set({ customThemeId }),
       setExpertModeEnabled: (expertModeEnabled) =>
         set((state) => ({
           expertModeEnabled,
@@ -90,4 +107,38 @@ export function useThemeEffect() {
       applyTheme(theme === "dark");
     }
   }, [theme]);
+}
+
+export function useAppearanceEffect() {
+  const appearanceMode = useSettingsStore((s) => s.appearanceMode);
+  const customThemeId = useSettingsStore((s) => s.customThemeId);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", appearanceMode);
+  }, [appearanceMode]);
+
+  useEffect(() => {
+    if (!customThemeId) {
+      clearCustomTheme();
+      return;
+    }
+
+    let cancelled = false;
+
+    void loadCustomThemeById(customThemeId).then((result) => {
+      if (cancelled) return;
+
+      if (!result.ok) {
+        clearCustomTheme();
+        useSettingsStore.setState({ customThemeId: null });
+        return;
+      }
+
+      applyCustomThemeCss(customThemeId, result.css);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customThemeId]);
 }

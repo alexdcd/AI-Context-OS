@@ -45,6 +45,51 @@
   --success: #57ab5a;
 }
 
+/* ─── Classic style: neutral grayscale accent ────────────────────────────
+   The style flavor layers on top of light/dark color schemes. `modern`
+   keeps the defaults above; `classic` replaces the accent with a neutral
+   near-black/near-white so the chrome feels more editorial and less
+   branded. Apply via `document.documentElement.dataset.theme = "classic"`.
+*/
+:root[data-theme="classic"].light {
+  --accent: #121212;
+  --accent-muted: rgba(18, 18, 18, 0.06);
+  --border-active: rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="classic"].dark {
+  --accent: #e9e9ea;
+  --accent-muted: rgba(233, 233, 234, 0.08);
+  --border-active: rgba(255, 255, 255, 0.20);
+}
+
+/* ─── Obsidian-compatible alias layer ────────────────────────────────────
+   A pragmatic compatibility surface so community themes distributed as a
+   single `.css` file (e.g. minimal by kepano) can target familiar tokens
+   without us adopting Obsidian's full design system. Themes that reference
+   these variables will pick up our current palette automatically. Not a
+   full port — advanced themes that rely on internal Obsidian selectors
+   won't work, but basic color/spacing skins will.
+*/
+:root {
+  --background-primary: var(--bg-1);
+  --background-primary-alt: var(--bg-2);
+  --background-secondary: var(--bg-0);
+  --background-secondary-alt: var(--bg-3);
+  --background-modifier-border: var(--border);
+  --background-modifier-border-hover: var(--border-active);
+  --text-normal: var(--text-0);
+  --text-muted: var(--text-1);
+  --text-faint: var(--text-2);
+  --text-accent: var(--accent);
+  --text-on-accent: #ffffff;
+  --interactive-accent: var(--accent);
+  --interactive-accent-hover: var(--accent);
+  --text-error: var(--danger);
+  --text-warning: var(--warning);
+  --text-success: var(--success);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -96,12 +141,12 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-2) 26%, transparent);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--text-2) 42%, transparent);
 }
 
 /* Layout shells */
@@ -128,6 +173,17 @@ textarea {
 
 .obs-inspector {
   transition: width 200ms ease, opacity 200ms ease;
+}
+
+.cm-editor .cm-link-icon {
+  opacity: 0.75;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.cm-editor .cm-link-preview:hover + .cm-link-icon,
+.cm-editor .cm-link-icon:hover {
+  opacity: 1;
+  transform: translateY(-1px);
 }
 
 /* TipTap editor — clean reading/writing experience */

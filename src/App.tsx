@@ -8,7 +8,7 @@ import { useContextEvents } from "./hooks/useContextEvents";
 import { useAppStore } from "./lib/store";
 import { isOnboarded } from "./lib/tauri";
 import { HealthBadge } from "./components/layout/HealthBadge";
-import { useThemeEffect } from "./lib/settingsStore";
+import { useThemeEffect, useAppearanceEffect } from "./lib/settingsStore";
 import { useVaultStore } from "./lib/vaultStore";
 import { VaultConfirmDialog } from "./components/vault/VaultConfirmDialog";
 import { VaultSwitchScreen } from "./components/vault/VaultSwitchScreen";
@@ -84,6 +84,7 @@ function AppContent() {
   useFileWatcher();
   useContextEvents();
   useThemeEffect();
+  useAppearanceEffect();
   const error = useAppStore((s) => s.error);
   const setError = useAppStore((s) => s.setError);
   const initialize = useAppStore((s) => s.initialize);
@@ -116,6 +117,9 @@ function AppContent() {
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (isEditableElement(e.target)) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(".cm-editor")) return;
+      if (document.querySelector(".cm-editor.cm-focused")) return;
       switch (e.key.toLowerCase()) {
         case "k":
           e.preventDefault();

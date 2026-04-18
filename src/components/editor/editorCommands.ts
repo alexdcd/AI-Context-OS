@@ -1,0 +1,130 @@
+import { EditorSelection, type Text } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
+
+type ChangeSpec = { from: number; to?: number; insert?: string };
+
+function getLinePrefixChange(line: { from: number; text: string }, prefix: string): ChangeSpec {
+  const headingMatch = line.text.match(/^#{1,6}\s+/);
+  const bulletMatch = line.text.match(/^(\s*)([-*+])\s+/);
+  const orderedMatch = line.text.match(/^(\s*)\d+\.\s+/);
+  const taskMatch = line.text.match(/^(\s*)-\s\[[ xX]\]\s+/);
+  const quoteMatch = line.text.match(/^>\s?/);
+
+  if (prefix.startsWith("#")) {
+    if (headingMatch && line.text.startsWith(prefix)) {
+      return { from: line.from, to: line.from + prefix.length, insert: "" };
+    }
+    if (headingMatch) {
+      return { from: line.from, to: line.from + headingMatch[0].length, insert: prefix };
+    }
+    return { from: line.from, insert: prefix };
+  }
+
+  if (prefix === "> ") {
+    if (quoteMatch) {
+      return { from: line.from, to: line.from + quoteMatch[0].length, insert: "" };
+    }
+    return { from: line.from, insert: prefix };
+  }
+
+  if (prefix === "- ") {
+    if (taskMatch) {
+      return { from: line.from, to: line.from + taskMatch[0].length, insert: prefix };
+    }
+    if (bulletMatch) {
+      return { from: line.from, to: line.from + bulletMatch[0].length, insert: "" };
+    }
+    if (orderedMatch) {
+      return { from: line.from, to: line.from + orderedMatch[0].length, insert: prefix };
+    }
+    return { from: line.from, insert: prefix };
+  }
+
+  if (prefix === "1. ") {
+    if (orderedMatch) {
+      return { from: line.from, to: line.from + orderedMatch[0].length, insert: "" };
+    }
+    if (bulletMatch) {
+      return { from: line.from, to: line.from + bulletMatch[0].length, insert: prefix };
+    }
+    return { from: line.from, insert: prefix };
+  }
+
+  if (prefix === "- [ ] ") {
+    if (taskMatch) {
+      return { from: line.from, to: line.from + taskMatch[0].length, insert: "" };
+    }
+    if (bulletMatch) {
+      return { from: line.from, to: line.from + bulletMatch[0].length, insert: prefix };
+    }
+    return { from: line.from, insert: prefix };
+  }
+
+  return { from: line.from, insert: prefix };
+}
+
+export function normalizeInlineRange(doc: Text, from: number, to: number) {
+  let nextFrom = from;
+  let nextTo = to;
+
+  while (nextTo > nextFrom) {
+    const char = doc.sliceString(nextTo - 1, nextTo);
+    if (char !== "\n" && char !== "\r") break;
+    nextTo -= 1;
+  }
+
+  const line = doc.lineAt(nextFrom);
+  if (nextFrom === line.from && nextTo >= line.to) {
+    const prefixMatch = line.text.match(/^(\s*(?:[-*+]\s|\d+\.\s|- \[[ xX]\]\s|>\s))/);
+    if (prefixMatch) {
+      nextFrom += prefixMatch[0].length;
+    }
+  }
+
+  return nextTo < nextFrom ? { from, to } : { from: nextFrom, to: nextTo };
+}
+
+export function applyLinePrefixToggle(view: EditorView, prefix: string) {
+  const { state } = view;
+  const lineNumbers = new Set<number>();
+
+  for (const range of state.selection.ranges) {
+    const startLine = state.doc.lineAt(range.from).number;
+    const endLine = state.doc.lineAt(range.to).number;
+    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+      lineNumbers.add(lineNumber);
+    }
+  }
+
+  const changes = Array.from(lineNumbers)
+    .sort((a, b) => a - b)
+    .map((lineNumber) => getLinePrefixChange(state.doc.line(lineNumber), prefix));
+
+  if (changes.length === 0) return;
+
+  view.dispatch({
+    changes,
+    selection: EditorSelection.create(
+      state.selection.ranges.map((range) => range.map(state.changes(changes))),
+      state.selection.mainIndex,
+    ),
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  view.focus();
+}
+
+export function insertMarkdownLink(view: EditorView, textPlaceholder: string) {
+  const { state } = view;
+  const range = state.selection.main;
+  const selected = state.sliceDoc(range.from, range.to) || textPlaceholder;
+  const insert = `[${selected}](url)`;
+
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert },
+    selection: EditorSelection.range(range.from + selected.length + 3, range.from + selected.length + 6),
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  view.focus();
+}

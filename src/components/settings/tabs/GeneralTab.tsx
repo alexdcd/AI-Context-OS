@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useSettingsStore, Theme } from "../../../lib/settingsStore";
-import { Monitor, Moon, Sun, Download, Upload, Check, Loader2, Eye, EyeOff } from "lucide-react";
+import { useSettingsStore } from "../../../lib/settingsStore";
+import { Download, Upload, Check, Loader2, Eye, EyeOff } from "lucide-react";
 import { clsx } from "clsx";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "../../../lib/store";
@@ -16,10 +16,8 @@ export function GeneralTab() {
   const handleCreateNew = () => window.dispatchEvent(new CustomEvent("vault:create-new"));
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
-  const theme = useSettingsStore((s) => s.theme);
   const expertModeEnabled = useSettingsStore((s) => s.expertModeEnabled);
   const showSystemFiles = useSettingsStore((s) => s.showSystemFiles);
-  const setTheme = useSettingsStore((s) => s.setTheme);
   const setExpertModeEnabled = useSettingsStore((s) => s.setExpertModeEnabled);
   const setShowSystemFiles = useSettingsStore((s) => s.setShowSystemFiles);
   const initialize = useAppStore((s) => s.initialize);
@@ -61,48 +59,9 @@ export function GeneralTab() {
     }
   }, [initialize, t]);
 
-  const themeOptions: { value: Theme; label: string; icon: typeof Monitor; describe: string }[] = [
-    { value: "system", label: t("settings.theme.system"), icon: Monitor, describe: t("settings.theme.systemDesc") },
-    { value: "light",  label: t("settings.theme.light"),  icon: Sun,     describe: t("settings.theme.lightDesc") },
-    { value: "dark",   label: t("settings.theme.dark"),   icon: Moon,    describe: t("settings.theme.darkDesc") },
-  ];
-
   return (
     <div className="space-y-6">
       <VaultSettingsSection onCreateNew={handleCreateNew} />
-
-      {/* Appearance */}
-      <section className="obs-panel border border-[color:var(--border)] p-6">
-        <h2 className="mb-4 text-lg font-medium text-[color:var(--text-0)]">{t("settings.appearance")}</h2>
-        <div className="flex flex-col gap-3">
-          {themeOptions.map((option) => {
-            const isActive = theme === option.value;
-            return (
-              <button
-                key={option.value}
-                onClick={() => setTheme(option.value)}
-                className={clsx(
-                  "flex flex-col items-start rounded-md border p-4 text-left transition-colors",
-                  isActive
-                    ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]"
-                    : "border-[color:var(--border)] bg-[color:var(--bg-0)] hover:border-[color:var(--border-active)]"
-                )}
-              >
-                <div className="flex w-full items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <option.icon className={clsx("h-5 w-5", isActive ? "text-[color:var(--accent)]" : "text-[color:var(--text-1)]")} />
-                    <span className={clsx("font-medium", isActive ? "text-[color:var(--text-0)]" : "text-[color:var(--text-1)]")}>
-                      {option.label}
-                    </span>
-                  </div>
-                  {isActive && <div className="h-2 w-2 rounded-full bg-[color:var(--accent)]" />}
-                </div>
-                <p className="mt-2 text-sm text-[color:var(--text-2)]">{option.describe}</p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
 
       {/* Language */}
       <section className="obs-panel border border-[color:var(--border)] p-6">

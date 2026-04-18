@@ -82,8 +82,32 @@
     },
     "tabs": {
       "general": "General",
+      "appearance": "Appearance",
       "localLLM": "Local LLM",
       "cloudLLM": "Cloud LLM"
+    },
+    "appearanceTab": {
+      "colorScheme": "Color scheme",
+      "colorSchemeDesc": "Choose whether the app follows your system or stays on a fixed mode.",
+      "style": "Style",
+      "styleDesc": "Modern keeps our signature accent. Classic swaps it for a neutral, editorial black-and-gray look.",
+      "modeModern": "Modern",
+      "modeModernDesc": "Vibrant accent, rounded surfaces — the default experience.",
+      "modeClassic": "Classic",
+      "modeClassicDesc": "Minimal, monochrome, distraction-free.",
+      "markdown": "Markdown syntax",
+      "markdownDesc": "By default, markers like # and ** are hidden except on the line under the cursor — similar to Obsidian's Live Preview. Turn this on to always see the raw Markdown.",
+      "markdownToggle": "Always show syntax",
+      "markdownOn": "Markers stay visible while you write.",
+      "markdownOff": "Markers appear only when the cursor is on that line.",
+      "customThemes": "Custom themes",
+      "customThemesDesc": "Drop a .css file into the vault's themes folder to skin the app. Themes can target our tokens (--bg-0, --text-0...) or the Obsidian-compatible aliases (--background-primary, --text-normal...).",
+      "customThemesEmpty": "No .css themes found in this vault yet.",
+      "customThemeNone": "Built-in (no custom theme)",
+      "createFolder": "Create themes folder",
+      "revealFolder": "Show themes folder",
+      "refresh": "Refresh",
+      "learnMore": "Learn more"
     },
     "localLLM": {
       "title": "Local LLM",
@@ -415,6 +439,30 @@
     "placeholders": {
       "typeHere": "Type here...",
       "l1Summary": "L1 summary (150-300 tokens)..."
+    },
+    "toolbar": {
+      "title": "Markdown formatting",
+      "searchPlaceholder": "Search formatting",
+      "noResults": "No results.",
+      "textPlaceholder": "text",
+      "codePlaceholder": "code",
+      "linkTextPlaceholder": "text",
+      "altPlaceholder": "alt",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strikethrough": "Strikethrough",
+      "inlineCode": "Inline code",
+      "link": "Link",
+      "image": "Image",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "bulletList": "Bullet list",
+      "numberedList": "Numbered list",
+      "taskList": "Task list",
+      "quote": "Quote",
+      "codeBlock": "Code block",
+      "divider": "Divider"
     },
     "saveStatus": {
       "saving": "Saving...",
