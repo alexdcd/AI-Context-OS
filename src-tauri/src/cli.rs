@@ -88,18 +88,12 @@ fn load_config(root: &PathBuf) -> Config {
         let content = std::fs::read_to_string(&config_path).unwrap_or_default();
         serde_yaml::from_str(&content).unwrap_or_else(|_| Config {
             root_dir: root.to_string_lossy().to_string(),
-            default_token_budget: 4000,
-            decay_threshold: 0.1,
-            scratch_ttl_days: 7,
-            active_tools: vec!["claude".to_string()],
+            ..Config::default()
         })
     } else {
         Config {
             root_dir: root.to_string_lossy().to_string(),
-            default_token_budget: 4000,
-            decay_threshold: 0.1,
-            scratch_ttl_days: 7,
-            active_tools: vec!["claude".to_string()],
+            ..Config::default()
         }
     }
 }
@@ -146,10 +140,7 @@ fn main() {
 
             let config = Config {
                 root_dir: root.to_string_lossy().to_string(),
-                default_token_budget: 4000,
-                decay_threshold: 0.1,
-                scratch_ttl_days: 7,
-                active_tools: vec!["claude".to_string()],
+                ..Config::default()
             };
             let paths = core::paths::SystemPaths::new(&root);
             let yaml = serde_yaml::to_string(&config).unwrap();

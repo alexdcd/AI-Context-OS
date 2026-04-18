@@ -23,14 +23,12 @@ pub fn create_workspace_structure(root: &Path, active_tools: &[String]) -> Resul
     // Create config
     let config = Config {
         root_dir: root.to_string_lossy().to_string(),
-        default_token_budget: 4000,
-        decay_threshold: 0.1,
-        scratch_ttl_days: 7,
         active_tools: if active_tools.is_empty() {
             vec!["claude".to_string()]
         } else {
             active_tools.to_vec()
         },
+        ..Config::default()
     };
     let config_yaml =
         serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
