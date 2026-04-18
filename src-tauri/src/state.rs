@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::core::index::scan_memories;
 use crate::core::observability::ObservabilityDb;
+use crate::core::paths::expand_home;
 use crate::core::types::Config;
 use crate::core::watcher::{MemoryIndex, WatcherHandle};
 
@@ -106,7 +107,7 @@ impl AppState {
         if trimmed.is_empty() {
             return None;
         }
-        Some(Self::expand_home(trimmed))
+        Some(expand_home(trimmed))
     }
 
     fn persist_root_hint(root: &Path) -> Result<(), String> {
