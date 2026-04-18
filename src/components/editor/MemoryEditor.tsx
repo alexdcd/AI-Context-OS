@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { FileText, PanelRightClose, PanelRightOpen, Trash2, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { useAppStore } from "../../lib/store";
+import { useSettingsStore } from "../../lib/settingsStore";
 import { FrontmatterForm } from "./FrontmatterForm";
 import { HybridMarkdownEditor } from "./HybridMarkdownEditor";
 import { FormatToolbar } from "./FormatToolbar";
@@ -53,6 +54,7 @@ export function MemoryEditor() {
     selectFile,
     setError,
   } = useAppStore();
+  const showMarkdownSyntax = useSettingsStore((s) => s.showMarkdownSyntax);
   const [meta, setMeta] = useState<MemoryMeta | null>(null);
   const [l1, setL1] = useState("");
   const [l2, setL2] = useState("");
@@ -375,7 +377,7 @@ export function MemoryEditor() {
             </p>
 
             <HybridMarkdownEditor
-              key={`${activeMemory.meta.id}-l2`}
+              key={`${activeMemory.meta.id}-l2-${showMarkdownSyntax ? "raw" : "preview"}`}
               content={l2}
               onChange={(val) => {
                 setL2(val);
@@ -386,6 +388,7 @@ export function MemoryEditor() {
               placeholder={t("memoryEditor.placeholders.typeHere")}
               editable={!isProtected}
               viewRef={editorViewRef}
+              showSyntax={showMarkdownSyntax}
             />
 
             <div className="mt-10 border-t border-[color:color-mix(in_srgb,var(--accent)_12%,var(--border))] pt-4">
