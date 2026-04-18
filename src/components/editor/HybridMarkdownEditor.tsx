@@ -19,6 +19,7 @@ import { tags as t } from "@lezer/highlight";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   content: string;
@@ -460,10 +461,10 @@ function applyToggleLinePrefix(view: EditorView, prefix: string) {
   view.dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
 }
 
-function insertMarkdownLink(view: EditorView) {
+function insertMarkdownLink(view: EditorView, textPlaceholder: string) {
   const { state } = view;
   const range = state.selection.main;
-  const selected = state.sliceDoc(range.from, range.to) || "texto";
+  const selected = state.sliceDoc(range.from, range.to) || textPlaceholder;
   const insert = `[${selected}](url)`;
   view.dispatch({
     changes: { from: range.from, to: range.to, insert },
@@ -508,26 +509,28 @@ function wrapWith(mark: string): StateCommand {
   };
 }
 
-const markdownKeymap: KeyBinding[] = [
-  { key: "Mod-b", run: toggleMark("**") },
-  { key: "Mod-i", run: toggleMark("*") },
-  { key: "Mod-e", run: toggleMark("`") },
-  {
-    key: "Mod-k",
-    run: (target) => {
-      insertMarkdownLink(target as unknown as EditorView);
-      return true;
+function createMarkdownKeymap(linkTextPlaceholder: string): KeyBinding[] {
+  return [
+    { key: "Mod-b", run: toggleMark("**") },
+    { key: "Mod-i", run: toggleMark("*") },
+    { key: "Mod-e", run: toggleMark("`") },
+    {
+      key: "Mod-k",
+      run: (target) => {
+        insertMarkdownLink(target as unknown as EditorView, linkTextPlaceholder);
+        return true;
+      },
     },
-  },
-  { key: "Mod-1", run: toggleLinePrefixCommand("# ") },
-  { key: "Mod-2", run: toggleLinePrefixCommand("## ") },
-  { key: "Mod-3", run: toggleLinePrefixCommand("### ") },
-  { key: "Mod-Shift-x", run: toggleMark("~~") },
-  { key: "*", run: wrapWith("*") },
-  { key: "_", run: wrapWith("_") },
-  { key: "`", run: wrapWith("`") },
-  { key: "~", run: wrapWith("~") },
-];
+    { key: "Mod-1", run: toggleLinePrefixCommand("# ") },
+    { key: "Mod-2", run: toggleLinePrefixCommand("## ") },
+    { key: "Mod-3", run: toggleLinePrefixCommand("### ") },
+    { key: "Mod-Shift-x", run: toggleMark("~~") },
+    { key: "*", run: wrapWith("*") },
+    { key: "_", run: wrapWith("_") },
+    { key: "`", run: wrapWith("`") },
+    { key: "~", run: wrapWith("~") },
+  ];
+}
 
 const turndownService = new TurndownService({
   headingStyle: "atx",
@@ -538,90 +541,130 @@ const turndownService = new TurndownService({
   strongDelimiter: "**",
 });
 
-const domHandlers = EditorView.domEventHandlers({
-  keydown(event, view) {
-    const isMod = event.metaKey || event.ctrlKey;
-    if (!isMod) return false;
-
-    const key = event.key.toLowerCase();
-    if (key === "b") {
-      event.preventDefault();
-      applyToggleMark(view, "**");
-      return true;
-    }
-    if (key === "i") {
-      event.preventDefault();
-      applyToggleMark(view, "*");
-      return true;
-    }
-    if (key === "e") {
-      event.preventDefault();
-      applyToggleMark(view, "`");
-      return true;
-    }
-    if (key === "k") {
-      event.preventDefault();
-      insertMarkdownLink(view);
-      return true;
-    }
-    if (key === "1" || key === "2" || key === "3") {
-      event.preventDefault();
-      applyToggleLinePrefix(view, key === "1" ? "# " : key === "2" ? "## " : "### ");
-      return true;
-    }
-    if (event.shiftKey && key === "x") {
-      event.preventDefault();
-      applyToggleMark(view, "~~");
-      return true;
-    }
-
-    return false;
+function getParagraphSelection(
+  doc: {
+    lineAt: (pos: number) => { from: number; to: number; text: string; number: number };
+    line: (number: number) => { from: number; to: number; text: string; number: number };
+    lines: number;
   },
+  pos: number,
+) {
+  const isBlankLine = (text: string) => text.trim().length === 0;
+  const currentLine = doc.lineAt(pos);
 
-  paste(event, view) {
-    const data = event.clipboardData;
-    if (!data) return false;
-    if (data.getData("vscode-editor-data") || data.getData("text/plain").includes("```")) {
+  if (isBlankLine(currentLine.text)) {
+    return { from: currentLine.from, to: currentLine.to };
+  }
+
+  let startLine = currentLine.number;
+  let endLine = currentLine.number;
+
+  while (startLine > 1) {
+    const prevLine = doc.line(startLine - 1);
+    if (isBlankLine(prevLine.text)) break;
+    startLine -= 1;
+  }
+
+  while (endLine < doc.lines) {
+    const nextLine = doc.line(endLine + 1);
+    if (isBlankLine(nextLine.text)) break;
+    endLine += 1;
+  }
+
+  return {
+    from: doc.line(startLine).from,
+    to: doc.line(endLine).to,
+  };
+}
+
+function createDomHandlers(linkTextPlaceholder: string) {
+  return EditorView.domEventHandlers({
+    keydown(event, view) {
+      const isMod = event.metaKey || event.ctrlKey;
+      if (!isMod) return false;
+
+      const key = event.key.toLowerCase();
+      if (key === "b") {
+        event.preventDefault();
+        applyToggleMark(view, "**");
+        return true;
+      }
+      if (key === "i") {
+        event.preventDefault();
+        applyToggleMark(view, "*");
+        return true;
+      }
+      if (key === "e") {
+        event.preventDefault();
+        applyToggleMark(view, "`");
+        return true;
+      }
+      if (key === "k") {
+        event.preventDefault();
+        insertMarkdownLink(view, linkTextPlaceholder);
+        return true;
+      }
+      if (key === "1" || key === "2" || key === "3") {
+        event.preventDefault();
+        applyToggleLinePrefix(view, key === "1" ? "# " : key === "2" ? "## " : "### ");
+        return true;
+      }
+      if (event.shiftKey && key === "x") {
+        event.preventDefault();
+        applyToggleMark(view, "~~");
+        return true;
+      }
+
       return false;
-    }
+    },
 
-    const html = data.getData("text/html");
-    if (!html) return false;
+    paste(event, view) {
+      const data = event.clipboardData;
+      if (!data) return false;
+      if (data.getData("vscode-editor-data") || data.getData("text/plain").includes("```")) {
+        return false;
+      }
 
-    try {
-      const parsedMarkdown = turndownService.turndown(html);
-      if (!parsedMarkdown) return false;
+      const html = data.getData("text/html");
+      if (!html) return false;
 
-      const changes = view.state.changeByRange((range) => ({
-        changes: [{ from: range.from, to: range.to, insert: parsedMarkdown }],
-        range: EditorSelection.range(range.from + parsedMarkdown.length, range.from + parsedMarkdown.length),
-      }));
+      try {
+        const parsedMarkdown = turndownService.turndown(html);
+        if (!parsedMarkdown) return false;
 
-      view.dispatch(view.state.update(changes, { scrollIntoView: true, userEvent: "input.paste" }));
+        const changes = view.state.changeByRange((range) => ({
+          changes: [{ from: range.from, to: range.to, insert: parsedMarkdown }],
+          range: EditorSelection.range(range.from + parsedMarkdown.length, range.from + parsedMarkdown.length),
+        }));
+
+        view.dispatch(view.state.update(changes, { scrollIntoView: true, userEvent: "input.paste" }));
+        event.preventDefault();
+        return true;
+      } catch (error) {
+        console.error("Paste Turndown Error:", error);
+        return false;
+      }
+    },
+
+    click(event, view) {
+      if (event.detail !== 3) return false;
+
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      if (pos === null) return false;
+
+      const selection = getParagraphSelection(view.state.doc, pos);
+      if (selection.from === selection.to) return false;
+
+      view.dispatch({
+        selection: EditorSelection.range(selection.from, selection.to),
+        scrollIntoView: true,
+        userEvent: "select.pointer",
+      });
       event.preventDefault();
       return true;
-    } catch (error) {
-      console.error("Paste Turndown Error:", error);
-      return false;
-    }
-  },
-
-  dblclick(event, view) {
-    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-    if (pos === null) return false;
-
-    const selection = getContentSelectionForLine(view.state.doc, pos);
-    if (selection.from === selection.to) return false;
-
-    view.dispatch({
-      selection: EditorSelection.range(selection.from, selection.to),
-      scrollIntoView: true,
-      userEvent: "select.pointer",
-    });
-    event.preventDefault();
-    return true;
-  },
-});
+    },
+  });
+}
 
 export function HybridMarkdownEditor({
   content,
@@ -634,7 +677,9 @@ export function HybridMarkdownEditor({
   viewRef,
   showSyntax = false,
 }: Props) {
+  const { t } = useTranslation();
   const localRef = useRef<EditorView | null>(null);
+  const linkTextPlaceholder = t("memoryEditor.toolbar.linkTextPlaceholder");
 
   useEffect(
     () => () => {
@@ -654,11 +699,11 @@ export function HybridMarkdownEditor({
       ...(showSyntax ? [] : [livePreviewPlugin]),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
-      keymap.of(markdownKeymap),
+      keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      domHandlers,
+      createDomHandlers(linkTextPlaceholder),
     ],
-    [themeVariant, showSyntax],
+    [themeVariant, showSyntax, linkTextPlaceholder],
   );
 
   return (
