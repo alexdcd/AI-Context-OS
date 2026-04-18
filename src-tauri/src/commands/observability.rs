@@ -84,10 +84,18 @@ pub fn get_unused_memories_stats(
 
 #[tauri::command]
 pub fn get_health_score(state: State<AppState>) -> Result<HealthScore, String> {
-    let root = state.get_root();
+    // Snapshot the in-memory index instead of re-scanning the filesystem.
+    // The watcher keeps memory_index in sync, so this is authoritative.
+    let entries: Vec<_> = state
+        .memory_index
+        .read()
+        .map_err(|e| format!("memory_index poisoned: {}", e))?
+        .values()
+        .cloned()
+        .collect();
     let obs = state.observability.lock().unwrap();
     match obs.as_ref() {
-        Some(db) => compute_health_score(db, &root),
+        Some(db) => compute_health_score(db, &entries),
         None => Err("Observability DB not initialized".to_string()),
     }
 }

@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::core::index::scan_memories;
 use crate::core::observability::ObservabilityDb;
-use std::path::Path;
+use crate::core::types::MemoryMeta;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthBreakdown {
@@ -17,13 +16,20 @@ pub struct HealthBreakdown {
 pub struct HealthScore {
     pub score: u32,
     pub breakdown: HealthBreakdown,
-    pub summary: String,
+    /// Translation key for the frontend. One of:
+    /// `empty` | `healthy` | `needs_attention` | `critical`.
+    pub status: String,
 }
 
 /// Compute a health score (0-100) from 5 components.
-pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthScore, String> {
-    let all_entries = scan_memories(root);
-    let total_memories = all_entries.len() as f64;
+///
+/// `entries` is the already-loaded memory index (see `AppState::memory_index`) —
+/// passed in to avoid re-scanning the filesystem on every call.
+pub fn compute_health_score(
+    db: &ObservabilityDb,
+    entries: &[(MemoryMeta, String)],
+) -> Result<HealthScore, String> {
+    let total_memories = entries.len() as f64;
 
     if total_memories == 0.0 {
         return Ok(HealthScore {
@@ -35,7 +41,7 @@ pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthS
                 balance: 0.0,
                 cleanliness: 0.0,
             },
-            summary: "Sin memorias en el workspace.".to_string(),
+            status: "empty".to_string(),
         });
     }
 
@@ -64,7 +70,7 @@ pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthS
     // 3. Freshness (20%) — % of memories with recent last_access (< 14 days)
     let freshness = {
         let now = chrono::Utc::now();
-        let fresh_count = all_entries
+        let fresh_count = entries
             .iter()
             .filter(|(meta, _)| {
                 let age_days = (now - meta.last_access).num_days();
@@ -78,7 +84,7 @@ pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthS
     let balance = {
         let mut type_counts: std::collections::HashMap<String, u32> =
             std::collections::HashMap::new();
-        for (meta, _) in &all_entries {
+        for (meta, _) in entries {
             let ontology_name = format!("{:?}", meta.ontology);
             *type_counts.entry(ontology_name).or_insert(0) += 1;
         }
@@ -115,13 +121,14 @@ pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthS
         + cleanliness * 0.15;
     let score = weighted.round() as u32;
 
-    let summary = if score > 70 {
-        "Workspace saludable.".to_string()
+    let status = if score > 70 {
+        "healthy"
     } else if score > 40 {
-        "Workspace necesita atencion. Revisa las optimizaciones.".to_string()
+        "needs_attention"
     } else {
-        "Workspace en mal estado. Hay optimizaciones criticas pendientes.".to_string()
-    };
+        "critical"
+    }
+    .to_string();
 
     let breakdown = HealthBreakdown {
         coverage,
@@ -138,6 +145,6 @@ pub fn compute_health_score(db: &ObservabilityDb, root: &Path) -> Result<HealthS
     Ok(HealthScore {
         score,
         breakdown,
-        summary,
+        status,
     })
 }
