@@ -394,6 +394,7 @@ const structuralDecorations = ViewPlugin.fromClass(
             if (node.name === "ListItem" && node.node.parent?.name === "BulletList") {
               let hasTaskChild = false;
               let taskMarker: string | null = null;
+              const depth = getListDepth(node.node);
               for (let child = node.node.firstChild; child; child = child.nextSibling) {
                 if (child.name === "Task") {
                   hasTaskChild = true;
@@ -408,34 +409,64 @@ const structuralDecorations = ViewPlugin.fromClass(
               }
               if (hasTaskChild) {
                 addLineClass(builder, node.from, "cm-task-item");
+                addLineClass(builder, node.from, `cm-list-depth-${depth}`);
                 if (taskMarker?.toLowerCase().includes("x")) {
                   addLineClass(builder, node.from, "cm-task-checked");
                 }
               } else {
                 addLineClass(builder, node.from, "cm-bullet-item");
+                addLineClass(builder, node.from, `cm-list-depth-${depth}`);
               }
               return;
             }
 
             if (node.name === "ListItem" && node.node.parent?.name === "OrderedList") {
+              const depth = getListDepth(node.node);
               const listMark = node.node.firstChild;
               const markerText =
                 listMark?.name === "ListMark"
                   ? view.state.doc.sliceString(listMark.from, listMark.to).replace(/\.$/, "")
                   : "";
               addLineClass(builder, node.from, "cm-ordered-item");
+              addLineClass(builder, node.from, `cm-list-depth-${depth}`);
               addLineAttributes(builder, node.from, { "data-list-index": markerText });
+              return;
+            }
+
+            if (node.name === "TableHeader") {
+              addLineClass(builder, node.from, "cm-table-header");
+              return;
+            }
+
+            if (node.name === "TableDelimiter") {
+              const line = view.state.doc.lineAt(node.from);
+              if (line.from === node.from) {
+                addLineClass(builder, node.from, "cm-table-separator");
+              }
+              return;
+            }
+
+            if (node.name === "TableRow") {
+              addLineClass(builder, node.from, "cm-table-row");
               return;
             }
 
             if (node.name === "FencedCode") {
               const startLine = view.state.doc.lineAt(node.from);
               const endLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1));
+              let language = "";
+              for (let child = node.node.firstChild; child; child = child.nextSibling) {
+                if (child.name === "CodeInfo") {
+                  language = view.state.doc.sliceString(child.from, child.to).trim();
+                  break;
+                }
+              }
               for (let lineNumber = startLine.number; lineNumber <= endLine.number; lineNumber += 1) {
                 const line = view.state.doc.line(lineNumber);
                 addLineClass(builder, line.from, "cm-codeblock");
                 if (lineNumber === startLine.number) {
                   addLineClass(builder, line.from, "cm-codeblock-start");
+                  addLineAttributes(builder, line.from, { "data-code-language": language || "code" });
                 } else if (lineNumber === endLine.number) {
                   addLineClass(builder, line.from, "cm-codeblock-end");
                 } else {
@@ -447,6 +478,18 @@ const structuralDecorations = ViewPlugin.fromClass(
 
             if (node.name === "HorizontalRule") {
               addLineClass(builder, node.from, "cm-hr");
+              return;
+            }
+
+            if (node.name === "Image") {
+              const raw = view.state.doc.sliceString(node.from, node.to);
+              const match = raw.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+              if (!match) return;
+              builder.add(
+                node.from,
+                node.to,
+                Decoration.replace({ widget: new ImagePreviewWidget(match[1], match[2]) }),
+              );
             }
           },
         });
@@ -635,6 +678,8 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
               "HorizontalRule",
               "ListMark",
               "TaskMarker",
+              "CodeInfo",
+              "TableDelimiter",
             ].includes(node.name);
 
               const line = state.doc.lineAt(node.from).number;
