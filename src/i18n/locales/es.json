@@ -82,8 +82,32 @@
     },
     "tabs": {
       "general": "General",
+      "appearance": "Apariencia",
       "localLLM": "LLM Local",
       "cloudLLM": "LLM Cloud"
+    },
+    "appearanceTab": {
+      "colorScheme": "Esquema de color",
+      "colorSchemeDesc": "Elige si la app sigue tu sistema o se mantiene en un modo fijo.",
+      "style": "Estilo",
+      "styleDesc": "Modern mantiene nuestro acento característico. Classic lo cambia por un aspecto editorial en blanco y negro.",
+      "modeModern": "Modern",
+      "modeModernDesc": "Acento vibrante, superficies redondeadas — la experiencia por defecto.",
+      "modeClassic": "Classic",
+      "modeClassicDesc": "Minimalista, monocromo, sin distracciones.",
+      "markdown": "Sintaxis Markdown",
+      "markdownDesc": "Por defecto, marcadores como # o ** se ocultan salvo en la línea donde está el cursor — al estilo del Live Preview de Obsidian. Actívalo para ver siempre el Markdown en bruto.",
+      "markdownToggle": "Mostrar sintaxis siempre",
+      "markdownOn": "Los marcadores permanecen visibles mientras escribes.",
+      "markdownOff": "Los marcadores aparecen solo en la línea del cursor.",
+      "customThemes": "Temas personalizados",
+      "customThemesDesc": "Coloca un archivo .css en la carpeta themes de tu vault para aplicar un tema. Puede usar nuestras variables (--bg-0, --text-0...) o los alias compatibles con Obsidian (--background-primary, --text-normal...).",
+      "customThemesEmpty": "Aún no hay temas .css en este vault.",
+      "customThemeNone": "Predeterminado (sin tema personalizado)",
+      "createFolder": "Crear carpeta themes",
+      "revealFolder": "Mostrar carpeta themes",
+      "refresh": "Actualizar",
+      "learnMore": "Más información"
     },
     "localLLM": {
       "title": "LLM Local",
