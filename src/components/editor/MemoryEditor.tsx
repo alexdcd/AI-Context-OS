@@ -677,7 +677,7 @@ function RawFileEditor({
   useEffect(() => {
     setContent(file.content);
     setSaveStatus("saved");
-  }, [file.path]);
+  }, [file.path, file.content]);
 
   const dirty = content !== file.content;
   const lineCount = content.length === 0 ? 0 : content.split(/\r?\n/).length;

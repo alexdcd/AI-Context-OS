@@ -20,6 +20,7 @@ import {
   Type,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   viewRef: React.MutableRefObject<EditorView | null>;
@@ -166,10 +167,10 @@ function insertBlock(view: EditorView, text: string, cursorOffset?: number) {
   view.focus();
 }
 
-function insertLink(view: EditorView) {
+function insertLink(view: EditorView, textPlaceholder: string) {
   const { state } = view;
   const range = state.selection.main;
-  const selected = state.sliceDoc(range.from, range.to) || "texto";
+  const selected = state.sliceDoc(range.from, range.to) || textPlaceholder;
   const insert = `[${selected}](url)`;
 
   view.dispatch({
@@ -181,13 +182,13 @@ function insertLink(view: EditorView) {
   view.focus();
 }
 
-function insertImage(view: EditorView) {
+function insertImage(view: EditorView, altPlaceholder: string) {
   const { state } = view;
   const range = state.selection.main;
 
   view.dispatch({
-    changes: { from: range.from, to: range.to, insert: "![alt](url)" },
-    selection: EditorSelection.range(range.from + 7, range.from + 10),
+    changes: { from: range.from, to: range.to, insert: `![${altPlaceholder}](url)` },
+    selection: EditorSelection.range(range.from + 2, range.from + 2 + altPlaceholder.length),
     scrollIntoView: true,
     userEvent: "input",
   });
@@ -203,29 +204,135 @@ type Item = {
   run: (view: EditorView) => void;
 };
 
-const items: Item[] = [
-  { key: "bold", label: "Negrita", shortcut: "Cmd+B", keywords: ["bold"], icon: <Bold className="h-3.5 w-3.5" />, run: (view) => wrapSelection(view, "**", "texto") },
-  { key: "italic", label: "Cursiva", shortcut: "Cmd+I", keywords: ["italic"], icon: <Type className="h-3.5 w-3.5 italic" />, run: (view) => wrapSelection(view, "*", "texto") },
-  { key: "strike", label: "Tachado", shortcut: "Cmd+Shift+X", keywords: ["strike"], icon: <Strikethrough className="h-3.5 w-3.5" />, run: (view) => wrapSelection(view, "~~", "texto") },
-  { key: "code", label: "Codigo inline", shortcut: "Cmd+E", keywords: ["code"], icon: <Code className="h-3.5 w-3.5" />, run: (view) => wrapSelection(view, "`", "codigo") },
-  { key: "link", label: "Enlace", shortcut: "Cmd+K", keywords: ["url", "link"], icon: <LinkIcon className="h-3.5 w-3.5" />, run: insertLink },
-  { key: "image", label: "Imagen", keywords: ["image"], icon: <ImageIcon className="h-3.5 w-3.5" />, run: insertImage },
-  { key: "h1", label: "Heading 1", shortcut: "Cmd+1", keywords: ["h1", "titulo"], icon: <Heading1 className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "# ") },
-  { key: "h2", label: "Heading 2", shortcut: "Cmd+2", keywords: ["h2", "subtitulo"], icon: <Heading2 className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "## ") },
-  { key: "h3", label: "Heading 3", shortcut: "Cmd+3", keywords: ["h3"], icon: <Heading3 className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "### ") },
-  { key: "ul", label: "Lista", keywords: ["unordered", "bullet"], icon: <List className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "- ") },
-  { key: "ol", label: "Lista numerada", keywords: ["ordered", "numbered"], icon: <ListOrdered className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "1. ") },
-  { key: "task", label: "Lista de tareas", keywords: ["task", "checkbox"], icon: <ListChecks className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "- [ ] ") },
-  { key: "quote", label: "Cita", keywords: ["quote", "blockquote"], icon: <Quote className="h-3.5 w-3.5" />, run: (view) => toggleLinePrefix(view, "> ") },
-  { key: "codeblock", label: "Bloque de codigo", keywords: ["snippet", "fenced"], icon: <Code className="h-3.5 w-3.5" />, run: (view) => insertBlock(view, "```\n\n```", 4) },
-  { key: "hr", label: "Separador", keywords: ["divider", "horizontal"], icon: <Minus className="h-3.5 w-3.5" />, run: (view) => insertBlock(view, "---\n") },
-];
-
 export function FormatToolbar({ viewRef, disabled = false }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const shortcutMod = useMemo(
+    () => (typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "Cmd" : "Ctrl"),
+    [],
+  );
+
+  const items: Item[] = useMemo(
+    () => [
+      {
+        key: "bold",
+        label: t("memoryEditor.toolbar.bold"),
+        shortcut: `${shortcutMod}+B`,
+        keywords: ["bold", "strong", "negrita"],
+        icon: <Bold className="h-3.5 w-3.5" />,
+        run: (view) => wrapSelection(view, "**", t("memoryEditor.toolbar.textPlaceholder")),
+      },
+      {
+        key: "italic",
+        label: t("memoryEditor.toolbar.italic"),
+        shortcut: `${shortcutMod}+I`,
+        keywords: ["italic", "emphasis", "cursiva"],
+        icon: <Type className="h-3.5 w-3.5 italic" />,
+        run: (view) => wrapSelection(view, "*", t("memoryEditor.toolbar.textPlaceholder")),
+      },
+      {
+        key: "strike",
+        label: t("memoryEditor.toolbar.strikethrough"),
+        shortcut: `${shortcutMod}+Shift+X`,
+        keywords: ["strike", "strikethrough", "tachado"],
+        icon: <Strikethrough className="h-3.5 w-3.5" />,
+        run: (view) => wrapSelection(view, "~~", t("memoryEditor.toolbar.textPlaceholder")),
+      },
+      {
+        key: "code",
+        label: t("memoryEditor.toolbar.inlineCode"),
+        shortcut: `${shortcutMod}+E`,
+        keywords: ["code", "inline code", "codigo"],
+        icon: <Code className="h-3.5 w-3.5" />,
+        run: (view) => wrapSelection(view, "`", t("memoryEditor.toolbar.codePlaceholder")),
+      },
+      {
+        key: "link",
+        label: t("memoryEditor.toolbar.link"),
+        shortcut: `${shortcutMod}+K`,
+        keywords: ["url", "link", "enlace"],
+        icon: <LinkIcon className="h-3.5 w-3.5" />,
+        run: (view) => insertLink(view, t("memoryEditor.toolbar.linkTextPlaceholder")),
+      },
+      {
+        key: "image",
+        label: t("memoryEditor.toolbar.image"),
+        keywords: ["image", "alt", "imagen"],
+        icon: <ImageIcon className="h-3.5 w-3.5" />,
+        run: (view) => insertImage(view, t("memoryEditor.toolbar.altPlaceholder")),
+      },
+      {
+        key: "h1",
+        label: t("memoryEditor.toolbar.heading1"),
+        shortcut: `${shortcutMod}+1`,
+        keywords: ["h1", "heading", "title", "titulo"],
+        icon: <Heading1 className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "# "),
+      },
+      {
+        key: "h2",
+        label: t("memoryEditor.toolbar.heading2"),
+        shortcut: `${shortcutMod}+2`,
+        keywords: ["h2", "heading", "subtitle", "subtitulo"],
+        icon: <Heading2 className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "## "),
+      },
+      {
+        key: "h3",
+        label: t("memoryEditor.toolbar.heading3"),
+        shortcut: `${shortcutMod}+3`,
+        keywords: ["h3", "heading"],
+        icon: <Heading3 className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "### "),
+      },
+      {
+        key: "ul",
+        label: t("memoryEditor.toolbar.bulletList"),
+        keywords: ["unordered", "bullet", "list", "lista"],
+        icon: <List className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "- "),
+      },
+      {
+        key: "ol",
+        label: t("memoryEditor.toolbar.numberedList"),
+        keywords: ["ordered", "numbered", "list", "lista"],
+        icon: <ListOrdered className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "1. "),
+      },
+      {
+        key: "task",
+        label: t("memoryEditor.toolbar.taskList"),
+        keywords: ["task", "checkbox", "todo", "checklist"],
+        icon: <ListChecks className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "- [ ] "),
+      },
+      {
+        key: "quote",
+        label: t("memoryEditor.toolbar.quote"),
+        keywords: ["quote", "blockquote", "cita"],
+        icon: <Quote className="h-3.5 w-3.5" />,
+        run: (view) => toggleLinePrefix(view, "> "),
+      },
+      {
+        key: "codeblock",
+        label: t("memoryEditor.toolbar.codeBlock"),
+        keywords: ["snippet", "fenced", "code block", "bloque"],
+        icon: <Code className="h-3.5 w-3.5" />,
+        run: (view) => insertBlock(view, "```\n\n```", 4),
+      },
+      {
+        key: "hr",
+        label: t("memoryEditor.toolbar.divider"),
+        keywords: ["divider", "horizontal rule", "separator", "separador"],
+        icon: <Minus className="h-3.5 w-3.5" />,
+        run: (view) => insertBlock(view, "---\n"),
+      },
+    ],
+    [shortcutMod, t],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -278,7 +385,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
           "flex items-center gap-1 rounded-md border border-[var(--border)] bg-[color:var(--bg-1)] px-2 py-1 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-0)] disabled:opacity-50",
           open && "bg-[color:var(--bg-2)] text-[color:var(--text-0)]",
         )}
-        title="Formato Markdown"
+        title={t("memoryEditor.toolbar.title")}
       >
         <span>Aa</span>
         <ChevronDown className={clsx("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
@@ -294,7 +401,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar formato"
+                placeholder={t("memoryEditor.toolbar.searchPlaceholder")}
                 className="w-full bg-transparent text-sm text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)] focus:outline-none"
               />
             </div>
@@ -302,7 +409,9 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
 
           <div className="max-h-80 overflow-y-auto p-1.5">
             {filteredItems.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-[color:var(--text-2)]">No hay resultados.</div>
+              <div className="px-3 py-6 text-center text-sm text-[color:var(--text-2)]">
+                {t("memoryEditor.toolbar.noResults")}
+              </div>
             ) : (
               filteredItems.map((item) => (
                 <button
