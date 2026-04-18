@@ -66,80 +66,129 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
   const preset = editorThemePresets[variant];
 
   return EditorView.theme({
-  "&": {
-    backgroundColor: "transparent !important",
-    color: "var(--text-0)",
-    fontSize: preset.baseFontSize,
-    lineHeight: preset.lineHeight,
-  },
-  ".cm-scroller": {
-    fontFamily: "inherit",
-  },
-  ".cm-content": {
-    padding: "0.1rem 0 4rem",
-    caretColor: "var(--text-0)",
-  },
-  "&.cm-focused": {
-    outline: "none",
-  },
-  ".cm-gutters": {
-    display: "none",
-  },
-  ".cm-line": {
-    padding: "0.12rem 0",
-    fontFamily: "inherit",
-    wordWrap: "break-word",
-    whiteSpace: "pre-wrap",
-  },
-  ".cm-activeLine": {
-    backgroundColor: "transparent",
-  },
-  ".cm-selectionBackground, ::selection": {
-    backgroundColor: "var(--bg-3) !important",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "var(--text-0)",
-  },
-  ".cm-line.cm-h1": {
-    fontSize: preset.heading1Size,
-    fontWeight: "740",
-    lineHeight: "1.22",
-    letterSpacing: "-0.025em",
-    paddingTop: "0.75em",
-    paddingBottom: "0.32em",
-    borderBottom: preset.headingBorderStrong,
-  },
-  ".cm-line.cm-h2": {
-    fontSize: preset.heading2Size,
-    fontWeight: "700",
-    lineHeight: "1.26",
-    color: preset.heading2Color,
-    paddingTop: "0.65em",
-    paddingBottom: "0.22em",
-    borderBottom: preset.headingBorderSoft,
-  },
-  ".cm-line.cm-h3": {
-    fontSize: "1.24em",
-    fontWeight: "670",
-    lineHeight: "1.3",
-    paddingTop: "0.5em",
-  },
-  ".cm-line.cm-h4": {
-    fontSize: "1.08em",
-    fontWeight: "640",
-    paddingTop: "0.35em",
-  },
-  ".cm-line.cm-h5": {
-    fontSize: "1em",
-    fontWeight: "630",
-  },
-  ".cm-line.cm-h6": {
-    fontSize: "0.94em",
-    fontWeight: "620",
-    color: "var(--text-2)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  },
+    "&": {
+      backgroundColor: "transparent !important",
+      color: "var(--text-0)",
+      fontSize: preset.baseFontSize,
+      lineHeight: preset.lineHeight,
+    },
+    ".cm-scroller": {
+      fontFamily: "inherit",
+    },
+    ".cm-content": {
+      padding: "0.1rem 0 4rem",
+      caretColor: "var(--text-0)",
+    },
+    "&.cm-focused": {
+      outline: "none",
+    },
+    ".cm-gutters": {
+      display: "none",
+    },
+    ".cm-line": {
+      padding: "0.12rem 0",
+      fontFamily: "inherit",
+      wordWrap: "break-word",
+      whiteSpace: "pre-wrap",
+    },
+    ".cm-activeLine": {
+      backgroundColor: "transparent",
+    },
+    ".cm-selectionBackground, ::selection": {
+      backgroundColor: "var(--bg-3) !important",
+    },
+    ".cm-cursor": {
+      borderLeftColor: "var(--text-0)",
+    },
+    ".cm-line.cm-h1": {
+      fontSize: preset.heading1Size,
+      fontWeight: "740",
+      lineHeight: "1.22",
+      letterSpacing: "-0.025em",
+      paddingTop: "0.75em",
+      paddingBottom: "0.32em",
+      borderBottom: preset.headingBorderStrong,
+    },
+    ".cm-line.cm-h2": {
+      fontSize: preset.heading2Size,
+      fontWeight: "700",
+      lineHeight: "1.26",
+      color: preset.heading2Color,
+      paddingTop: "0.65em",
+      paddingBottom: "0.22em",
+      borderBottom: preset.headingBorderSoft,
+    },
+    ".cm-line.cm-h3": {
+      fontSize: "1.24em",
+      fontWeight: "670",
+      lineHeight: "1.3",
+      paddingTop: "0.5em",
+    },
+    ".cm-line.cm-h4": {
+      fontSize: "1.08em",
+      fontWeight: "640",
+      paddingTop: "0.35em",
+    },
+    ".cm-line.cm-h5": {
+      fontSize: "1em",
+      fontWeight: "630",
+    },
+    ".cm-line.cm-h6": {
+      fontSize: "0.94em",
+      fontWeight: "620",
+      color: "var(--text-2)",
+      textTransform: "uppercase",
+      letterSpacing: "0.04em",
+    },
+    ".cm-line.cm-blockquote": {
+      marginLeft: "0.1rem",
+      paddingLeft: "0.95rem",
+      borderLeft: "3px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
+      color: "var(--text-1)",
+      backgroundColor: "color-mix(in srgb, var(--accent-muted) 55%, transparent)",
+    },
+    ".cm-line.cm-codeblock": {
+      fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+      fontSize: "0.92em",
+      backgroundColor: "color-mix(in srgb, var(--bg-2) 92%, transparent)",
+      color: "var(--text-0)",
+      paddingLeft: "0.95rem",
+      paddingRight: "0.95rem",
+    },
+    ".cm-line.cm-codeblock-start": {
+      marginTop: "0.7rem",
+      paddingTop: "0.55rem",
+      borderTopLeftRadius: "14px",
+      borderTopRightRadius: "14px",
+      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      color: "var(--text-2)",
+      fontSize: "0.76em",
+      letterSpacing: "0.06em",
+      textTransform: "uppercase",
+    },
+    ".cm-line.cm-codeblock-body": {
+      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+    },
+    ".cm-line.cm-codeblock-end": {
+      paddingBottom: "0.55rem",
+      borderBottomLeftRadius: "14px",
+      borderBottomRightRadius: "14px",
+      borderBottom: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      color: "var(--text-2)",
+      fontSize: "0.76em",
+    },
+    ".cm-line.cm-hr": {
+      height: "0",
+      paddingTop: "1rem",
+      marginTop: "0.4rem",
+      marginBottom: "1.1rem",
+      borderTop: "1px solid color-mix(in srgb, var(--border) 88%, transparent)",
+    },
   });
 }
 
@@ -165,7 +214,15 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: [t.processingInstruction, t.meta, t.punctuation], color: "var(--text-2)" },
 ]);
 
-const headingDecorations = ViewPlugin.fromClass(
+function addLineClass(
+  builder: RangeSetBuilder<Decoration>,
+  lineFrom: number,
+  className: string,
+) {
+  builder.add(lineFrom, lineFrom, Decoration.line({ class: className }));
+}
+
+const structuralDecorations = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
 
@@ -185,11 +242,45 @@ const headingDecorations = ViewPlugin.fromClass(
         syntaxTree(view.state).iterate({
           from,
           to,
-          enter(node) {
-            if (!node.name.includes("Heading")) return;
-            const match = node.name.match(/Heading(\d)/);
-            if (!match) return;
-            builder.add(node.from, node.from, Decoration.line({ class: `cm-h${match[1]}` }));
+          enter: (node) => {
+            if (node.name.includes("Heading")) {
+              const match = node.name.match(/Heading(\d)/);
+              if (!match) return;
+              addLineClass(builder, node.from, `cm-h${match[1]}`);
+              return;
+            }
+
+            if (node.name === "Blockquote") {
+              let line = view.state.doc.lineAt(node.from);
+              const endLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1));
+              while (line.number <= endLine.number) {
+                addLineClass(builder, line.from, "cm-blockquote");
+                if (line.number === endLine.number) break;
+                line = view.state.doc.line(line.number + 1);
+              }
+              return;
+            }
+
+            if (node.name === "FencedCode") {
+              const startLine = view.state.doc.lineAt(node.from);
+              const endLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1));
+              for (let lineNumber = startLine.number; lineNumber <= endLine.number; lineNumber += 1) {
+                const line = view.state.doc.line(lineNumber);
+                addLineClass(builder, line.from, "cm-codeblock");
+                if (lineNumber === startLine.number) {
+                  addLineClass(builder, line.from, "cm-codeblock-start");
+                } else if (lineNumber === endLine.number) {
+                  addLineClass(builder, line.from, "cm-codeblock-end");
+                } else {
+                  addLineClass(builder, line.from, "cm-codeblock-body");
+                }
+              }
+              return;
+            }
+
+            if (node.name === "HorizontalRule") {
+              addLineClass(builder, node.from, "cm-hr");
+            }
           },
         });
       }
@@ -295,9 +386,11 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
                 "EmphasisMark",
                 "StrongEmphasisMark",
                 "StrikethroughMark",
-                "CodeMark",
-                "LinkMark",
-              ].includes(node.name);
+              "CodeMark",
+              "LinkMark",
+              "QuoteMark",
+              "HorizontalRule",
+            ].includes(node.name);
 
               const line = state.doc.lineAt(node.from).number;
               if (activeLines.has(line)) return;
@@ -677,7 +770,7 @@ export function HybridMarkdownEditor({
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       createEditorTheme(themeVariant),
-      headingDecorations,
+      structuralDecorations,
       ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
