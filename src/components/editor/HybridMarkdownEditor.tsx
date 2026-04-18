@@ -37,6 +37,8 @@ interface Props {
    * line under the cursor, like Obsidian's Live Preview.
    */
   showSyntax?: boolean;
+  /** When false, preview mode never reveals raw markdown on click/focus. */
+  revealSyntaxOnActiveLine?: boolean;
 }
 
 const editorThemePresets = {
@@ -253,90 +255,94 @@ class LinkIconWidget extends WidgetType {
   }
 }
 
-const livePreviewPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = this.buildDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
-        this.decorations = this.buildDecorations(update.view);
-      }
-    }
-
-    buildDecorations(view: EditorView) {
-      const builder = new RangeSetBuilder<Decoration>();
-      const state = view.state;
-
-      const activeLines = new Set<number>();
-      for (const range of state.selection.ranges) {
-        activeLines.add(state.doc.lineAt(range.head).number);
+      constructor(view: EditorView) {
+        this.decorations = this.buildDecorations(view);
       }
 
-      const hideDeco = Decoration.replace({});
-      const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
-      const decos: { from: number; to: number; deco: Decoration }[] = [];
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged || update.selectionSet) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
 
-      for (const { from, to } of view.visibleRanges) {
-        syntaxTree(state).iterate({
-          from,
-          to,
-          enter(node) {
-            const isHiddenMarker = [
-              "HeaderMark",
-              "EmphasisMark",
-              "StrongEmphasisMark",
-              "StrikethroughMark",
-              "CodeMark",
-              "LinkMark",
-            ].includes(node.name);
+      buildDecorations(view: EditorView) {
+        const builder = new RangeSetBuilder<Decoration>();
+        const state = view.state;
 
-            const line = state.doc.lineAt(node.from).number;
-            if (activeLines.has(line)) return;
+        const activeLines = new Set<number>();
+        if (revealSyntaxOnActiveLine) {
+          for (const range of state.selection.ranges) {
+            activeLines.add(state.doc.lineAt(range.head).number);
+          }
+        }
 
-            if (isHiddenMarker) {
-              decos.push({ from: node.from, to: node.to, deco: hideDeco });
-            } else if (node.name === "URL" && node.node.parent?.name === "Link") {
-              const urlText = state
-                .sliceDoc(node.from, node.to)
-                .replace(/^[(<]/, "")
-                .replace(/[)>]$/, "");
-              decos.push({
-                from: node.from,
-                to: node.to,
-                deco: Decoration.replace({ widget: new LinkIconWidget(urlText) }),
-              });
-            } else if (node.name === "Link") {
-              const firstChild = node.node.firstChild;
-              const lastChild = node.node.lastChild;
-              if (firstChild && lastChild) {
-                const textFrom = firstChild.to;
-                const textTo =
-                  firstChild.nextSibling?.name === "LinkMark"
-                    ? firstChild.nextSibling.from
-                    : lastChild.from;
-                if (textTo > textFrom) {
-                  decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+        const hideDeco = Decoration.replace({});
+        const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
+        const decos: { from: number; to: number; deco: Decoration }[] = [];
+
+        for (const { from, to } of view.visibleRanges) {
+          syntaxTree(state).iterate({
+            from,
+            to,
+            enter(node) {
+              const isHiddenMarker = [
+                "HeaderMark",
+                "EmphasisMark",
+                "StrongEmphasisMark",
+                "StrikethroughMark",
+                "CodeMark",
+                "LinkMark",
+              ].includes(node.name);
+
+              const line = state.doc.lineAt(node.from).number;
+              if (activeLines.has(line)) return;
+
+              if (isHiddenMarker) {
+                decos.push({ from: node.from, to: node.to, deco: hideDeco });
+              } else if (node.name === "URL" && node.node.parent?.name === "Link") {
+                const urlText = state
+                  .sliceDoc(node.from, node.to)
+                  .replace(/^[(<]/, "")
+                  .replace(/[)>]$/, "");
+                decos.push({
+                  from: node.from,
+                  to: node.to,
+                  deco: Decoration.replace({ widget: new LinkIconWidget(urlText) }),
+                });
+              } else if (node.name === "Link") {
+                const firstChild = node.node.firstChild;
+                const lastChild = node.node.lastChild;
+                if (firstChild && lastChild) {
+                  const textFrom = firstChild.to;
+                  const textTo =
+                    firstChild.nextSibling?.name === "LinkMark"
+                      ? firstChild.nextSibling.from
+                      : lastChild.from;
+                  if (textTo > textFrom) {
+                    decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                  }
                 }
               }
-            }
-          },
-        });
-      }
+            },
+          });
+        }
 
-      decos.sort((a, b) => a.from - b.from || a.to - b.to);
-      for (const d of decos) {
-        builder.add(d.from, d.to, d.deco);
-      }
+        decos.sort((a, b) => a.from - b.from || a.to - b.to);
+        for (const d of decos) {
+          builder.add(d.from, d.to, d.deco);
+        }
 
-      return builder.finish();
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
+        return builder.finish();
+      }
+    },
+    { decorations: (v) => v.decorations },
+  );
+}
 
 function applyToggleMark(view: EditorView, mark: string) {
   const { state } = view;
@@ -651,6 +657,7 @@ export function HybridMarkdownEditor({
   themeVariant = "classic",
   viewRef,
   showSyntax = false,
+  revealSyntaxOnActiveLine = true,
 }: Props) {
   const { t } = useTranslation();
   const localRef = useRef<EditorView | null>(null);
@@ -671,14 +678,14 @@ export function HybridMarkdownEditor({
       EditorView.lineWrapping,
       createEditorTheme(themeVariant),
       headingDecorations,
-      ...(showSyntax ? [] : [livePreviewPlugin]),
+      ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       createDomHandlers(linkTextPlaceholder),
     ],
-    [themeVariant, showSyntax, linkTextPlaceholder],
+    [themeVariant, showSyntax, linkTextPlaceholder, revealSyntaxOnActiveLine],
   );
 
   return (
