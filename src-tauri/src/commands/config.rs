@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tauri::{AppHandle, State};
 
@@ -120,18 +120,6 @@ pub fn read_config_from_root(root: &Path) -> Result<Option<Config>, String> {
     let config: Config = serde_yaml::from_str(&content)
         .map_err(|e| format!("Failed to parse config {}: {}", config_path.display(), e))?;
     Ok(Some(config))
-}
-
-fn expand_home(path: &str) -> PathBuf {
-    if path == "~" {
-        return dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    }
-    if let Some(rest) = path.strip_prefix("~/") {
-        if let Some(home) = dirs::home_dir() {
-            return home.join(rest);
-        }
-    }
-    PathBuf::from(path)
 }
 
 pub fn sync_workspace_runtime(

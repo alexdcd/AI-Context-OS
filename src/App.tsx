@@ -212,7 +212,7 @@ function AppContent() {
 
   if (!onboarded || showOnboardingForVault) {
     return (
-      <Suspense fallback={<FullscreenSpinner />}>
+      <Suspense fallback={<Spinner fullscreen />}>
         <OnboardingWizard
           onComplete={() => {
             if (showOnboardingForVault) {
@@ -293,7 +293,7 @@ function AppContent() {
         <Sidebar onCreateVault={() => setShowOnboardingForVault(true)} />
         <main className="relative flex min-w-0 flex-1 overflow-hidden">
           <div className="min-w-0 flex-1 overflow-hidden bg-[color:var(--bg-1)]">
-            <Suspense fallback={<RouteFallback />}>
+            <Suspense fallback={<Spinner />}>
               <Routes>
                 <Route path="/" element={<ExplorerView />} />
                 <Route path="/journal" element={<JournalView />} />
@@ -362,17 +362,9 @@ function Toast({ message, onDismiss }: { message: string | null; onDismiss: () =
   );
 }
 
-function FullscreenSpinner() {
+function Spinner({ fullscreen = false }: { fullscreen?: boolean }) {
   return (
-    <div className="flex h-screen items-center justify-center text-[color:var(--text-2)]">
-      <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--text-2)] border-t-transparent" />
-    </div>
-  );
-}
-
-function RouteFallback() {
-  return (
-    <div className="flex h-full items-center justify-center text-[color:var(--text-2)]">
+    <div className={`flex ${fullscreen ? "h-screen" : "h-full"} items-center justify-center text-[color:var(--text-2)]`}>
       <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--text-2)] border-t-transparent" />
     </div>
   );
