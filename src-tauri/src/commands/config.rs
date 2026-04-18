@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 use crate::core::jsonl::create_jsonl_with_schema;
-use crate::core::paths::SystemPaths;
+use crate::core::paths::{expand_home, SystemPaths};
 use crate::core::types::Config;
 use crate::core::watcher::start_watcher;
 use crate::state::AppState;

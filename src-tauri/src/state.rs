@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::core::index::scan_memories;
 use crate::core::observability::ObservabilityDb;
+use crate::core::paths::expand_home;
 use crate::core::types::Config;
 use crate::core::watcher::{MemoryIndex, WatcherHandle};
 
