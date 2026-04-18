@@ -114,6 +114,10 @@ impl SystemPaths {
         self.root.join("claude.md")
     }
 
+    pub fn agents_md(&self) -> PathBuf {
+        self.root.join("AGENTS.md")
+    }
+
     pub fn cursorrules(&self) -> PathBuf {
         self.root.join(".cursorrules")
     }
