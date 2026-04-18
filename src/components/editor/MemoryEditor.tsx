@@ -55,6 +55,7 @@ export function MemoryEditor() {
     setError,
   } = useAppStore();
   const showMarkdownSyntax = useSettingsStore((s) => s.showMarkdownSyntax);
+  const appearanceMode = useSettingsStore((s) => s.appearanceMode);
   const [meta, setMeta] = useState<MemoryMeta | null>(null);
   const [l1, setL1] = useState("");
   const [l2, setL2] = useState("");
@@ -356,73 +357,84 @@ export function MemoryEditor() {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[820px] px-8 py-6">
-            <div className="rounded-2xl border border-[var(--border)] bg-[color:var(--bg-1)] px-8 py-7 shadow-sm">
-            <input
-              type="text"
-              value={meta.l0}
-              onChange={(e) => {
-                handleMetaChange({ ...meta, l0: e.target.value });
-              }}
-              readOnly={isProtected}
-              placeholder={t("memoryEditor.untitled")}
-              className="mb-2 w-full bg-transparent text-[2.35rem] font-semibold leading-[1.05] tracking-[-0.04em] text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]/40 focus:outline-none"
-            />
-            <p className="mb-8 font-mono text-[11px] leading-5 text-[color:var(--text-2)]">
-              {meta.type}
-              {meta.system_role && ` · ${meta.system_role}`}
-              {meta.folder_category && ` · ${meta.folder_category}`}
-              {meta.importance >= 0.7 ? ` · ${t("memoryEditor.meta.high")}` : meta.importance >= 0.4 ? "" : ` · ${t("memoryEditor.meta.low")}`}
-              {meta.tags.length > 0 && ` · ${meta.tags.join(", ")}`}
-              {` · ${t("memoryEditor.meta.l2Content")} · v${meta.version}`}
-            </p>
-
-            <HybridMarkdownEditor
-              key={`${activeMemory.meta.id}-l2-${showMarkdownSyntax ? "raw" : "preview"}`}
-              content={l2}
-              onChange={(val) => {
-                setL2(val);
-                setDirty(true);
-                setSaveStatus("dirty");
-              }}
-              className="min-h-[520px]"
-              placeholder={t("memoryEditor.placeholders.typeHere")}
-              editable={!isProtected}
-              viewRef={editorViewRef}
-              showSyntax={showMarkdownSyntax}
-            />
-
-            <div className="mt-10 border-t border-[color:color-mix(in_srgb,var(--accent)_12%,var(--border))] pt-4">
-              <button
-                type="button"
-                onClick={() => setL1Open((prev) => !prev)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
-              >
-                <ChevronRight
-                  className={clsx(
-                    "h-3 w-3 transition-transform",
-                    l1Open && "rotate-90",
-                  )}
-                />
-                {t("memoryEditor.l1Title")}
-              </button>
-              {l1Open && (
-                <div className="mt-2">
-                  <textarea
-                    value={l1}
-                    onChange={(e) => {
-                      setL1(e.target.value);
-                      setDirty(true);
-                      setSaveStatus("dirty");
-                    }}
-                    onBlur={() => void handleSave()}
-                    readOnly={isProtected}
-                    placeholder={t("memoryEditor.placeholders.l1Summary")}
-                    rows={3}
-                    className="w-full resize-y rounded-2xl border border-[var(--border)] bg-[color:var(--bg-0)] px-4 py-3 text-sm leading-relaxed text-[color:var(--text-1)] placeholder:text-[color:var(--text-2)]/40 focus:outline-none"
-                  />
-                </div>
+            <div
+              className={clsx(
+                "px-8 py-7",
+                appearanceMode === "modern" &&
+                  "rounded-2xl border border-[var(--border)] bg-[color:var(--bg-1)] shadow-sm",
               )}
-            </div>
+            >
+              <input
+                type="text"
+                value={meta.l0}
+                onChange={(e) => {
+                  handleMetaChange({ ...meta, l0: e.target.value });
+                }}
+                readOnly={isProtected}
+                placeholder={t("memoryEditor.untitled")}
+                className="mb-2 w-full bg-transparent text-[2.35rem] font-semibold leading-[1.05] tracking-[-0.04em] text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]/40 focus:outline-none"
+              />
+              <p className="mb-8 font-mono text-[11px] leading-5 text-[color:var(--text-2)]">
+                {meta.type}
+                {meta.system_role && ` · ${meta.system_role}`}
+                {meta.folder_category && ` · ${meta.folder_category}`}
+                {meta.importance >= 0.7 ? ` · ${t("memoryEditor.meta.high")}` : meta.importance >= 0.4 ? "" : ` · ${t("memoryEditor.meta.low")}`}
+                {meta.tags.length > 0 && ` · ${meta.tags.join(", ")}`}
+                {` · ${t("memoryEditor.meta.l2Content")} · v${meta.version}`}
+              </p>
+
+              <HybridMarkdownEditor
+                key={`${activeMemory.meta.id}-l2-${showMarkdownSyntax ? "raw" : "preview"}`}
+                content={l2}
+                onChange={(val) => {
+                  setL2(val);
+                  setDirty(true);
+                  setSaveStatus("dirty");
+                }}
+                className="min-h-[520px]"
+                placeholder={t("memoryEditor.placeholders.typeHere")}
+                editable={!isProtected}
+                viewRef={editorViewRef}
+                showSyntax={showMarkdownSyntax}
+              />
+
+              <div className="mt-10 border-t border-[color:color-mix(in_srgb,var(--accent)_12%,var(--border))] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setL1Open((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
+                >
+                  <ChevronRight
+                    className={clsx(
+                      "h-3 w-3 transition-transform",
+                      l1Open && "rotate-90",
+                    )}
+                  />
+                  {t("memoryEditor.l1Title")}
+                </button>
+                {l1Open && (
+                  <div className="mt-2">
+                    <textarea
+                      value={l1}
+                      onChange={(e) => {
+                        setL1(e.target.value);
+                        setDirty(true);
+                        setSaveStatus("dirty");
+                      }}
+                      onBlur={() => void handleSave()}
+                      readOnly={isProtected}
+                      placeholder={t("memoryEditor.placeholders.l1Summary")}
+                      rows={3}
+                      className={clsx(
+                        "w-full resize-y px-4 py-3 text-sm leading-relaxed text-[color:var(--text-1)] placeholder:text-[color:var(--text-2)]/40 focus:outline-none",
+                        appearanceMode === "modern"
+                          ? "rounded-2xl border border-[var(--border)] bg-[color:var(--bg-0)]"
+                          : "rounded-lg border border-[color:color-mix(in_srgb,var(--border)_78%,transparent)] bg-transparent",
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -403,31 +403,6 @@ function normalizeInlineRange(
   return nextTo < nextFrom ? { from, to } : { from: nextFrom, to: nextTo };
 }
 
-function getContentSelectionForLine(
-  doc: { lineAt: (pos: number) => { from: number; to: number; text: string } },
-  pos: number,
-) {
-  const line = doc.lineAt(pos);
-  const prefixMatch = line.text.match(/^(\s*(?:[-*+]\s|\d+\.\s|- \[[ xX]\]\s|>\s))/);
-  const leadingTrimmed = line.text.replace(/^\s+/, "");
-  const trailingWhitespaceMatch = line.text.match(/\s+$/);
-
-  let from = line.from + (prefixMatch?.[0].length ?? 0);
-  let to = line.to - (trailingWhitespaceMatch?.[0].length ?? 0);
-
-  if (!leadingTrimmed.length) {
-    from = line.from;
-    to = line.to;
-  }
-
-  if (to < from) {
-    from = line.from;
-    to = line.to;
-  }
-
-  return { from, to };
-}
-
 function applyToggleLinePrefix(view: EditorView, prefix: string) {
   const { state } = view;
   const changes = state.changeByRange((range) => {
