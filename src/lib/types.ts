@@ -476,7 +476,8 @@ export interface HealthBreakdown {
 export interface HealthScore {
   score: number;
   breakdown: HealthBreakdown;
-  summary: string;
+  /** i18n key suffix: `empty` | `healthy` | `needs_attention` | `critical` */
+  status: string;
 }
 
 export interface HealthScoreSnapshot {
