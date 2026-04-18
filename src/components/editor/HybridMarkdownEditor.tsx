@@ -196,6 +196,147 @@ const headingDecorations = ViewPlugin.fromClass(
   { decorations: (value) => value.decorations },
 );
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function buildLinkIconSvg(): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", "12");
+  svg.setAttribute("height", "12");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6");
+  svg.appendChild(path);
+
+  const polyline = document.createElementNS(SVG_NS, "polyline");
+  polyline.setAttribute("points", "15 3 21 3 21 9");
+  svg.appendChild(polyline);
+
+  const line = document.createElementNS(SVG_NS, "line");
+  line.setAttribute("x1", "10");
+  line.setAttribute("y1", "14");
+  line.setAttribute("x2", "21");
+  line.setAttribute("y2", "3");
+  svg.appendChild(line);
+
+  return svg;
+}
+
+class LinkIconWidget extends WidgetType {
+  constructor(public url: string) {
+    super();
+  }
+
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-link-icon";
+    span.style.display = "inline-flex";
+    span.style.alignItems = "center";
+    span.style.marginLeft = "4px";
+    span.style.color = "var(--text-2)";
+    span.style.cursor = "pointer";
+    span.appendChild(buildLinkIconSvg());
+
+    span.addEventListener("click", (e) => {
+      open(this.url).catch(console.error);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    return span;
+  }
+}
+
+const livePreviewPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.buildDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+        this.decorations = this.buildDecorations(update.view);
+      }
+    }
+
+    buildDecorations(view: EditorView) {
+      const builder = new RangeSetBuilder<Decoration>();
+      const state = view.state;
+
+      const activeLines = new Set<number>();
+      for (const range of state.selection.ranges) {
+        activeLines.add(state.doc.lineAt(range.head).number);
+      }
+
+      const hideDeco = Decoration.replace({});
+      const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
+      const decos: { from: number; to: number; deco: Decoration }[] = [];
+
+      for (const { from, to } of view.visibleRanges) {
+        syntaxTree(state).iterate({
+          from,
+          to,
+          enter(node) {
+            const isHiddenMarker = [
+              "HeaderMark",
+              "EmphasisMark",
+              "StrongEmphasisMark",
+              "StrikethroughMark",
+              "CodeMark",
+              "LinkMark",
+            ].includes(node.name);
+
+            const line = state.doc.lineAt(node.from).number;
+            if (activeLines.has(line)) return;
+
+            if (isHiddenMarker) {
+              decos.push({ from: node.from, to: node.to, deco: hideDeco });
+            } else if (node.name === "URL" && node.node.parent?.name === "Link") {
+              const urlText = state
+                .sliceDoc(node.from, node.to)
+                .replace(/^[(<]/, "")
+                .replace(/[)>]$/, "");
+              decos.push({
+                from: node.from,
+                to: node.to,
+                deco: Decoration.replace({ widget: new LinkIconWidget(urlText) }),
+              });
+            } else if (node.name === "Link") {
+              const firstChild = node.node.firstChild;
+              const lastChild = node.node.lastChild;
+              if (firstChild && lastChild) {
+                const textFrom = firstChild.to;
+                const textTo =
+                  firstChild.nextSibling?.name === "LinkMark"
+                    ? firstChild.nextSibling.from
+                    : lastChild.from;
+                if (textTo > textFrom) {
+                  decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                }
+              }
+            }
+          },
+        });
+      }
+
+      decos.sort((a, b) => a.from - b.from || a.to - b.to);
+      for (const d of decos) {
+        builder.add(d.from, d.to, d.deco);
+      }
+
+      return builder.finish();
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
 function applyToggleMark(view: EditorView, mark: string) {
   const { state } = view;
   const changes = state.changeByRange((range) => {
@@ -491,6 +632,7 @@ export function HybridMarkdownEditor({
   editable = true,
   themeVariant = "classic",
   viewRef,
+  showSyntax = false,
 }: Props) {
   const localRef = useRef<EditorView | null>(null);
 
@@ -509,13 +651,14 @@ export function HybridMarkdownEditor({
       EditorView.lineWrapping,
       createEditorTheme(themeVariant),
       headingDecorations,
+      ...(showSyntax ? [] : [livePreviewPlugin]),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
       keymap.of(markdownKeymap),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       domHandlers,
     ],
-    [themeVariant],
+    [themeVariant, showSyntax],
   );
 
   return (
