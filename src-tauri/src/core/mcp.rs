@@ -18,6 +18,7 @@ use crate::core::observability::{classify_task, ObservabilityDb};
 use crate::core::paths::{enrich_memory_meta, AI_DIR, RULES_DIR, SKILLS_DIR};
 use crate::core::types::{Config, LoadLevel, MemoryMeta, MemoryOntology, SystemRole};
 use crate::core::usage::record_accesses;
+use crate::core::wikilinks::normalize_memory_bodies;
 
 /// Shared state accessible by the MCP server tools.
 pub struct McpSharedState {
@@ -269,6 +270,7 @@ impl AiContextMcpServer {
             .iter()
             .find(|(meta, _)| meta.id == params.id)
             .cloned();
+        let existing_id = existing.as_ref().map(|(existing_meta, _)| existing_meta.id.clone());
         let file_path = if let Some((existing_meta, existing_path)) = &existing {
             if existing_meta.protected {
                 return format!(
@@ -322,7 +324,17 @@ impl AiContextMcpServer {
         };
         enrich_memory_meta(&mut meta, &file_path, &root);
 
-        let body = join_levels(&params.l1_content, &params.l2_content);
+        let current_meta = meta.clone();
+        let memories_snapshot: Vec<MemoryMeta> = all_entries.iter().map(|(meta, _)| meta.clone()).collect();
+        let normalized = normalize_memory_bodies(
+            &params.l1_content,
+            &params.l2_content,
+            &memories_snapshot,
+            Some(&current_meta),
+            existing_id.as_deref(),
+        );
+
+        let body = join_levels(&normalized.l1_content, &normalized.l2_content);
         match serialize_frontmatter(&meta, &body) {
             Ok(content) => {
                 // Ensure directory exists
@@ -336,7 +348,16 @@ impl AiContextMcpServer {
                         let config = self.state.config.read().unwrap().clone();
                         match crate::commands::router::regenerate_router_files(&root, &config) {
                             Ok(_) => {
-                                format!("Memory '{}' saved to {}", params.id, file_path.display())
+                                if normalized.warnings.is_empty() {
+                                    format!("Memory '{}' saved to {}", params.id, file_path.display())
+                                } else {
+                                    format!(
+                                        "Memory '{}' saved to {} with {} wikilink warning(s)",
+                                        params.id,
+                                        file_path.display(),
+                                        normalized.warnings.len()
+                                    )
+                                }
                             }
                             Err(e) => format!(
                                 "Memory '{}' saved to {} but router regeneration failed: {}",

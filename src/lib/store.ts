@@ -6,6 +6,7 @@ import type {
   MemoryMeta,
   RawFileDocument,
   RawFileKind,
+  SaveMemoryResult,
 } from "./types";
 import * as api from "./tauri";
 
@@ -39,7 +40,7 @@ interface AppStore {
     l2: string,
     meta: MemoryMeta,
     refreshDerivedState?: boolean,
-  ) => Promise<Memory>;
+  ) => Promise<SaveMemoryResult>;
   deleteMemory: (id: string) => Promise<void>;
   loadGraph: () => Promise<void>;
   regenerateRouter: () => Promise<void>;
@@ -156,12 +157,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   saveActiveMemory: async (sourceId, l1, l2, meta, refreshDerivedState = false) => {
     try {
-      const saved = await api.saveMemory({
+      const result = await api.saveMemory({
         id: sourceId,
         meta,
         l1_content: l1,
         l2_content: l2,
       });
+      const saved = result.memory;
       markRecentLocalWrite(saved.file_path);
       set((state) => {
         const isStillActive =
@@ -181,7 +183,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         await get().loadFileTree();
         await get().loadGraph();
       }
-      return saved;
+      return result;
     } catch (e) {
       const message = String(e);
       set({ error: message });

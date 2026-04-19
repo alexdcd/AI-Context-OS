@@ -21,6 +21,11 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
+import {
+  createWikilinkExtensions,
+  type WikilinkDraftMemory,
+  type WikilinkTarget,
+} from "./editorWikilinks";
 
 interface Props {
   content: string;
@@ -40,6 +45,9 @@ interface Props {
   showSyntax?: boolean;
   /** When false, preview mode never reveals raw markdown on click/focus. */
   revealSyntaxOnActiveLine?: boolean;
+  wikilinkTargets?: WikilinkTarget[];
+  onOpenWikilink?: (id: string) => void;
+  onCreateWikilinkMemory?: (draft: WikilinkDraftMemory) => void | Promise<void>;
 }
 
 const editorThemePresets = {
@@ -941,6 +949,9 @@ export function HybridMarkdownEditor({
   viewRef,
   showSyntax = false,
   revealSyntaxOnActiveLine = true,
+  wikilinkTargets = [],
+  onOpenWikilink,
+  onCreateWikilinkMemory,
 }: Props) {
   const { t } = useTranslation();
   const localRef = useRef<EditorView | null>(null);
@@ -962,13 +973,29 @@ export function HybridMarkdownEditor({
       createEditorTheme(themeVariant),
       structuralDecorations,
       ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
+      ...(showSyntax
+        ? []
+        : createWikilinkExtensions({
+            targets: wikilinkTargets,
+            revealSyntaxOnActiveLine,
+            onOpenMemory: onOpenWikilink,
+            onCreateMemory: onCreateWikilinkMemory,
+          })),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       createDomHandlers(),
     ],
-    [themeVariant, showSyntax, linkTextPlaceholder, revealSyntaxOnActiveLine],
+    [
+      themeVariant,
+      showSyntax,
+      linkTextPlaceholder,
+      revealSyntaxOnActiveLine,
+      wikilinkTargets,
+      onOpenWikilink,
+      onCreateWikilinkMemory,
+    ],
   );
 
   return (

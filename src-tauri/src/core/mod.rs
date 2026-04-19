@@ -23,3 +23,4 @@ pub mod tasks;
 pub mod types;
 pub mod usage;
 pub mod watcher;
+pub mod wikilinks;

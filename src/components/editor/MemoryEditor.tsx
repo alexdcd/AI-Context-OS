@@ -10,6 +10,8 @@ import { HybridMarkdownEditor } from "./HybridMarkdownEditor";
 import { FormatToolbar } from "./FormatToolbar";
 import type { EditorView } from "@codemirror/view";
 import type { Memory, MemoryMeta, MemoryOntology, RawFileDocument } from "../../lib/types";
+import { createMemory } from "../../lib/tauri";
+import type { WikilinkDraftMemory } from "./editorWikilinks";
 
 type InspectorTab = "properties" | "links" | "history";
 type SaveStatus = "saved" | "dirty" | "saving" | "error";
@@ -51,6 +53,9 @@ export function MemoryEditor() {
     deleteMemory,
     loading,
     memories,
+    loadFileTree,
+    loadGraph,
+    loadMemories,
     selectFile,
     setError,
   } = useAppStore();
@@ -112,7 +117,8 @@ export function MemoryEditor() {
       l1,
       l2,
       meta,
-      refreshDerivedState: hasDerivedMemoryChanges(activeMemory, meta),
+      refreshDerivedState:
+        hasDerivedMemoryChanges(activeMemory, meta) || hasBodyChanges(activeMemory, l1, l2),
     };
   }, [activeMemory, sourceId, meta, l1, l2, dirty]);
 
@@ -301,6 +307,39 @@ export function MemoryEditor() {
     [selectFile, setError],
   );
 
+  const wikilinkTargets = useMemo(
+    () =>
+      memories.map((memory) => ({
+        id: memory.id,
+        l0: memory.l0,
+        ontology: memory.type,
+        folderCategory: memory.folder_category,
+      })),
+    [memories],
+  );
+
+  const handleCreateWikilinkMemory = useCallback(
+    async ({ id, l0 }: WikilinkDraftMemory) => {
+      try {
+        await createMemory({
+          id,
+          ontology: "unknown",
+          l0,
+          importance: 0.5,
+          tags: [],
+          l1_content: "",
+          l2_content: "",
+        });
+        await loadMemories();
+        await loadFileTree();
+        await loadGraph();
+      } catch (error) {
+        setError(String(error));
+      }
+    },
+    [loadFileTree, loadGraph, loadMemories, setError],
+  );
+
   if (!activeMemory || !meta) {
     if (activeRawFile) {
       return (
@@ -397,6 +436,9 @@ export function MemoryEditor() {
                 editable={!isProtected}
                 viewRef={editorViewRef}
                 showSyntax={showMarkdownSyntax}
+                wikilinkTargets={wikilinkTargets}
+                onOpenWikilink={handleOpenMemory}
+                onCreateWikilinkMemory={handleCreateWikilinkMemory}
               />
 
               <div className="mt-10 border-t border-[color:color-mix(in_srgb,var(--accent)_12%,var(--border))] pt-4">
@@ -918,6 +960,10 @@ function getFileName(path: string): string {
 
 function hasDerivedMemoryChanges(previous: Memory, next: MemoryMeta) {
   return JSON.stringify(toComparableMemoryMeta(previous.meta)) !== JSON.stringify(toComparableMemoryMeta(next));
+}
+
+function hasBodyChanges(previous: Memory, nextL1: string, nextL2: string) {
+  return previous.l1_content !== nextL1 || previous.l2_content !== nextL2;
 }
 
 function toComparableMemoryMeta(meta: MemoryMeta) {

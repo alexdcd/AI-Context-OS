@@ -3,10 +3,10 @@ use std::collections::{HashMap, HashSet};
 use chrono::Utc;
 use petgraph::graph::{Graph, NodeIndex};
 use petgraph::Undirected;
-use regex::Regex;
 
 use crate::core::decay::decay_score;
 use crate::core::types::{GodNode, GraphData, GraphEdge, GraphNode, Memory};
+use crate::core::wikilinks::parse_wikilinks;
 
 // ─── Edge types and weights ───────────────────────────────────────────────────
 
@@ -69,13 +69,11 @@ impl TypedEdge {
     }
 }
 
-/// Extract [[wikilink]] targets from markdown content.
+/// Extract `[[wikilink]]` targets (inner text) from markdown content.
+/// Delegates to the canonical parser in `core::wikilinks` so graph edges
+/// and save-time normalization stay in sync.
 fn extract_wikilinks(content: &str) -> Vec<String> {
-    let re = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
-    re.captures_iter(content)
-        .map(|c| c[1].trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
+    parse_wikilinks(content).into_iter().map(|m| m.inner).collect()
 }
 
 // ─── Unified edge generation ──────────────────────────────────────────────────

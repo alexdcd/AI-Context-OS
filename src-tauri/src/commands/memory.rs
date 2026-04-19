@@ -9,7 +9,87 @@ use crate::core::memory::{read_memory, write_memory};
 use crate::core::paths::{enrich_memory_meta, SystemPaths};
 use crate::core::types::{CreateMemoryInput, Memory, MemoryFilter, MemoryMeta, SaveMemoryInput};
 use crate::core::usage::record_access;
+use crate::core::wikilinks::{
+    find_backlink_occurrences, normalize_memory_bodies, resolve_wikilink, rewrite_wikilink_target,
+    BacklinkOccurrence, CascadeRewriteOutcome, NormalizedMemoryBodies, SaveMemoryResult,
+    WikilinkResolution,
+};
 use crate::state::AppState;
+
+/// Rewrite every `[[old_id]]` occurrence in every canonical memory's body to
+/// `[[new_id]]`. Runs *after* the renamed memory has been written, so the new
+/// file is already on disk with its new id.
+///
+/// Scope is limited to memories indexed by `scan_memories` — bare markdown
+/// files without valid frontmatter are not touched. Protected memories that
+/// would have been rewritten are skipped and reported; the user must
+/// unprotect them before the cascade can fix their links.
+fn apply_id_rename_cascade(
+    app: &AppHandle,
+    state: &State<AppState>,
+    old_id: &str,
+    new_id: &str,
+) -> Result<CascadeRewriteOutcome, String> {
+    let mut outcome = CascadeRewriteOutcome {
+        old_id: old_id.to_string(),
+        new_id: new_id.to_string(),
+        rewrite_count: 0,
+        affected_ids: Vec::new(),
+        skipped_protected_ids: Vec::new(),
+    };
+
+    if old_id == new_id {
+        return Ok(outcome);
+    }
+
+    let root = state.get_root();
+    let scanned = scan_memories(&root);
+
+    for (meta, path_str) in scanned {
+        let file_path = PathBuf::from(&path_str);
+        let mut memory = match read_memory(&root, &file_path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let (new_l1, n1) = rewrite_wikilink_target(&memory.l1_content, old_id, new_id);
+        let (new_l2, n2) = rewrite_wikilink_target(&memory.l2_content, old_id, new_id);
+        let rewrites = n1 + n2;
+        if rewrites == 0 {
+            continue;
+        }
+
+        if meta.protected {
+            outcome.skipped_protected_ids.push(meta.id.clone());
+            continue;
+        }
+
+        memory.l1_content = new_l1;
+        memory.l2_content = new_l2;
+        memory.meta.modified = Utc::now();
+        memory.meta.version = memory.meta.version.saturating_add(1);
+
+        write_memory(&file_path, &memory)?;
+        state.mark_recent_write(&file_path);
+
+        {
+            let mut index = state.memory_index.write().unwrap();
+            if let Some(entry) = index.get_mut(&meta.id) {
+                entry.0.modified = memory.meta.modified;
+                entry.0.version = memory.meta.version;
+            }
+        }
+
+        outcome.affected_ids.push(meta.id.clone());
+        outcome.rewrite_count += rewrites;
+    }
+
+    if !outcome.is_empty() {
+        let _ = app.emit("wikilinks-cascade", &outcome);
+    }
+
+    Ok(outcome)
+}
 
 fn should_regenerate_router(
     old_meta: &MemoryMeta,
@@ -214,13 +294,15 @@ pub fn create_memory_at_path(
     create_memory_internal(input, parent_dir, app, state)
 }
 
-/// Save/update an existing memory.
+/// Save/update an existing memory. Normalizes `[[wikilinks]]` in L1/L2 to
+/// canonical `[[id]]` form before writing; returns warnings for unresolved
+/// or ambiguous links without blocking the save.
 #[tauri::command]
 pub fn save_memory(
     input: SaveMemoryInput,
     app: AppHandle,
     state: State<AppState>,
-) -> Result<Memory, String> {
+) -> Result<SaveMemoryResult, String> {
     let root = state.get_root();
     let index = state.memory_index.read().unwrap();
     let (old_meta, path) = index
@@ -234,12 +316,29 @@ pub fn save_memory(
     if input.meta.id != input.id && index.contains_key(&input.meta.id) {
         return Err(format!("Memory already exists: {}", input.meta.id));
     }
+    let mut requested_meta = input.meta.clone();
+    requested_meta.id = requested_meta.id.trim().to_string();
+    // Snapshot every canonical meta for wikilink resolution before releasing
+    // the read lock.
+    let memories_snapshot: Vec<MemoryMeta> =
+        index.values().map(|(meta, _)| meta.clone()).collect();
     drop(index);
+
+    let NormalizedMemoryBodies {
+        l1_content: normalized_l1,
+        l2_content: normalized_l2,
+        warnings: wikilink_warnings,
+    } = normalize_memory_bodies(
+        &input.l1_content,
+        &input.l2_content,
+        &memories_snapshot,
+        Some(&requested_meta),
+        Some(&input.id),
+    );
 
     if old_meta.protected {
         let current = read_memory(&root, &old_file_path)?;
-        if !can_unlock_protected_memory(&current, &input.meta, &input.l1_content, &input.l2_content)
-        {
+        if !can_unlock_protected_memory(&current, &requested_meta, &normalized_l1, &normalized_l2) {
             return Err(format!(
                 "Memory '{}' is protected. Unprotect it first, then retry the edit.",
                 old_meta.id
@@ -247,7 +346,7 @@ pub fn save_memory(
         }
     }
 
-    let mut meta = input.meta;
+    let mut meta = requested_meta;
     meta.modified = Utc::now();
     meta.version += 1;
     meta.id = meta.id.trim().to_string();
@@ -270,8 +369,8 @@ pub fn save_memory(
 
     let memory = Memory {
         meta,
-        l1_content: input.l1_content,
-        l2_content: input.l2_content,
+        l1_content: normalized_l1,
+        l2_content: normalized_l2,
         raw_content: String::new(),
         file_path: target_file_path.to_string_lossy().to_string(),
     };
@@ -301,11 +400,27 @@ pub fn save_memory(
     drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
+
+    let cascade = if input.id != memory.meta.id {
+        let outcome = apply_id_rename_cascade(&app, &state, &input.id, &memory.meta.id)?;
+        if outcome.is_empty() {
+            None
+        } else {
+            Some(outcome)
+        }
+    } else {
+        None
+    };
+
     if should_regenerate_router(&old_meta, &memory.meta, &old_file_path, &target_file_path) {
         crate::commands::router::regenerate_router_internal(&app, &state)?;
     }
 
-    Ok(memory)
+    Ok(SaveMemoryResult {
+        memory,
+        wikilink_warnings,
+        cascade,
+    })
 }
 
 /// Delete a memory file.
@@ -397,6 +512,11 @@ pub fn rename_memory_file(
     drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
+
+    if old_id != memory.meta.id {
+        apply_id_rename_cascade(&app, &state, &old_id, &memory.meta.id)?;
+    }
+
     crate::commands::router::regenerate_router_internal(&app, &state)?;
 
     Ok(memory)
@@ -567,6 +687,7 @@ fn create_memory_internal(
     if index.contains_key(trimmed_id) {
         return Err(format!("Memory already exists: {}", trimmed_id));
     }
+    let memories_snapshot: Vec<MemoryMeta> = index.values().map(|(meta, _)| meta.clone()).collect();
     drop(index);
 
     let file_path = parent_dir.join(format!("{}.md", trimmed_id));
@@ -601,10 +722,22 @@ fn create_memory_internal(
     };
     enrich_memory_meta(&mut meta, &file_path, &state.get_root());
 
+    let NormalizedMemoryBodies {
+        l1_content: normalized_l1,
+        l2_content: normalized_l2,
+        warnings: _warnings,
+    } = normalize_memory_bodies(
+        &input.l1_content,
+        &input.l2_content,
+        &memories_snapshot,
+        Some(&meta),
+        None,
+    );
+
     let memory = Memory {
         meta,
-        l1_content: input.l1_content,
-        l2_content: input.l2_content,
+        l1_content: normalized_l1,
+        l2_content: normalized_l2,
         raw_content: String::new(),
         file_path: file_path.to_string_lossy().to_string(),
     };
@@ -623,4 +756,76 @@ fn create_memory_internal(
     crate::commands::router::regenerate_router_internal(&app, &state)?;
 
     Ok(memory)
+}
+
+/// One canonical memory that contains one or more `[[target_id]]` references.
+/// Grouped by source so the UI can render a per-source list of excerpts.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BacklinkRef {
+    pub source_id: String,
+    pub source_l0: String,
+    pub source_path: String,
+    pub occurrences: Vec<BacklinkOccurrence>,
+}
+
+/// Return every canonical memory whose body contains `[[id]]` along with the
+/// line and excerpt for each occurrence. Scope is limited to memories indexed
+/// by `scan_memories` — bare markdown files without frontmatter are ignored.
+#[tauri::command]
+pub fn get_backlinks(id: String, state: State<AppState>) -> Result<Vec<BacklinkRef>, String> {
+    let target = id.trim();
+    if target.is_empty() {
+        return Err("Backlink target id cannot be empty".to_string());
+    }
+
+    let root = state.get_root();
+    let scanned = scan_memories(&root);
+    let mut refs = Vec::new();
+
+    for (meta, path_str) in scanned {
+        // A memory cannot list itself as a backlink source.
+        if meta.id == target {
+            continue;
+        }
+        let file_path = PathBuf::from(&path_str);
+        let memory = match read_memory(&root, &file_path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let mut occurrences = find_backlink_occurrences(&memory.l1_content, target, "l1");
+        occurrences.extend(find_backlink_occurrences(&memory.l2_content, target, "l2"));
+        if occurrences.is_empty() {
+            continue;
+        }
+
+        refs.push(BacklinkRef {
+            source_id: meta.id.clone(),
+            source_l0: meta.l0.clone(),
+            source_path: path_str,
+            occurrences,
+        });
+    }
+
+    Ok(refs)
+}
+
+/// Resolve a wikilink text (`[[inner]]`) against the current memory index
+/// without touching disk. Used by the UI for hover tooltips and the broken-link
+/// flow. Returns one of `ExactId`, `ExactL0`, `FuzzyL0`, `Ambiguous`,
+/// `Unresolved`.
+#[tauri::command]
+pub fn resolve_wikilink_text(
+    text: String,
+    state: State<AppState>,
+) -> Result<WikilinkResolution, String> {
+    let memories: Vec<MemoryMeta> = state
+        .memory_index
+        .read()
+        .unwrap()
+        .values()
+        .map(|(meta, _)| meta.clone())
+        .collect();
+
+    Ok(resolve_wikilink(&text, &memories))
 }

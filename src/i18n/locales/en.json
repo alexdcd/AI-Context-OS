@@ -678,6 +678,7 @@
     "tokenBudget": "Token budget",
     "running": "Running…",
     "simulate": "Simulate",
+    "activeVaultStatus": "Active vault · {{count}} indexed memories",
     "fromHistory": "from history",
     "totalLoaded": "{{tokens}}/{{budget}} tokens · {{count}} loaded",
     "copyTooltip": "Copy context to clipboard",
@@ -689,7 +690,12 @@
     "importance": "Importance",
     "frequency": "Frequency",
     "graph": "Graph",
-    "noResults": "Type a query and simulate to see which memories would load."
+    "noResults": "Type a query and simulate to see which memories would load.",
+    "emptyTitle": "The simulation returned no memories",
+    "emptyBody": "The query \"{{query}}\" ran with a {{budget}} token budget, but the retrieval engine did not select any memories from the active vault.",
+    "emptyVaultHint": "The active vault has no indexed memories. Open or switch to a vault with memories before simulating.",
+    "errorTitle": "Simulation failed",
+    "errorBody": "The view could not execute `simulate_context`. If the frontend and backend are out of sync, or you're outside the Tauri app, the real error will appear here."
   },
   "vault": {
     "title": "Vaults",

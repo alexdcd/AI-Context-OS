@@ -21,8 +21,11 @@ import type {
   ApplyIngestProposalInput,
   ProviderModel,
   RecentOperationalContext,
+  BacklinkRef,
   SaveMemoryInput,
+  SaveMemoryResult,
   ScoredMemory,
+  WikilinkResolution,
   Conflict,
   ConsolidationSuggestion,
   TaskFilter,
@@ -50,7 +53,7 @@ export const createMemory = (input: CreateMemoryInput) =>
 export const createMemoryAtPath = (input: CreateMemoryInput, parentDir: string) =>
   invoke<Memory>("create_memory_at_path", { input, parentDir });
 export const saveMemory = (input: SaveMemoryInput) =>
-  invoke<Memory>("save_memory", { input });
+  invoke<SaveMemoryResult>("save_memory", { input });
 export const deleteMemory = (id: string) =>
   invoke<void>("delete_memory", { id });
 export const renameMemoryFile = (path: string, newId: string) =>
@@ -59,6 +62,10 @@ export const duplicateMemoryFile = (path: string, newId: string) =>
   invoke<Memory>("duplicate_memory_file", { path, newId });
 export const moveMemoryFile = (path: string, destinationDir: string) =>
   invoke<Memory>("move_memory_file", { path, destinationDir });
+export const getBacklinks = (id: string) =>
+  invoke<BacklinkRef[]>("get_backlinks", { id });
+export const resolveWikilinkText = (text: string) =>
+  invoke<WikilinkResolution>("resolve_wikilink_text", { text });
 
 // Filesystem
 export const getFileTree = () => invoke<FileNode[]>("get_file_tree");
@@ -85,12 +92,12 @@ export const getRouterContent = () => invoke<string>("get_router_content");
 export const simulateContext = (query: string, tokenBudget: number) =>
   invoke<ScoredMemory[]>("simulate_context", {
     query,
-    token_budget: tokenBudget,
+    tokenBudget,
   });
 export const buildChatContext = (query: string, tokenBudget: number) =>
   invoke<ChatContextPayload>("build_chat_context", {
     query,
-    token_budget: tokenBudget,
+    tokenBudget,
   });
 
 // Graph
