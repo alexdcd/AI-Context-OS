@@ -49,7 +49,7 @@
       "showSystemFilesDesc": "Hides internal files and prevents visual noise for most users.",
       "showSystemFilesActive": "Active",
       "showSystemFilesHidden": "Hidden",
-      "showSystemFilesVisible": "You will see YAML, JSONL, claude.md and other advanced artifacts alongside memories.",
+      "showSystemFilesVisible": "You will see YAML, JSONL, claude.md, AGENTS.md, and other advanced artifacts alongside memories.",
       "showSystemFilesHiddenDesc": "Keeps the explorer focused on memories, although expert mode remains available."
     },
     "update": {
@@ -223,7 +223,7 @@
       "chooseFolder": "Choose folder",
       "existingHint": "Best if you already keep information in organized folders. The app will work from that root without forcing a prior migration.",
       "newHint": "The app will create a new root and add a few starter folders to help you begin.",
-      "systemFiles": "AI Context OS will add or update its system files if they are missing: .ai/, claude.md, .cursorrules, .windsurfrules, inbox/, and sources/.",
+      "systemFiles": "AI Context OS will add or update its system files if they are missing: .ai/, claude.md, AGENTS.md, .cursorrules, .windsurfrules, inbox/, and sources/.",
       "compatibility": "An Obsidian or Logseq vault can be used as the root. Your notes stay where they are; Markdown files with compatible frontmatter can be indexed as memories.",
       "structure": "System infrastructure: inbox/ · sources/ · .ai/ (rules, journal, scratch)",
       "modeValue": {

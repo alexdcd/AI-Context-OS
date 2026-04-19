@@ -86,7 +86,8 @@ AI Context OS uses a "Zero Gravity" architecture: the physical folder a file liv
 │   └── index.yaml  ← auto-generated L0 catalog
 ├── User_Folders/   ← cosmetic, user-defined (e.g., Projects/, Notes/)
 ├── .cache/
-├── claude.md       ← master router (auto-generated)
+├── claude.md       ← Claude adapter router (auto-generated)
+├── AGENTS.md       ← agent adapter router (auto-generated)
 ├── .cursorrules
 └── .windsurfrules
 ```
@@ -95,6 +96,7 @@ Key notes:
 
 - System infrastructure is fixed: `inbox/`, `sources/`, and `.ai/` — everything else is user-defined.
 - Journal pages live in `.ai/journal/YYYY-MM-DD.md`.
+- `claude.md` and `AGENTS.md` are generated adapter artifacts, not canonical memories or note files.
 - `claude.md` exists for compatibility, but the architecture target is adapter-first with neutral core output.
 - Moving a memory file between user folders does **not** break indexing — classification comes from `type:` in frontmatter.
 
@@ -124,7 +126,7 @@ Implemented and wired:
 - Workspace initialization, config load/save, and watcher rebind
 - Memory CRUD (create/read/update/delete + file operations like rename/duplicate/move)
 - File tree and raw file read/write from UI
-- Router regeneration and adapter artifact writing (`claude.md`, `.cursorrules`, `.windsurfrules`)
+- Router regeneration and adapter artifact writing (`claude.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`)
 - Context simulation endpoint and scoring pipeline
 - Graph data generation and graph view
 - Governance checks: conflicts, decay candidates, consolidation suggestions, scratch TTL candidates
@@ -149,7 +151,7 @@ This roadmap reflects the current codebase plus the alignment doc (`REVISION-TEC
 ### 1. Adapter-first hardening
 
 - Keep neutral core generation as primary architecture.
-- Preserve compatibility artifacts (`claude.md`) without letting them become canonical.
+- Preserve compatibility artifacts (`claude.md`, `AGENTS.md`) without letting them become canonical.
 - Continue reducing implicit tool-specific assumptions in core flows.
 
 ### 2. Connector honesty and tier clarity

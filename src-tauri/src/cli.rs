@@ -50,7 +50,7 @@ enum Commands {
         #[arg(short, long, default_value = "4000")]
         budget: u32,
     },
-    /// Regenerate claude.md router and compatibility files
+    /// Regenerate router adapter artifacts and compatibility files
     Regenerate,
     /// List all memories
     List,

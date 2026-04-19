@@ -49,7 +49,7 @@
       "showSystemFilesDesc": "Oculta los archivos internos y evita ruido visual para la mayoría de usuarios.",
       "showSystemFilesActive": "Activo",
       "showSystemFilesHidden": "Oculto",
-      "showSystemFilesVisible": "Verás YAML, JSONL, claude.md y otros artefactos avanzados junto a las memorias.",
+      "showSystemFilesVisible": "Verás YAML, JSONL, claude.md, AGENTS.md y otros artefactos avanzados junto a las memorias.",
       "showSystemFilesHiddenDesc": "Mantiene el explorador centrado en las memorias, aunque el modo experto sigue disponible."
     },
     "update": {
@@ -223,7 +223,7 @@
       "chooseFolder": "Elegir carpeta",
       "existingHint": "Ideal si ya guardas tus notas en carpetas organizadas. La app trabajará desde esa raíz sin forzar una migración previa.",
       "newHint": "La app creará una raíz nueva y añadirá algunas carpetas de arranque para ayudarte a empezar.",
-      "systemFiles": "AI Context OS añadirá o actualizará sus archivos de sistema si faltan: .ai/, claude.md, .cursorrules, .windsurfrules, inbox/ y sources/.",
+      "systemFiles": "AI Context OS añadirá o actualizará sus archivos de sistema si faltan: .ai/, claude.md, AGENTS.md, .cursorrules, .windsurfrules, inbox/ y sources/.",
       "compatibility": "Un vault de Obsidian o Logseq puede usarse como raíz. Tus notas seguirán ahí; los archivos Markdown con frontmatter compatible podrán indexarse como memorias.",
       "structure": "Infraestructura del sistema: inbox/ · sources/ · .ai/ (rules, journal, scratch)",
       "modeValue": {

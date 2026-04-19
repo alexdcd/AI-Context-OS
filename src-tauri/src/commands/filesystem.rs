@@ -82,15 +82,7 @@ fn normalize_path(path: &Path) -> PathBuf {
 }
 
 fn generated_artifact_paths(root: &Path) -> Vec<PathBuf> {
-    let paths = SystemPaths::new(root);
-    vec![
-        paths.claude_md(),
-        paths.cursorrules(),
-        paths.windsurfrules(),
-        paths.config_yaml(),
-        paths.index_yaml(),
-        paths.catalog_md(),
-    ]
+    SystemPaths::new(root).generated_artifact_paths()
 }
 
 fn protected_memory_paths(root: &Path) -> Vec<(String, PathBuf)> {

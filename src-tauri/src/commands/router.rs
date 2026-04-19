@@ -23,6 +23,8 @@ pub(crate) fn regenerate_router_files(
     // Generate static adapter bootstrap from the manifest
     let neutral = render_static_router(&manifest);
 
+    // Important invariant: adapter artifacts are written into the active
+    // workspace/vault root selected by the app, not into the app source repo.
     // Write adapter artifacts from neutral content
     let claude_md = render_claude_adapter(&neutral);
     fs::write(root.join("claude.md"), &claude_md)
@@ -74,7 +76,7 @@ pub fn regenerate_router_internal(
     Ok(claude_md)
 }
 
-/// Regenerate claude.md, .ai/index.yaml, .cursorrules, .windsurfrules.
+/// Regenerate router adapter artifacts and rich catalog files.
 #[tauri::command]
 pub fn regenerate_router(app: AppHandle, state: State<AppState>) -> Result<String, String> {
     regenerate_router_internal(&app, &state)

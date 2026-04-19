@@ -3,7 +3,10 @@ use std::path::Path;
 
 use crate::core::folder_contract::{check_required_fields, load_folder_contract};
 use crate::core::frontmatter::parse_frontmatter;
-use crate::core::paths::{enrich_memory_meta, AI_DIR, AI_SKIP_SUBDIRS, INBOX_DIR, SCAN_SKIP_DIRS};
+use crate::core::paths::{
+    enrich_memory_meta, is_generated_artifact_path, AI_DIR, AI_SKIP_SUBDIRS, INBOX_DIR,
+    SCAN_SKIP_DIRS,
+};
 use crate::core::types::MemoryMeta;
 use crate::core::usage::{apply_usage, load_usage_map};
 
@@ -49,6 +52,10 @@ fn scan_dir_recursive(
             }
             scan_dir_recursive(root, &path, usage, results);
         } else if path.extension().map_or(false, |ext| ext == "md") {
+            // Router adapters and rich catalogs are derived artifacts, never canonical memories.
+            if is_generated_artifact_path(root, &path) {
+                continue;
+            }
             // Skip files starting with _ (like _project.md templates)
             if name.starts_with('_') {
                 continue;

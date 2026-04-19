@@ -137,6 +137,7 @@ pub fn render_static_router(manifest: &RouterManifest) -> String {
     out.push_str("# How This Workspace Works\n\n");
     out.push_str("AI Context OS workspace. Canonical knowledge lives in Markdown memories with YAML frontmatter plus `<!-- L1 -->` / `<!-- L2 -->` markers.\n");
     out.push_str("If MCP is available, use the MCP tools first. If MCP is not available, use this file as the discovery map and then open only the canonical files you actually need.\n\n");
+    out.push_str("Files like `claude.md`, `AGENTS.md`, `.cursorrules`, and `.windsurfrules` are generated adapter artifacts. They are not canonical memories and must not be used as scratchpads or note files.\n\n");
 
     out.push_str("# Reading Memories\n\n");
     out.push_str("1. Start from the compact L0 index in this file.\n");
@@ -168,6 +169,7 @@ pub fn render_static_router(manifest: &RouterManifest) -> String {
     out.push_str("├── inbox/\n");
     out.push_str("├── sources/\n");
     out.push_str("├── claude.md\n");
+    out.push_str("├── AGENTS.md\n");
     out.push_str("├── .cursorrules\n");
     out.push_str("├── .windsurfrules\n");
     out.push_str("├── .ai/\n");

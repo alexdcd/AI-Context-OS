@@ -580,6 +580,7 @@ const PROTECTED_FILE_NAMES = new Set([
   "index.yaml",
   "catalog.md",
   "claude.md",
+  "AGENTS.md",
   ".cursorrules",
   ".windsurfrules",
 ]);

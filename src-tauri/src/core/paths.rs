@@ -23,6 +23,15 @@ pub const SCAN_SKIP_DIRS: &[&str] = &[".git", "node_modules", ".cache"];
 /// `.ai/` subdirectories that are system-managed and should NOT be indexed as memories.
 /// Rules, skills, and context subdirs ARE scannable (they contain user-authored memory files).
 pub const AI_SKIP_SUBDIRS: &[&str] = &["scratch", "journal", "ingest", "proposals"];
+pub const GENERATED_ARTIFACT_RELATIVE_PATHS: &[&str] = &[
+    "claude.md",
+    "AGENTS.md",
+    ".cursorrules",
+    ".windsurfrules",
+    ".ai/config.yaml",
+    ".ai/index.yaml",
+    ".ai/catalog.md",
+];
 
 impl SystemPaths {
     pub fn new(root: &Path) -> Self {
@@ -106,10 +115,13 @@ impl SystemPaths {
         self.root.join(SOURCES_DIR)
     }
 
+    /// Generated router artifact for the active user workspace root.
+    /// This must follow the configured vault root, not the app source repo root.
     pub fn claude_md(&self) -> PathBuf {
         self.root.join("claude.md")
     }
 
+    /// Repo-agnostic agent instructions artifact for the active user workspace root.
     pub fn agents_md(&self) -> PathBuf {
         self.root.join("AGENTS.md")
     }
@@ -137,6 +149,13 @@ impl SystemPaths {
             self.proposals_dir(),
             self.inbox_attachments_dir(),
         ]
+    }
+
+    pub fn generated_artifact_paths(&self) -> Vec<PathBuf> {
+        GENERATED_ARTIFACT_RELATIVE_PATHS
+            .iter()
+            .map(|relative| self.root.join(relative))
+            .collect()
     }
 }
 
@@ -196,6 +215,17 @@ pub fn enrich_memory_meta(meta: &mut MemoryMeta, path: &Path, root: &Path) {
     meta.system_role = system_role(path, root);
 }
 
+pub fn is_generated_artifact_path(root: &Path, path: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(root) else {
+        return false;
+    };
+
+    let normalized = relative.to_string_lossy().replace('\\', "/");
+    GENERATED_ARTIFACT_RELATIVE_PATHS
+        .iter()
+        .any(|candidate| *candidate == normalized)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,5 +249,20 @@ mod tests {
             Some(SystemRole::Rule)
         );
         assert_eq!(system_role(&root.join("ideas/nota.md"), &root), None);
+    }
+
+    #[test]
+    fn generated_artifact_detection_covers_router_and_catalog_files() {
+        let root = PathBuf::from("/workspace");
+        assert!(is_generated_artifact_path(&root, &root.join("claude.md")));
+        assert!(is_generated_artifact_path(&root, &root.join("AGENTS.md")));
+        assert!(is_generated_artifact_path(
+            &root,
+            &root.join(".ai/catalog.md")
+        ));
+        assert!(!is_generated_artifact_path(
+            &root,
+            &root.join("notes/idea.md")
+        ));
     }
 }

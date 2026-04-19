@@ -7,6 +7,7 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use tauri::{AppHandle, Emitter};
 
+use crate::core::paths::is_generated_artifact_path;
 use crate::core::types::MemoryMeta;
 
 /// Shared memory index type: id -> (meta, file_path)
@@ -73,21 +74,7 @@ pub fn start_watcher(
                         if path_str.contains("/.cache/") || path_str.contains("\\.cache\\") {
                             continue;
                         }
-                        if path_str.ends_with("/claude.md")
-                            || path_str.ends_with("\\claude.md")
-                            || path_str.ends_with("/AGENTS.md")
-                            || path_str.ends_with("\\AGENTS.md")
-                            || path_str.ends_with("/.ai/index.yaml")
-                            || path_str.ends_with("\\.ai\\index.yaml")
-                            || path_str.ends_with("/.ai/catalog.md")
-                            || path_str.ends_with("\\.ai\\catalog.md")
-                            || path_str.ends_with("/.ai/config.yaml")
-                            || path_str.ends_with("\\.ai\\config.yaml")
-                            || path_str.ends_with("/.cursorrules")
-                            || path_str.ends_with("\\.cursorrules")
-                            || path_str.ends_with("/.windsurfrules")
-                            || path_str.ends_with("\\.windsurfrules")
-                        {
+                        if is_generated_artifact_path(&root, &event.path) {
                             continue;
                         }
 

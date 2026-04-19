@@ -88,7 +88,8 @@ AI Context OS utiliza una arquitectura "Zero Gravity": la carpeta física donde 
 │   └── index.yaml  ← catálogo L0 autogenerado
 ├── User_Folders/   ← estructura cosmética del usuario (ej. Proyectos/, Notas/)
 ├── .cache/
-├── claude.md       ← master router (autogenerado)
+├── claude.md       ← router adapter de Claude (autogenerado)
+├── AGENTS.md       ← router adapter para agentes (autogenerado)
 ├── .cursorrules
 └── .windsurfrules
 ```
@@ -97,6 +98,7 @@ Notas:
 
 - La infraestructura del sistema es fija: `inbox/`, `sources/` y `.ai/`. Todo lo demás es definido por el usuario.
 - Las páginas del Journal viven en `.ai/journal/YYYY-MM-DD.md`.
+- `claude.md` y `AGENTS.md` son artefactos adapter generados, no memorias canónicas ni archivos para notas.
 - `claude.md` existe por compatibilidad, pero el objetivo arquitectónico es core neutral + adapters.
 - Mover un archivo de memoria entre carpetas de usuario **no** rompe la indexación — la clasificación viene del campo `type:` en el frontmatter.
 
@@ -107,7 +109,7 @@ Implementado y conectado:
 - Inicialización de workspace, carga/guardado de config y watcher
 - CRUD de memorias y operaciones de archivo asociadas
 - Árbol de archivos + lectura/escritura de archivos raw en UI
-- Regeneración de router y escritura de adapters (`claude.md`, `.cursorrules`, `.windsurfrules`)
+- Regeneración de router y escritura de adapters (`claude.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`)
 - Simulación de contexto y pipeline de scoring
 - Grafo de memorias
 - Governance: conflictos, decay, consolidación y scratch TTL
@@ -131,7 +133,7 @@ Alineado con el estado actual y con `REVISION-TECNICA-ALINEACION-2026-03-29.md`.
 ### 1. Endurecer adapter-first
 
 - Mantener el core neutral como base.
-- Conservar `claude.md` por compatibilidad sin volverlo fuente de verdad.
+- Conservar `claude.md` y `AGENTS.md` por compatibilidad sin volverlos fuente de verdad.
 - Reducir acoplamientos específicos de herramienta en el núcleo.
 
 ### 2. Honestidad de conectores
