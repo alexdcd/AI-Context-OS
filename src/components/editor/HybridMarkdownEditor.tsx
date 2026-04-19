@@ -1061,6 +1061,7 @@ function createDomHandlers(editable: boolean) {
 
       const lineElement = target.closest(".cm-line");
       if (!(lineElement instanceof HTMLElement)) return false;
+      if (target !== lineElement) return false;
 
       const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
       view.dispatch({
@@ -1101,21 +1102,44 @@ function createDomHandlers(editable: boolean) {
     },
 
     click(event, view) {
-      if (event.detail !== 3) return false;
+      if (!editable || event.button !== 0) return false;
 
-      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-      if (pos === null) return false;
+      if (event.detail === 3) {
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos === null) return false;
 
-      const selection = getParagraphSelection(view.state.doc, pos);
-      if (selection.from === selection.to) return false;
+        const selection = getParagraphSelection(view.state.doc, pos);
+        if (selection.from === selection.to) return false;
 
-      view.dispatch({
-        selection: EditorSelection.range(selection.from, selection.to),
-        scrollIntoView: true,
-        userEvent: "select.pointer",
-      });
-      event.preventDefault();
-      return true;
+        view.dispatch({
+          selection: EditorSelection.range(selection.from, selection.to),
+          scrollIntoView: true,
+          userEvent: "select.pointer",
+        });
+        event.preventDefault();
+        return true;
+      }
+
+      if (event.detail !== 1) return false;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false;
+
+      const target = getEventTargetElement(event.target);
+      if (!target) return false;
+      if (target.closest(".cm-widget, .cm-tooltip, button, a")) return false;
+
+      const lineElement = target.closest(".cm-line");
+      if (!(lineElement instanceof HTMLElement)) return false;
+      if (target === lineElement) return false;
+
+      const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
+      if (pos !== null && pos !== view.state.selection.main.head) {
+        view.dispatch({
+          selection: EditorSelection.cursor(pos),
+          scrollIntoView: false,
+          userEvent: "select.pointer",
+        });
+      }
+      return false;
     },
   });
 }
