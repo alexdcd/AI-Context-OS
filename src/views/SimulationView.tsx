@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, Zap, Copy, Check, Clock, Trash2, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { getConfig, simulateContext } from "../lib/tauri";
 import type { ScoredMemory } from "../lib/types";
 import { MEMORY_ONTOLOGY_COLORS } from "../lib/types";
@@ -32,7 +33,9 @@ function saveHistory(runs: SimulationRun[]) {
 
 export function SimulationView() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const indexedMemories = useAppStore((state) => state.memories.length);
+  const selectFile = useAppStore((state) => state.selectFile);
   const activeVaultPath = useVaultStore((state) => state.activeVaultPath);
   const [query, setQuery] = useState("");
   const [budget, setBudget] = useState(4000);
@@ -119,6 +122,11 @@ export function SimulationView() {
   const clearHistory = () => {
     setHistory([]);
     setActiveHistoryId(null);
+  };
+
+  const openMemory = async (memoryId: string) => {
+    await selectFile(memoryId);
+    navigate("/");
   };
 
   const totalTokens = results.reduce((acc, r) => acc + r.token_estimate, 0);
@@ -309,6 +317,13 @@ export function SimulationView() {
                 <span className="rounded border border-[var(--border)] px-1 py-0.5 font-mono text-[10px] text-[color:var(--text-2)]">
                   {r.load_level.toUpperCase()}
                 </span>
+                <button
+                  onClick={() => void openMemory(r.memory_id)}
+                  className="shrink-0 rounded px-1 py-0.5 font-mono text-[11px] text-[color:var(--accent)] hover:bg-[color:var(--bg-2)] hover:underline"
+                  title={r.memory_id}
+                >
+                  {r.memory_id}
+                </button>
                 <span className="flex-1 truncate text-xs text-[color:var(--text-1)]">
                   {r.l0}
                 </span>
