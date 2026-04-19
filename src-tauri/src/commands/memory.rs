@@ -10,8 +10,9 @@ use crate::core::paths::{enrich_memory_meta, SystemPaths};
 use crate::core::types::{CreateMemoryInput, Memory, MemoryFilter, MemoryMeta, SaveMemoryInput};
 use crate::core::usage::record_access;
 use crate::core::wikilinks::{
-    normalize_wikilinks, rewrite_wikilink_target, CascadeRewriteOutcome, NormalizationOutcome,
-    SaveMemoryResult, WikilinkSaveWarning,
+    find_backlink_occurrences, normalize_wikilinks, resolve_wikilink, rewrite_wikilink_target,
+    BacklinkOccurrence, CascadeRewriteOutcome, NormalizationOutcome, SaveMemoryResult,
+    WikilinkResolution, WikilinkSaveWarning,
 };
 use crate::state::AppState;
 
@@ -549,6 +550,11 @@ pub fn rename_memory_file(
     drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
+
+    if old_id != memory.meta.id {
+        apply_id_rename_cascade(&app, &state, &old_id, &memory.meta.id)?;
+    }
+
     crate::commands::router::regenerate_router_internal(&app, &state)?;
 
     Ok(memory)

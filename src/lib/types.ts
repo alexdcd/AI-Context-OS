@@ -253,9 +253,18 @@ export interface WikilinkSaveWarning {
   candidates?: WikilinkCandidate[];
 }
 
+export interface CascadeRewriteOutcome {
+  old_id: string;
+  new_id: string;
+  rewrite_count: number;
+  affected_ids: string[];
+  skipped_protected_ids: string[];
+}
+
 export interface SaveMemoryResult {
   memory: Memory;
   wikilink_warnings: WikilinkSaveWarning[];
+  cascade?: CascadeRewriteOutcome | null;
 }
 
 export interface MemoryFilter {

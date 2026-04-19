@@ -272,6 +272,91 @@ pub fn normalize_wikilinks(body: &str, memories: &[MemoryMeta]) -> Normalization
     }
 }
 
+/// One occurrence of a `[[target_id]]` link found inside a source memory.
+/// Returned by backlink queries so the UI can render a click-through list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BacklinkOccurrence {
+    /// "l1" or "l2" — which body section the link appears in.
+    pub level: String,
+    /// 1-based line number inside that body section.
+    pub line: u32,
+    /// Small snippet of surrounding text, with the raw `[[...]]` preserved.
+    /// Use for hover previews and search-result-style rendering.
+    pub excerpt: String,
+}
+
+/// Collect all occurrences of `[[target_id]]` in a body. Line numbers are
+/// 1-based within `body`. Whitespace inside the brackets is tolerated.
+pub fn find_backlink_occurrences(body: &str, target_id: &str, level: &str) -> Vec<BacklinkOccurrence> {
+    let matches = parse_wikilinks(body);
+    if matches.is_empty() {
+        return Vec::new();
+    }
+
+    matches
+        .into_iter()
+        .filter(|m| m.inner == target_id)
+        .map(|m| {
+            let line = body[..m.start].bytes().filter(|b| *b == b'\n').count() as u32 + 1;
+            let excerpt = build_excerpt(body, m.start, m.end);
+            BacklinkOccurrence {
+                level: level.to_string(),
+                line,
+                excerpt,
+            }
+        })
+        .collect()
+}
+
+/// Take up to `max_bytes` from `text`, aligning to a UTF-8 char boundary.
+/// Returns `(slice, was_truncated)` where `slice` is the truncated view.
+fn truncate_right(text: &str, max_bytes: usize) -> (&str, bool) {
+    if text.len() <= max_bytes {
+        return (text, false);
+    }
+    let mut end = max_bytes;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    (&text[..end], true)
+}
+
+fn truncate_left(text: &str, max_bytes: usize) -> (&str, bool) {
+    if text.len() <= max_bytes {
+        return (text, false);
+    }
+    let mut start = text.len().saturating_sub(max_bytes);
+    while start < text.len() && !text.is_char_boundary(start) {
+        start += 1;
+    }
+    (&text[start..], true)
+}
+
+fn build_excerpt(body: &str, start: usize, end: usize) -> String {
+    const PAD: usize = 40;
+
+    let line_start = body[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_end = body[end..]
+        .find('\n')
+        .map(|i| end + i)
+        .unwrap_or(body.len());
+
+    let before = &body[line_start..start];
+    let middle = &body[start..end];
+    let after = &body[end..line_end];
+
+    let (before_clipped, before_truncated) = truncate_left(before, PAD);
+    let (after_clipped, after_truncated) = truncate_right(after, PAD);
+
+    let prefix = if before_truncated { "…" } else { "" };
+    let suffix = if after_truncated { "…" } else { "" };
+
+    format!(
+        "{}{}{}{}{}",
+        prefix, before_clipped, middle, after_clipped, suffix
+    )
+}
+
 /// Rewrite every `[[old_id]]` in `body` to `[[new_id]]`. Whitespace inside the
 /// brackets is tolerated (e.g. `[[ old_id ]]`). Links with a different inner
 /// text are untouched.
@@ -580,5 +665,64 @@ mod tests {
         let (body, n) = rewrite_wikilink_target("[[ old ]]", "old", "new");
         assert_eq!(body, "[[new]]");
         assert_eq!(n, 1);
+    }
+
+    // ─── find_backlink_occurrences ───
+
+    #[test]
+    fn backlinks_empty_when_no_match() {
+        let occs = find_backlink_occurrences("nothing here", "foo", "l1");
+        assert!(occs.is_empty());
+    }
+
+    #[test]
+    fn backlinks_finds_single_occurrence() {
+        let occs = find_backlink_occurrences("see [[foo]] now", "foo", "l2");
+        assert_eq!(occs.len(), 1);
+        assert_eq!(occs[0].line, 1);
+        assert_eq!(occs[0].level, "l2");
+        assert!(occs[0].excerpt.contains("[[foo]]"));
+    }
+
+    #[test]
+    fn backlinks_reports_line_numbers() {
+        let body = "line one\nline two [[foo]] tail\nline three [[foo]]";
+        let occs = find_backlink_occurrences(body, "foo", "l1");
+        assert_eq!(occs.len(), 2);
+        assert_eq!(occs[0].line, 2);
+        assert_eq!(occs[1].line, 3);
+    }
+
+    #[test]
+    fn backlinks_ignores_non_matching_links() {
+        // Only the `[[foo]]` occurrence is returned; the `[[bar]]` text may
+        // still appear in the excerpt (it shares a line with the match).
+        let occs = find_backlink_occurrences("[[foo]] and [[bar]]", "foo", "l1");
+        assert_eq!(occs.len(), 1);
+        assert!(occs[0].excerpt.contains("[[foo]]"));
+    }
+
+    #[test]
+    fn backlinks_excerpt_truncates_long_lines() {
+        let long_prefix = "word ".repeat(30);
+        let long_suffix = " word".repeat(30);
+        let body = format!("{}[[foo]]{}", long_prefix, long_suffix);
+        let occs = find_backlink_occurrences(&body, "foo", "l1");
+        assert_eq!(occs.len(), 1);
+        assert!(occs[0].excerpt.starts_with('…'));
+        assert!(occs[0].excerpt.ends_with('…'));
+        assert!(occs[0].excerpt.contains("[[foo]]"));
+    }
+
+    #[test]
+    fn backlinks_excerpt_respects_char_boundaries() {
+        // Multi-byte characters near the truncation window must not split UTF-8.
+        let prefix = "¡".repeat(60);
+        let suffix = "!".repeat(60);
+        let body = format!("{}[[foo]]{}", prefix, suffix);
+        let occs = find_backlink_occurrences(&body, "foo", "l1");
+        assert_eq!(occs.len(), 1);
+        // The excerpt must still be valid UTF-8 (format! on &str guarantees this).
+        assert!(occs[0].excerpt.contains("[[foo]]"));
     }
 }
