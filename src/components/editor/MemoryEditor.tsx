@@ -102,11 +102,6 @@ export function MemoryEditor() {
   const editorViewRef = useRef<EditorView | null>(null);
   const pendingWikilinkCreationsRef = useRef<Set<string>>(new Set());
 
-  const loadWorkspaceIndexes = useCallback(async () => {
-    await loadMemories();
-    await loadFileTree();
-  }, [loadFileTree, loadMemories]);
-
   useEffect(() => {
     if (!activeMemory) return;
 
@@ -362,8 +357,9 @@ export function MemoryEditor() {
   const handleCreateWikilinkMemory = useCallback(
     async ({ id, l0 }: WikilinkDraftMemory) => {
       pendingWikilinkCreationsRef.current.add(id);
+      pendingWikilinkCreationsRef.current.add(l0);
       try {
-        await createMemory({
+        const created = await createMemory({
           id,
           ontology: "unknown",
           l0,
@@ -372,18 +368,26 @@ export function MemoryEditor() {
           l1_content: "",
           l2_content: "",
         });
-        await loadWorkspaceIndexes();
-        void loadGraph();
+        useAppStore.setState((state) => ({
+          memories: upsertMemoryMeta(state.memories, created.meta),
+        }));
         setWikilinkWarnings((prev) =>
-          prev.filter((warning) => !(warning.kind === "unresolved" && warning.text === id)),
+          prev.filter(
+            (warning) =>
+              !(
+                warning.kind === "unresolved" &&
+                (warning.text === id || warning.text === l0)
+              ),
+          ),
         );
       } catch (error) {
         setError(String(error));
       } finally {
         pendingWikilinkCreationsRef.current.delete(id);
+        pendingWikilinkCreationsRef.current.delete(l0);
       }
     },
-    [loadGraph, loadWorkspaceIndexes, setError],
+    [setError],
   );
 
   const applyWikilinkCandidate = useCallback(
@@ -408,7 +412,7 @@ export function MemoryEditor() {
   const confirmBrokenLinkCreation = useCallback(
     async (warning: WikilinkSaveWarning, draft: { id: string; l0: string; ontology: MemoryOntology }) => {
       try {
-        await createMemory({
+        const created = await createMemory({
           id: draft.id,
           ontology: draft.ontology,
           l0: draft.l0,
@@ -417,15 +421,16 @@ export function MemoryEditor() {
           l1_content: "",
           l2_content: "",
         });
-        await loadWorkspaceIndexes();
-        void loadGraph();
+        useAppStore.setState((state) => ({
+          memories: upsertMemoryMeta(state.memories, created.meta),
+        }));
         applyWikilinkCandidate(warning, draft.id);
         setBrokenLinkDraft(null);
       } catch (error) {
         setError(String(error));
       }
     },
-    [applyWikilinkCandidate, loadGraph, loadWorkspaceIndexes, setError],
+    [applyWikilinkCandidate, setError],
   );
 
   if (!activeMemory || !meta) {
