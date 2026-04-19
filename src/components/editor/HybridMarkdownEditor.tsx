@@ -257,7 +257,7 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-task-priority-badge": {
       display: "inline-flex",
       alignItems: "center",
-      marginRight: "0.42rem",
+      marginRight: "0",
       padding: "0.02rem 0.32rem",
       borderRadius: "999px",
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
@@ -277,6 +277,12 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-task-priority-c": {
       color: "var(--text-2)",
       backgroundColor: "color-mix(in srgb, var(--text-2) 12%, transparent)",
+    },
+    ".cm-task-priority-hidden": {
+      display: "inline-block",
+      width: "0",
+      overflow: "hidden",
+      color: "transparent",
     },
     ".cm-line.cm-codeblock": {
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
@@ -720,7 +726,8 @@ class TaskPriorityWidget extends WidgetType {
     const root = document.createElement("span");
     root.style.position = "relative";
     root.style.display = "inline-flex";
-    root.style.marginLeft = "0.5rem";
+    root.style.float = "right";
+    root.style.marginLeft = "0.75rem";
     root.style.verticalAlign = "middle";
 
     const trigger = document.createElement("button");
@@ -924,7 +931,16 @@ function createLivePreviewPlugin(
                       ? firstChild.nextSibling.from
                       : lastChild.from;
                   if (textTo > textFrom) {
-                    decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                    const linkText = state.sliceDoc(textFrom, textTo);
+                    if (/^#(?:[ABCabc])$/.test(linkText)) {
+                      decos.push({
+                        from: textFrom,
+                        to: textTo,
+                        deco: Decoration.mark({ class: "cm-task-priority-hidden" }),
+                      });
+                    } else {
+                      decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                    }
                   }
                 }
               }
@@ -934,29 +950,11 @@ function createLivePreviewPlugin(
           let line = state.doc.lineAt(from);
           const endLine = state.doc.lineAt(Math.max(from, to - 1));
           while (line.number <= endLine.number) {
+            const currentLineNumber = line.number;
             const taskMatch = line.text.match(/^(\s*-\s\[[ xX]\]\s+)(\[#([ABCabc])\]\s+)?/);
-            if (taskMatch) {
+            if (taskMatch && !activeLines.has(currentLineNumber)) {
               const currentPriority = (taskMatch[3]?.toUpperCase() ?? "B") as "A" | "B" | "C";
-              const prefixFrom = line.from;
-              const prefixTo = line.from + taskMatch[1].length;
-              const markerFrom = prefixTo;
-              const markerTo = markerFrom + (taskMatch[2]?.length ?? 0);
-
-              decos.push({
-                from: prefixFrom,
-                to: prefixTo,
-                deco: hideDeco,
-              });
-
-              if (taskMatch[2]) {
-                decos.push({
-                  from: markerFrom,
-                  to: markerTo,
-                  deco: hideDeco,
-                });
-              }
-
-              if (!decoratedTaskPriorityLines.has(line.number)) {
+              if (!decoratedTaskPriorityLines.has(currentLineNumber)) {
                 decos.push({
                   from: line.to,
                   to: line.to,
@@ -967,12 +965,12 @@ function createLivePreviewPlugin(
                       priorityLabels,
                       editable,
                       (nextPriority) => {
-                        void setTaskPriorityOnLine(view, line.number, nextPriority);
+                        void setTaskPriorityOnLine(view, currentLineNumber, nextPriority);
                       },
                     ),
                   }),
                 });
-                decoratedTaskPriorityLines.add(line.number);
+                decoratedTaskPriorityLines.add(currentLineNumber);
               }
             }
 
