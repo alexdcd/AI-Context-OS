@@ -267,6 +267,26 @@ export interface SaveMemoryResult {
   cascade?: CascadeRewriteOutcome | null;
 }
 
+export interface BacklinkOccurrence {
+  level: "l1" | "l2";
+  line: number;
+  excerpt: string;
+}
+
+export interface BacklinkRef {
+  source_id: string;
+  source_l0: string;
+  source_path: string;
+  occurrences: BacklinkOccurrence[];
+}
+
+export type WikilinkResolution =
+  | { kind: "exact_id"; id: string }
+  | { kind: "exact_l0"; id: string }
+  | { kind: "fuzzy_l0"; id: string }
+  | { kind: "ambiguous"; candidates: WikilinkCandidate[] }
+  | { kind: "unresolved" };
+
 export interface MemoryFilter {
   ontology?: MemoryOntology;
   tags?: string[];
