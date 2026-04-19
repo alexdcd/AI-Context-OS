@@ -459,7 +459,15 @@ function createWikilinkCompletionSource(options: WikilinkEditorOptions) {
       },
     }));
 
-    if (completions.length === 0 && trimmedQuery && options.onCreateMemory) {
+    const resolution = trimmedQuery
+      ? resolveWikilinkText(trimmedQuery, options.targets)
+      : null;
+    const shouldOfferCreate =
+      trimmedQuery &&
+      options.onCreateMemory &&
+      (resolution === null || resolution.kind === "unresolved");
+
+    if (shouldOfferCreate) {
       const l0 = trimmedQuery;
       const id = nextUniqueMemoryId(l0, options.targets);
       const draft = { id, l0 };
