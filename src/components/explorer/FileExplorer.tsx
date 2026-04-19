@@ -1561,7 +1561,7 @@ export function FileExplorer() {
 }
 
 // .ai/ subdirectories that are system-managed and should not receive dropped files
-const AI_SYSTEM_SUBDIRS = new Set(["tasks", "scratch", "journal"]);
+const AI_SYSTEM_SUBDIRS = new Set(["scratch", "journal"]);
 
 function isAiSystemSubdir(node: FileNode): boolean {
   const segments = pathSegments(node.path);

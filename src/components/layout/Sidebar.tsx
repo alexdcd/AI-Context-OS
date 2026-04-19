@@ -8,7 +8,6 @@ import {
   Shield,
   Brain,
   BookOpen,
-  ListTodo,
   Activity,
   Plug,
   Settings,
@@ -18,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useGovernanceBadge } from "../../lib/useGovernanceBadge";
 import { VaultSwitcherFooter } from "../vault/VaultSwitcherFooter";
 
-type SidebarKey = "explorer" | "inbox" | "journal" | "tasks" | "graph" | "simulation" | "governance" | "observability" | "connectors";
+type SidebarKey = "explorer" | "inbox" | "journal" | "graph" | "simulation" | "governance" | "observability" | "connectors";
 
 interface SidebarProps {
   onCreateVault?: () => void;
@@ -28,7 +27,6 @@ const navItems: { to: string; icon: React.ElementType; key: SidebarKey }[] = [
   { to: "/", icon: FolderTree, key: "explorer" },
   { to: "/inbox", icon: Inbox, key: "inbox" },
   { to: "/journal", icon: BookOpen, key: "journal" },
-  { to: "/tasks", icon: ListTodo, key: "tasks" },
   { to: "/graph", icon: Network, key: "graph" },
   { to: "/simulation", icon: FlaskConical, key: "simulation" },
   { to: "/governance", icon: Shield, key: "governance" },

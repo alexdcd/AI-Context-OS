@@ -30,9 +30,6 @@ const GovernanceView = lazy(() =>
 const JournalView = lazy(() =>
   import("./views/JournalView").then((module) => ({ default: module.JournalView })),
 );
-const TaskView = lazy(() =>
-  import("./views/TaskView").then((module) => ({ default: module.TaskView })),
-);
 const OnboardingWizard = lazy(() =>
   import("./components/onboarding/OnboardingWizard").then((module) => ({
     default: module.OnboardingWizard,
@@ -298,7 +295,6 @@ function AppContent() {
               <Routes>
                 <Route path="/" element={<ExplorerView />} />
                 <Route path="/journal" element={<JournalView />} />
-                <Route path="/tasks" element={<TaskView />} />
                 <Route path="/graph" element={<GraphViewPage />} />
                 <Route path="/simulation" element={<SimulationView />} />
                 <Route path="/governance" element={<GovernanceView />} />

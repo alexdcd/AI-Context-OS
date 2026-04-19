@@ -28,8 +28,6 @@ import type {
   WikilinkResolution,
   Conflict,
   ConsolidationSuggestion,
-  TaskFilter,
-  TaskItem,
   VaultEntry,
   UpdateInboxItemInput,
   ChatCompletionRequest,
@@ -172,19 +170,6 @@ export const saveJournalPage = (date: string, content: string) =>
 export const listJournalDates = () =>
   invoke<JournalDateInfo[]>("list_journal_dates");
 export const getToday = () => invoke<string>("get_today");
-
-// Tasks
-export const listTasks = (filter?: TaskFilter) =>
-  invoke<TaskItem[]>("list_tasks", { filter: filter ?? null });
-export const createTask = (task: TaskItem) =>
-  invoke<TaskItem>("create_task", { task });
-export const updateTask = (task: TaskItem) =>
-  invoke<TaskItem>("update_task", { task });
-export const deleteTask = (id: string) =>
-  invoke<void>("delete_task", { id });
-export const toggleTaskState = (id: string) =>
-  invoke<TaskItem>("toggle_task_state", { id });
-export const generateTaskId = () => invoke<string>("generate_task_id");
 
 // Backup
 export const backupWorkspace = (destination: string) =>

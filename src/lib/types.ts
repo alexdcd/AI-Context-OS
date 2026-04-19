@@ -171,46 +171,6 @@ export interface JournalDateInfo {
 export type TaskState = "todo" | "in_progress" | "done" | "cancelled";
 export type TaskPriority = "a" | "b" | "c";
 
-export interface TaskItem {
-  id: string;
-  title: string;
-  state: TaskState;
-  priority: TaskPriority | null;
-  tags: string[];
-  source_date: string | null;
-  source_file: string | null;
-  created: string;
-  modified: string;
-  notes: string;
-  due: string | null;
-}
-
-export interface TaskFilter {
-  state?: TaskState;
-  priority?: TaskPriority;
-  tag?: string;
-}
-
-export const TASK_STATE_LABELS: Record<TaskState, string> = {
-  todo: "Todo",
-  in_progress: "In Progress",
-  done: "Done",
-  cancelled: "Cancelled",
-};
-
-export const TASK_STATE_COLORS: Record<TaskState, string> = {
-  todo: "#f59e0b",
-  in_progress: "#3b82f6",
-  done: "#10b981",
-  cancelled: "#71717a",
-};
-
-export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
-  a: "High",
-  b: "Medium",
-  c: "Low",
-};
-
 export interface CreateMemoryInput {
   id: string;
   ontology: MemoryOntology;
