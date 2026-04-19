@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { MemoryMeta, MemoryOntology } from "../../lib/types";
+import { AlertTriangle, FileSymlink } from "lucide-react";
+import type { BacklinkRef, MemoryMeta, MemoryOntology } from "../../lib/types";
+import { getBacklinks } from "../../lib/tauri";
+import { useAppStore } from "../../lib/store";
 
 interface FrontmatterFormProps {
   meta: MemoryMeta;
@@ -85,6 +88,7 @@ const toMemoryRef = (value: string) =>
 export function FrontmatterForm({ meta, onChange, readonly = false }: FrontmatterFormProps) {
   const { t } = useTranslation();
   const [localId, setLocalId] = useState(meta.id);
+  const [pendingRename, setPendingRename] = useState<{ from: string; to: string } | null>(null);
 
   useEffect(() => {
     setLocalId(meta.id);
@@ -92,6 +96,27 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
 
   const update = (partial: Partial<MemoryMeta>) => {
     onChange({ ...meta, ...partial });
+  };
+
+  const requestIdChange = () => {
+    if (readonly) return;
+    const trimmed = localId.trim();
+    if (!trimmed || trimmed === meta.id) {
+      setLocalId(meta.id);
+      return;
+    }
+    setPendingRename({ from: meta.id, to: trimmed });
+  };
+
+  const confirmIdChange = () => {
+    if (!pendingRename) return;
+    update({ id: pendingRename.to });
+    setPendingRename(null);
+  };
+
+  const cancelIdChange = () => {
+    setPendingRename(null);
+    setLocalId(meta.id);
   };
 
   const addUnique = (list: string[], rawValue: string, normalize = true) => {
@@ -110,15 +135,12 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
           type="text"
           value={localId}
           onChange={(e) => setLocalId(toMemoryRef(e.target.value))}
-          onBlur={() => {
-            if (localId && localId !== meta.id) {
-              update({ id: localId });
-            } else {
-              setLocalId(meta.id);
-            }
-          }}
+          onBlur={requestIdChange}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              setLocalId(meta.id);
               e.currentTarget.blur();
             }
           }}
@@ -126,7 +148,19 @@ export function FrontmatterForm({ meta, onChange, readonly = false }: Frontmatte
           className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)] placeholder:text-[color:var(--text-2)]"
           placeholder={t("memoryEditor.frontmatter.memoryIdPlaceholder")}
         />
+        <p className="mt-1 text-[10px] leading-4 text-[color:var(--text-2)]">
+          {t("memoryEditor.frontmatter.idHint")}
+        </p>
       </Field>
+
+      {pendingRename && (
+        <RenameIdDialog
+          fromId={pendingRename.from}
+          toId={pendingRename.to}
+          onCancel={cancelIdChange}
+          onConfirm={confirmIdChange}
+        />
+      )}
 
       {meta.status && (
         <Field label={t("memoryEditor.frontmatter.status")}>
@@ -290,6 +324,187 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1">
       <span className="text-[10px] text-[color:var(--text-2)]">{label}</span>
       {children}
+    </div>
+  );
+}
+
+function RenameIdDialog({
+  fromId,
+  toId,
+  onCancel,
+  onConfirm,
+}: {
+  fromId: string;
+  toId: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  const memories = useAppStore((s) => s.memories);
+  const [backlinks, setBacklinks] = useState<BacklinkRef[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const refs = await getBacklinks(fromId);
+        if (!cancelled) setBacklinks(refs);
+      } catch {
+        if (!cancelled) setBacklinks([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fromId]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel();
+      } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        onConfirm();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onCancel, onConfirm]);
+
+  const protectedIds = useMemo(() => {
+    const byId = new Map(memories.map((m) => [m.id, m]));
+    return (backlinks ?? [])
+      .filter((ref) => byId.get(ref.source_id)?.protected)
+      .map((ref) => ref.source_id);
+  }, [backlinks, memories]);
+
+  const occurrenceCount = useMemo(
+    () => (backlinks ?? []).reduce((sum, ref) => sum + ref.occurrences.length, 0),
+    [backlinks],
+  );
+  const sourceCount = backlinks?.length ?? 0;
+  const loading = backlinks === null;
+
+  const handleBackdropClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (event.target === event.currentTarget) onCancel();
+    },
+    [onCancel],
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onMouseDown={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full max-w-md rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-1)] p-5 shadow-xl">
+        <div className="mb-3 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[color:var(--accent-muted)]">
+            <FileSymlink className="h-4 w-4 text-[color:var(--accent)]" />
+          </div>
+          <h2 className="text-sm font-semibold text-[color:var(--text-0)]">
+            {t("memoryEditor.frontmatter.renameIdTitle")}
+          </h2>
+        </div>
+
+        <p className="mb-3 text-xs leading-5 text-[color:var(--text-2)]">
+          {t("memoryEditor.frontmatter.renameIdDescription")}
+        </p>
+
+        <div className="mb-3 space-y-1.5 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-2)] p-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+              {t("memoryEditor.frontmatter.renameIdOldLabel")}
+            </span>
+            <span className="truncate font-mono text-[11px] text-[color:var(--text-1)]">
+              {fromId}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+              {t("memoryEditor.frontmatter.renameIdNewLabel")}
+            </span>
+            <span className="truncate font-mono text-[11px] font-semibold text-[color:var(--accent)]">
+              {toId}
+            </span>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-2)] p-3">
+          {loading && (
+            <p className="text-xs text-[color:var(--text-2)]">
+              {t("memoryEditor.frontmatter.renameIdImpactLoading")}
+            </p>
+          )}
+          {!loading && sourceCount === 0 && (
+            <p className="text-xs text-[color:var(--text-2)]">
+              {t("memoryEditor.frontmatter.renameIdImpactNone")}
+            </p>
+          )}
+          {!loading && sourceCount > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-[color:var(--text-1)]">
+                {t("memoryEditor.frontmatter.renameIdImpact", { count: sourceCount })}
+                {" · "}
+                <span className="text-[color:var(--text-2)]">
+                  {t("memoryEditor.frontmatter.renameIdImpactOccurrences", {
+                    count: occurrenceCount,
+                  })}
+                </span>
+              </p>
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+                  {t("memoryEditor.frontmatter.renameIdPreviewTitle")}
+                </p>
+                <ul className="max-h-28 space-y-0.5 overflow-y-auto pr-1 text-[11px] text-[color:var(--text-1)]">
+                  {backlinks!.map((ref) => {
+                    const isProtected = protectedIds.includes(ref.source_id);
+                    return (
+                      <li
+                        key={ref.source_id}
+                        className="flex items-center justify-between gap-2 font-mono"
+                      >
+                        <span className="truncate">{ref.source_id}</span>
+                        <span className="shrink-0 text-[10px] text-[color:var(--text-2)]">
+                          {isProtected
+                            ? "—"
+                            : ref.occurrences.length}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          )}
+          {!loading && protectedIds.length > 0 && (
+            <div className="mt-2 flex items-start gap-1.5 rounded-sm bg-[color:var(--warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--warning)]">
+              <AlertTriangle className="mt-[1px] h-3 w-3 shrink-0" />
+              <span>{t("memoryEditor.frontmatter.renameIdProtectedWarning")}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-2)] px-4 py-1.5 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)]"
+          >
+            {t("memoryEditor.frontmatter.renameIdCancel")}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 rounded-md bg-[color:var(--accent)] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+          >
+            {t("memoryEditor.frontmatter.renameIdConfirm")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
