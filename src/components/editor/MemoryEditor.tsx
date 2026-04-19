@@ -34,6 +34,7 @@ import {
   nextUniqueMemoryId,
   slugifyMemoryId,
   type WikilinkDraftMemory,
+  type WikilinkTarget,
 } from "./editorWikilinks";
 
 type InspectorTab = "properties" | "links" | "history";
@@ -949,6 +950,352 @@ function formatTimestamp(value: string, t: TFunction): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t("memoryEditor.history.notAvailable");
   return date.toLocaleString();
+}
+
+function rewriteWikilinkText(body: string, rawText: string, newId: string): string {
+  const escaped = rawText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\[\\[\\s*${escaped}\\s*\\]\\]`, "g");
+  return body.replace(pattern, `[[${newId}]]`);
+}
+
+type GroupedWarning = {
+  key: string;
+  level: "l1" | "l2";
+  text: string;
+  kind: "ambiguous" | "unresolved";
+  candidates: WikilinkCandidate[];
+  occurrences: number;
+  representative: WikilinkSaveWarning;
+};
+
+function groupWikilinkWarnings(warnings: WikilinkSaveWarning[]): GroupedWarning[] {
+  const byKey = new Map<string, GroupedWarning>();
+  for (const warning of warnings) {
+    const key = `${warning.level}::${warning.text}::${warning.kind}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.occurrences += 1;
+      continue;
+    }
+    byKey.set(key, {
+      key,
+      level: warning.level,
+      text: warning.text,
+      kind: warning.kind,
+      candidates: warning.candidates ?? [],
+      occurrences: 1,
+      representative: warning,
+    });
+  }
+  return Array.from(byKey.values());
+}
+
+function WikilinkWarningsBanner({
+  warnings,
+  collapsed,
+  onToggleCollapsed,
+  onPickCandidate,
+  onCreateMemory,
+}: {
+  warnings: WikilinkSaveWarning[];
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  onPickCandidate: (warning: WikilinkSaveWarning, candidateId: string) => void;
+  onCreateMemory: (warning: WikilinkSaveWarning) => void;
+}) {
+  const { t } = useTranslation();
+  const grouped = useMemo(() => groupWikilinkWarnings(warnings), [warnings]);
+  const totalCount = warnings.length;
+
+  return (
+    <div className="mb-3 rounded-lg border border-[color:var(--warning)]/40 bg-[color:var(--warning)]/5 px-3 py-2 text-[11px] text-[color:var(--text-1)]">
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[color:var(--warning)]" />
+        <span className="font-semibold text-[color:var(--warning)]">
+          {t("memoryEditor.warnings.title")}
+        </span>
+        <span className="rounded-full border border-[color:var(--warning)]/40 bg-[color:var(--warning)]/10 px-1.5 py-[1px] text-[10px] font-medium text-[color:var(--warning)]">
+          {totalCount}
+        </span>
+        <span className="ml-auto text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+          {collapsed
+            ? t("memoryEditor.warnings.show", { count: totalCount })
+            : t("memoryEditor.warnings.hide")}
+        </span>
+        <ChevronRight
+          className={clsx(
+            "h-3 w-3 shrink-0 text-[color:var(--text-2)] transition-transform",
+            !collapsed && "rotate-90",
+          )}
+        />
+      </button>
+      {!collapsed && (
+        <>
+          <p className="mt-2 text-[10px] leading-4 text-[color:var(--text-2)]">
+            {t("memoryEditor.warnings.hint")}
+          </p>
+          <ul className="mt-2 space-y-2">
+            {grouped.map((group) => (
+              <WarningRow
+                key={group.key}
+                group={group}
+                onPickCandidate={onPickCandidate}
+                onCreateMemory={onCreateMemory}
+              />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WarningRow({
+  group,
+  onPickCandidate,
+  onCreateMemory,
+}: {
+  group: GroupedWarning;
+  onPickCandidate: (warning: WikilinkSaveWarning, candidateId: string) => void;
+  onCreateMemory: (warning: WikilinkSaveWarning) => void;
+}) {
+  const { t } = useTranslation();
+  const pillClass =
+    group.kind === "ambiguous"
+      ? "bg-[color:var(--warning)]/20 text-[color:var(--warning)]"
+      : "bg-[color:var(--danger)]/20 text-[color:var(--danger)]";
+  return (
+    <li className="rounded-md border border-[color:var(--border)] bg-[color:var(--bg-1)] px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span
+          className={clsx(
+            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            pillClass,
+          )}
+        >
+          {group.kind === "ambiguous"
+            ? t("memoryEditor.warnings.ambiguous")
+            : t("memoryEditor.warnings.unresolved")}
+        </span>
+        <span className="rounded bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[10px] text-[color:var(--text-2)]">
+          {group.level.toUpperCase()}
+        </span>
+        <code className="truncate font-mono text-[11px] text-[color:var(--text-0)]">
+          [[{group.text}]]
+        </code>
+        {group.occurrences > 1 && (
+          <span className="text-[10px] text-[color:var(--text-2)]">
+            ×{group.occurrences}
+          </span>
+        )}
+      </div>
+      {group.kind === "ambiguous" && group.candidates.length > 0 && (
+        <div className="mt-1.5 space-y-1">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+            {t("memoryEditor.warnings.pickCandidate")}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {group.candidates.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => onPickCandidate(group.representative, candidate.id)}
+                className="inline-flex items-center gap-1 rounded border border-[color:var(--border)] bg-[color:var(--bg-2)] px-1.5 py-0.5 text-[11px] text-[color:var(--text-1)] transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+              >
+                <span className="font-mono">{candidate.id}</span>
+                {candidate.l0 && candidate.l0 !== candidate.id && (
+                  <span className="text-[color:var(--text-2)]">· {candidate.l0}</span>
+                )}
+                <span className="rounded bg-[color:var(--bg-3)] px-1 py-[1px] text-[9px] uppercase tracking-wide text-[color:var(--text-2)]">
+                  {candidate.match_type === "exact_l0"
+                    ? t("memoryEditor.warnings.matchExact")
+                    : t("memoryEditor.warnings.matchFuzzy")}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {group.kind === "unresolved" && (
+        <div className="mt-1.5">
+          <button
+            type="button"
+            onClick={() => onCreateMemory(group.representative)}
+            className="inline-flex items-center gap-1.5 rounded border border-[color:var(--border)] bg-[color:var(--bg-2)] px-2 py-0.5 text-[11px] text-[color:var(--text-1)] transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+          >
+            <Plus className="h-3 w-3" />
+            {t("memoryEditor.warnings.createMemory")}
+          </button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function BrokenLinkCreateDialog({
+  warning,
+  targets,
+  onCancel,
+  onConfirm,
+}: {
+  warning: WikilinkSaveWarning;
+  targets: ReadonlyArray<WikilinkTarget>;
+  onCancel: () => void;
+  onConfirm: (draft: { id: string; l0: string; ontology: MemoryOntology }) => void;
+}) {
+  const { t } = useTranslation();
+  const [l0, setL0] = useState(warning.text);
+  const [id, setId] = useState(() =>
+    nextUniqueMemoryId(warning.text, [...targets]),
+  );
+  const [idTouched, setIdTouched] = useState(false);
+  const [ontology, setOntology] = useState<MemoryOntology>("unknown");
+
+  useEffect(() => {
+    if (!idTouched) {
+      setId(nextUniqueMemoryId(l0 || warning.text, [...targets]));
+    }
+  }, [l0, warning.text, targets, idTouched]);
+
+  const hasCollision = useMemo(
+    () => targets.some((target) => target.id === id.trim()),
+    [targets, id],
+  );
+  const trimmedId = id.trim();
+  const trimmedL0 = l0.trim();
+  const canConfirm = trimmedId.length > 0 && trimmedL0.length > 0 && !hasCollision;
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onCancel]);
+
+  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) onCancel();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onMouseDown={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full max-w-md rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-1)] p-5 shadow-xl">
+        <div className="mb-3 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[color:var(--accent-muted)]">
+            <Link2Off className="h-4 w-4 text-[color:var(--accent)]" />
+          </div>
+          <h2 className="text-sm font-semibold text-[color:var(--text-0)]">
+            {t("memoryEditor.brokenLink.title", { text: warning.text })}
+          </h2>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ml-auto rounded p-1 text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-0)]"
+            aria-label={t("memoryEditor.brokenLink.cancel")}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <p className="mb-3 text-xs leading-5 text-[color:var(--text-2)]">
+          {t("memoryEditor.brokenLink.description")}
+        </p>
+
+        <div className="space-y-2">
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+              {t("memoryEditor.brokenLink.l0Label")}
+            </span>
+            <input
+              type="text"
+              value={l0}
+              onChange={(event) => setL0(event.target.value)}
+              autoFocus
+              className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-0)]"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+              {t("memoryEditor.brokenLink.idLabel")}
+            </span>
+            <input
+              type="text"
+              value={id}
+              onChange={(event) => {
+                setIdTouched(true);
+                setId(slugifyMemoryId(event.target.value));
+              }}
+              className={clsx(
+                "w-full rounded-md border bg-[color:var(--bg-2)] px-2 py-1.5 font-mono text-xs text-[color:var(--text-0)]",
+                hasCollision
+                  ? "border-[color:var(--danger)]"
+                  : "border-[var(--border)]",
+              )}
+            />
+            {hasCollision && (
+              <p className="text-[10px] text-[color:var(--danger)]">
+                {t("memoryEditor.brokenLink.idCollision")}
+              </p>
+            )}
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+              {t("memoryEditor.brokenLink.ontologyLabel")}
+            </span>
+            <select
+              value={ontology}
+              onChange={(event) => setOntology(event.target.value as MemoryOntology)}
+              className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-1)]"
+            >
+              {(["unknown", "source", "entity", "concept", "synthesis"] as MemoryOntology[]).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {t(`ontologies.${value}`)}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-2)] px-4 py-1.5 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)]"
+          >
+            {t("memoryEditor.brokenLink.cancel")}
+          </button>
+          <button
+            type="button"
+            disabled={!canConfirm}
+            onClick={() =>
+              onConfirm({
+                id: trimmedId,
+                l0: trimmedL0,
+                ontology,
+              })
+            }
+            className="flex-1 rounded-md bg-[color:var(--accent)] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("memoryEditor.brokenLink.confirm")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SaveStateBadge({ status }: { status: SaveStatus }) {
