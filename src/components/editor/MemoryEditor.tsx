@@ -22,6 +22,7 @@ import { FormatToolbar } from "./FormatToolbar";
 import type { EditorView } from "@codemirror/view";
 import type {
   BacklinkRef,
+  FileNode,
   Memory,
   MemoryMeta,
   MemoryOntology,
@@ -29,7 +30,7 @@ import type {
   WikilinkCandidate,
   WikilinkSaveWarning,
 } from "../../lib/types";
-import { createMemory, createMemoryAtPath, getBacklinks } from "../../lib/tauri";
+import { createMemoryAtPath, getBacklinks } from "../../lib/tauri";
 import {
   nextUniqueMemoryId,
   slugifyMemoryId,
@@ -67,6 +68,17 @@ interface RawFileDraft {
   content: string;
 }
 
+interface CreateMemoryDialogState {
+  sourceText: string;
+  warning?: WikilinkSaveWarning;
+  suggestedDraft: WikilinkDraftMemory;
+}
+
+interface MemoryDirectoryOption {
+  path: string;
+  label: string;
+}
+
 export function MemoryEditor() {
   const { t } = useTranslation();
   const activeMemory = useAppStore((state) => state.activeMemory);
@@ -75,6 +87,7 @@ export function MemoryEditor() {
   const saveRawFile = useAppStore((state) => state.saveRawFile);
   const deleteMemory = useAppStore((state) => state.deleteMemory);
   const loading = useAppStore((state) => state.loading);
+  const fileTree = useAppStore((state) => state.fileTree);
   const memories = useAppStore((state) => state.memories);
   const selectFile = useAppStore((state) => state.selectFile);
   const setError = useAppStore((state) => state.setError);
@@ -91,7 +104,7 @@ export function MemoryEditor() {
   const [l1Open, setL1Open] = useState(false);
   const [wikilinkWarnings, setWikilinkWarnings] = useState<WikilinkSaveWarning[]>([]);
   const [warningsCollapsed, setWarningsCollapsed] = useState(false);
-  const [brokenLinkDraft, setBrokenLinkDraft] = useState<WikilinkSaveWarning | null>(null);
+  const [createMemoryDialog, setCreateMemoryDialog] = useState<CreateMemoryDialogState | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef<MemoryDraft | null>(null);
   const queuedDraftRef = useRef<MemoryDraft | null>(null);
@@ -113,7 +126,7 @@ export function MemoryEditor() {
       setInspectorTab("properties");
       setWikilinkWarnings([]);
       setWarningsCollapsed(false);
-      setBrokenLinkDraft(null);
+      setCreateMemoryDialog(null);
       return;
     }
 
@@ -341,9 +354,20 @@ export function MemoryEditor() {
   );
 
   const wikilinkTargets = useStableWikilinkTargets(memories);
+  const memoryDirectoryOptions = useMemo(
+    () => collectMemoryDirectoryOptions(fileTree),
+    [fileTree],
+  );
+  const preferredMemoryDirectory = useMemo(
+    () => getPreferredMemoryDirectory(activeMemory?.file_path, memoryDirectoryOptions),
+    [activeMemory?.file_path, memoryDirectoryOptions],
+  );
 
   const createLinkedMemory = useCallback(
-    async (draft: { id: string; l0: string; ontology: MemoryOntology }) => {
+    async (
+      draft: { id: string; l0: string; ontology: MemoryOntology },
+      targetDirectory: string,
+    ) => {
       pendingWikilinkCreationsRef.current.add(draft.id);
       pendingWikilinkCreationsRef.current.add(draft.l0);
       try {
@@ -356,10 +380,7 @@ export function MemoryEditor() {
           l1_content: "",
           l2_content: "",
         };
-        const parentDir = getMemoryParentDirectory(activeMemory?.file_path);
-        const created = parentDir
-          ? await createMemoryAtPath(input, parentDir)
-          : await createMemory(input);
+        const created = await createMemoryAtPath(input, targetDirectory);
         markRecentLocalWriteForPath(created.file_path);
         useAppStore.setState((state) => ({
           memories: upsertMemoryMeta(state.memories, created.meta),
@@ -382,14 +403,17 @@ export function MemoryEditor() {
         pendingWikilinkCreationsRef.current.delete(draft.l0);
       }
     },
-    [activeMemory?.file_path, setError],
+    [setError],
   );
 
   const handleCreateWikilinkMemory = useCallback(
-    async ({ id, l0 }: WikilinkDraftMemory) => {
-      await createLinkedMemory({ id, l0, ontology: "unknown" });
+    async (draft: WikilinkDraftMemory) => {
+      setCreateMemoryDialog({
+        sourceText: draft.l0,
+        suggestedDraft: draft,
+      });
     },
-    [createLinkedMemory],
+    [],
   );
 
   const applyWikilinkCandidate = useCallback(
@@ -411,14 +435,31 @@ export function MemoryEditor() {
     [],
   );
 
-  const confirmBrokenLinkCreation = useCallback(
-    async (warning: WikilinkSaveWarning, draft: { id: string; l0: string; ontology: MemoryOntology }) => {
-      setBrokenLinkDraft(null);
-      const created = await createLinkedMemory(draft);
+  const confirmCreateMemory = useCallback(
+    async (draft: {
+      id: string;
+      l0: string;
+      ontology: MemoryOntology;
+      directory: string;
+    }) => {
+      if (!createMemoryDialog) return;
+      const created = await createLinkedMemory(
+        { id: draft.id, l0: draft.l0, ontology: draft.ontology },
+        draft.directory,
+      );
       if (!created) return;
-      applyWikilinkCandidate(warning, draft.id);
+
+      if (createMemoryDialog.warning) {
+        applyWikilinkCandidate(createMemoryDialog.warning, draft.id);
+      } else {
+        setL2((prev) => rewriteWikilinkText(prev, createMemoryDialog.sourceText, draft.id));
+        setDirty(true);
+        setSaveStatus("dirty");
+      }
+
+      setCreateMemoryDialog(null);
     },
-    [applyWikilinkCandidate, createLinkedMemory],
+    [applyWikilinkCandidate, createLinkedMemory, createMemoryDialog],
   );
 
   if (!activeMemory || !meta) {
@@ -510,7 +551,16 @@ export function MemoryEditor() {
                   collapsed={warningsCollapsed}
                   onToggleCollapsed={() => setWarningsCollapsed((prev) => !prev)}
                   onPickCandidate={applyWikilinkCandidate}
-                  onCreateMemory={(warning) => setBrokenLinkDraft(warning)}
+                  onCreateMemory={(warning) =>
+                    setCreateMemoryDialog({
+                      sourceText: warning.text,
+                      warning,
+                      suggestedDraft: {
+                        id: nextUniqueMemoryId(warning.text, wikilinkTargets),
+                        l0: warning.text,
+                      },
+                    })
+                  }
                 />
               )}
 
@@ -532,12 +582,15 @@ export function MemoryEditor() {
                 onCreateWikilinkMemory={handleCreateWikilinkMemory}
               />
 
-              {brokenLinkDraft && (
+              {createMemoryDialog && (
                 <BrokenLinkCreateDialog
-                  warning={brokenLinkDraft}
+                  text={createMemoryDialog.sourceText}
+                  suggestedDraft={createMemoryDialog.suggestedDraft}
                   targets={wikilinkTargets}
-                  onCancel={() => setBrokenLinkDraft(null)}
-                  onConfirm={(draft) => void confirmBrokenLinkCreation(brokenLinkDraft, draft)}
+                  directoryOptions={memoryDirectoryOptions}
+                  defaultDirectory={preferredMemoryDirectory}
+                  onCancel={() => setCreateMemoryDialog(null)}
+                  onConfirm={(draft) => void confirmCreateMemory(draft)}
                 />
               )}
 
@@ -1011,6 +1064,103 @@ function useStableWikilinkTargets(memories: ReadonlyArray<MemoryMeta>) {
   }, [memories]);
 }
 
+function collectMemoryDirectoryOptions(fileTree: ReadonlyArray<FileNode>): MemoryDirectoryOption[] {
+  const rootPath = getWorkspaceRootPath(fileTree);
+  const options: MemoryDirectoryOption[] = [];
+  const seen = new Set<string>();
+
+  const pushOption = (path: string) => {
+    if (seen.has(path) || !canStoreMemoryInDirectoryPath(path)) {
+      return;
+    }
+    seen.add(path);
+    options.push({
+      path,
+      label: formatMemoryDirectoryLabel(path, rootPath),
+    });
+  };
+
+  if (rootPath) {
+    pushOption(rootPath);
+  }
+
+  const visit = (nodes: ReadonlyArray<FileNode>) => {
+    for (const node of nodes) {
+      if (!node.is_dir) continue;
+      pushOption(node.path);
+      visit(node.children);
+    }
+  };
+
+  visit(fileTree);
+  return options;
+}
+
+function getPreferredMemoryDirectory(
+  activeFilePath: string | null | undefined,
+  options: ReadonlyArray<MemoryDirectoryOption>,
+) {
+  const currentDirectory = getMemoryParentDirectory(activeFilePath);
+  if (currentDirectory && options.some((option) => option.path === currentDirectory)) {
+    return currentDirectory;
+  }
+  return options[0]?.path ?? null;
+}
+
+function getWorkspaceRootPath(fileTree: ReadonlyArray<FileNode>) {
+  const firstPath = fileTree[0]?.path;
+  return firstPath ? getMemoryParentDirectory(firstPath) : null;
+}
+
+function formatMemoryDirectoryLabel(path: string, rootPath: string | null) {
+  const normalizedPath = normalizePathForComparison(path);
+  const normalizedRoot = rootPath ? normalizePathForComparison(rootPath) : null;
+
+  if (normalizedRoot && normalizedPath === normalizedRoot) {
+    return "/";
+  }
+
+  if (normalizedRoot && normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    return normalizedPath.slice(normalizedRoot.length + 1);
+  }
+
+  return normalizedPath;
+}
+
+function canStoreMemoryInDirectoryPath(path: string) {
+  const segments = pathSegments(path);
+  if (segments.includes("inbox") || segments.includes("sources")) {
+    return false;
+  }
+
+  const aiIndex = segments.indexOf(".ai");
+  return aiIndex === -1;
+}
+
+function pathSegments(path: string) {
+  return normalizePathForComparison(path).split("/").filter(Boolean);
+}
+
+function normalizePathForComparison(path: string) {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function defaultOntologyForDirectory(path: string): Exclude<MemoryOntology, "unknown"> {
+  const normalized = normalizePathForComparison(path);
+  if (normalized.includes("/sources") || normalized.endsWith("/sources")) {
+    return "source";
+  }
+  if (
+    normalized.includes("/.ai/skills")
+    || normalized.endsWith("/.ai/skills")
+    || normalized.includes("/.ai/rules")
+    || normalized.endsWith("/.ai/rules")
+  ) {
+    return "concept";
+  }
+  return "entity";
+}
+
 function getMemoryParentDirectory(filePath?: string | null) {
   if (!filePath) return null;
   const normalized = filePath.replace(/[\\/]+$/, "");
@@ -1203,29 +1353,50 @@ function WarningRow({
 }
 
 function BrokenLinkCreateDialog({
-  warning,
+  text,
+  suggestedDraft,
   targets,
+  directoryOptions,
+  defaultDirectory,
   onCancel,
   onConfirm,
 }: {
-  warning: WikilinkSaveWarning;
+  text: string;
+  suggestedDraft: WikilinkDraftMemory;
   targets: ReadonlyArray<WikilinkTarget>;
+  directoryOptions: ReadonlyArray<MemoryDirectoryOption>;
+  defaultDirectory: string | null;
   onCancel: () => void;
-  onConfirm: (draft: { id: string; l0: string; ontology: MemoryOntology }) => void;
+  onConfirm: (draft: {
+    id: string;
+    l0: string;
+    ontology: MemoryOntology;
+    directory: string;
+  }) => void;
 }) {
   const { t } = useTranslation();
-  const [l0, setL0] = useState(warning.text);
+  const [l0, setL0] = useState(suggestedDraft.l0);
   const [id, setId] = useState(() =>
-    nextUniqueMemoryId(warning.text, targets),
+    suggestedDraft.id,
   );
   const [idTouched, setIdTouched] = useState(false);
-  const [ontology, setOntology] = useState<MemoryOntology>("unknown");
+  const [selectedDirectory, setSelectedDirectory] = useState(defaultDirectory ?? "");
+  const [ontology, setOntology] = useState<MemoryOntology>(
+    defaultDirectory ? defaultOntologyForDirectory(defaultDirectory) : "unknown",
+  );
+  const [ontologyTouched, setOntologyTouched] = useState(false);
 
   useEffect(() => {
     if (!idTouched) {
-      setId(nextUniqueMemoryId(l0 || warning.text, targets));
+      setId(nextUniqueMemoryId(l0 || suggestedDraft.l0, targets));
     }
-  }, [l0, warning.text, targets, idTouched]);
+  }, [l0, suggestedDraft.l0, targets, idTouched]);
+
+  useEffect(() => {
+    if (!ontologyTouched && selectedDirectory) {
+      setOntology(defaultOntologyForDirectory(selectedDirectory));
+    }
+  }, [selectedDirectory, ontologyTouched]);
 
   const hasCollision = useMemo(
     () => targets.some((target) => target.id === id.trim()),
@@ -1233,7 +1404,11 @@ function BrokenLinkCreateDialog({
   );
   const trimmedId = id.trim();
   const trimmedL0 = l0.trim();
-  const canConfirm = trimmedId.length > 0 && trimmedL0.length > 0 && !hasCollision;
+  const canConfirm =
+    trimmedId.length > 0
+    && trimmedL0.length > 0
+    && selectedDirectory.length > 0
+    && !hasCollision;
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -1263,7 +1438,7 @@ function BrokenLinkCreateDialog({
             <Link2Off className="h-4 w-4 text-[color:var(--accent)]" />
           </div>
           <h2 className="text-sm font-semibold text-[color:var(--text-0)]">
-            {t("memoryEditor.brokenLink.title", { text: warning.text })}
+            {t("memoryEditor.brokenLink.title", { text })}
           </h2>
           <button
             type="button"
@@ -1322,7 +1497,10 @@ function BrokenLinkCreateDialog({
             </span>
             <select
               value={ontology}
-              onChange={(event) => setOntology(event.target.value as MemoryOntology)}
+              onChange={(event) => {
+                setOntologyTouched(true);
+                setOntology(event.target.value as MemoryOntology);
+              }}
               className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-1)]"
             >
               {(["unknown", "source", "entity", "concept", "synthesis"] as MemoryOntology[]).map(
@@ -1333,6 +1511,30 @@ function BrokenLinkCreateDialog({
                 ),
               )}
             </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)]">
+              {t("memoryEditor.brokenLink.folderLabel")}
+            </span>
+            <select
+              value={selectedDirectory}
+              onChange={(event) => setSelectedDirectory(event.target.value)}
+              className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1.5 text-xs text-[color:var(--text-1)]"
+            >
+              <option value="">
+                {t("memoryEditor.brokenLink.folderPlaceholder")}
+              </option>
+              {directoryOptions.map((option) => (
+                <option key={option.path} value={option.path}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {!selectedDirectory && (
+              <p className="text-[10px] text-[color:var(--danger)]">
+                {t("memoryEditor.brokenLink.folderRequired")}
+              </p>
+            )}
           </label>
         </div>
 
@@ -1352,6 +1554,7 @@ function BrokenLinkCreateDialog({
                 id: trimmedId,
                 l0: trimmedL0,
                 ontology,
+                directory: selectedDirectory,
               })
             }
             className="flex-1 rounded-md bg-[color:var(--accent)] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
