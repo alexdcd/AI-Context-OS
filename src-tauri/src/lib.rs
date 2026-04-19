@@ -126,6 +126,8 @@ pub fn run() {
             commands::memory::rename_memory_file,
             commands::memory::duplicate_memory_file,
             commands::memory::move_memory_file,
+            commands::memory::get_backlinks,
+            commands::memory::resolve_wikilink_text,
             // Filesystem
             commands::filesystem::get_file_tree,
             commands::filesystem::read_file,

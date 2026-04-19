@@ -782,3 +782,75 @@ fn create_memory_internal(
 
     Ok(memory)
 }
+
+/// One canonical memory that contains one or more `[[target_id]]` references.
+/// Grouped by source so the UI can render a per-source list of excerpts.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BacklinkRef {
+    pub source_id: String,
+    pub source_l0: String,
+    pub source_path: String,
+    pub occurrences: Vec<BacklinkOccurrence>,
+}
+
+/// Return every canonical memory whose body contains `[[id]]` along with the
+/// line and excerpt for each occurrence. Scope is limited to memories indexed
+/// by `scan_memories` — bare markdown files without frontmatter are ignored.
+#[tauri::command]
+pub fn get_backlinks(id: String, state: State<AppState>) -> Result<Vec<BacklinkRef>, String> {
+    let target = id.trim();
+    if target.is_empty() {
+        return Err("Backlink target id cannot be empty".to_string());
+    }
+
+    let root = state.get_root();
+    let scanned = scan_memories(&root);
+    let mut refs = Vec::new();
+
+    for (meta, path_str) in scanned {
+        // A memory cannot list itself as a backlink source.
+        if meta.id == target {
+            continue;
+        }
+        let file_path = PathBuf::from(&path_str);
+        let memory = match read_memory(&root, &file_path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let mut occurrences = find_backlink_occurrences(&memory.l1_content, target, "l1");
+        occurrences.extend(find_backlink_occurrences(&memory.l2_content, target, "l2"));
+        if occurrences.is_empty() {
+            continue;
+        }
+
+        refs.push(BacklinkRef {
+            source_id: meta.id.clone(),
+            source_l0: meta.l0.clone(),
+            source_path: path_str,
+            occurrences,
+        });
+    }
+
+    Ok(refs)
+}
+
+/// Resolve a wikilink text (`[[inner]]`) against the current memory index
+/// without touching disk. Used by the UI for hover tooltips and the broken-link
+/// flow. Returns one of `ExactId`, `ExactL0`, `FuzzyL0`, `Ambiguous`,
+/// `Unresolved`.
+#[tauri::command]
+pub fn resolve_wikilink_text(
+    text: String,
+    state: State<AppState>,
+) -> Result<WikilinkResolution, String> {
+    let memories: Vec<MemoryMeta> = state
+        .memory_index
+        .read()
+        .unwrap()
+        .values()
+        .map(|(meta, _)| meta.clone())
+        .collect();
+
+    Ok(resolve_wikilink(&text, &memories))
+}
