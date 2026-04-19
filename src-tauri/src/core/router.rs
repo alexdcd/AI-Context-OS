@@ -177,7 +177,6 @@ pub fn render_static_router(manifest: &RouterManifest) -> String {
     out.push_str("│   ├── rules/\n");
     out.push_str("│   ├── skills/\n");
     out.push_str("│   ├── journal/\n");
-    out.push_str("│   ├── tasks/\n");
     out.push_str("│   └── scratch/\n");
     out.push_str("└── [your folders]/\n");
     out.push_str("```\n\n");

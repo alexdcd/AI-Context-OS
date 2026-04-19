@@ -22,7 +22,7 @@ pub const SCAN_SKIP_DIRS: &[&str] = &[".git", "node_modules", ".cache"];
 
 /// `.ai/` subdirectories that are system-managed and should NOT be indexed as memories.
 /// Rules, skills, and context subdirs ARE scannable (they contain user-authored memory files).
-pub const AI_SKIP_SUBDIRS: &[&str] = &["tasks", "scratch", "journal", "ingest", "proposals"];
+pub const AI_SKIP_SUBDIRS: &[&str] = &["scratch", "journal", "ingest", "proposals"];
 
 impl SystemPaths {
     pub fn new(root: &Path) -> Self {
@@ -66,10 +66,6 @@ impl SystemPaths {
 
     pub fn daily_log(&self) -> PathBuf {
         self.root.join(".ai/journal/daily-log.jsonl")
-    }
-
-    pub fn tasks_dir(&self) -> PathBuf {
-        self.root.join(".ai/tasks")
     }
 
     pub fn scratch_dir(&self) -> PathBuf {
@@ -136,7 +132,6 @@ impl SystemPaths {
             self.skills_dir(),
             self.journal_dir(),
             self.sessions_dir(),
-            self.tasks_dir(),
             self.scratch_dir(),
             self.ingest_dir(),
             self.proposals_dir(),

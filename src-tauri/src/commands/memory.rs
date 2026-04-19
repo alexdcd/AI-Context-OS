@@ -184,8 +184,7 @@ fn validate_memory_directory(root: &Path, dir: &Path) -> Result<PathBuf, String>
     if normalized_dir == paths.ai_dir() {
         return Err("Cannot store memories in the .ai/ system directory".to_string());
     }
-    if normalized_dir.starts_with(paths.tasks_dir())
-        || normalized_dir.starts_with(paths.journal_dir())
+    if normalized_dir.starts_with(paths.journal_dir())
         || normalized_dir.starts_with(paths.scratch_dir())
     {
         return Err("Cannot store memories in system-managed .ai/ subdirectories".to_string());

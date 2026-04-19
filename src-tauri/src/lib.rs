@@ -182,13 +182,6 @@ pub fn run() {
             commands::journal::save_journal_page,
             commands::journal::list_journal_dates,
             commands::journal::get_today,
-            // Tasks
-            commands::tasks::list_tasks,
-            commands::tasks::create_task,
-            commands::tasks::update_task,
-            commands::tasks::delete_task,
-            commands::tasks::toggle_task_state,
-            commands::tasks::generate_task_id,
             // Onboarding
             commands::onboarding::run_onboarding,
             commands::onboarding::is_onboarded,

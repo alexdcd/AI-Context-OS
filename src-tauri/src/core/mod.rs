@@ -19,7 +19,6 @@ pub mod paths;
 pub mod router;
 pub mod scoring;
 pub mod search;
-pub mod tasks;
 pub mod types;
 pub mod usage;
 pub mod watcher;

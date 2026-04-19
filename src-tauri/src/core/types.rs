@@ -322,41 +322,6 @@ pub enum TaskPriority {
     C,
 }
 
-impl TaskPriority {
-    pub fn importance(&self) -> f64 {
-        match self {
-            TaskPriority::A => 0.9,
-            TaskPriority::B => 0.6,
-            TaskPriority::C => 0.3,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskItem {
-    pub id: String,
-    pub title: String,
-    pub state: TaskState,
-    pub priority: Option<TaskPriority>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    pub source_date: Option<String>, // journal date YYYY-MM-DD if from journal
-    pub source_file: Option<String>, // file path of origin
-    pub created: DateTime<Utc>,
-    pub modified: DateTime<Utc>,
-    #[serde(default)]
-    pub notes: String,
-    #[serde(default)]
-    pub due: Option<String>, // YYYY-MM-DD due date
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskFilter {
-    pub state: Option<TaskState>,
-    pub priority: Option<TaskPriority>,
-    pub tag: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateMemoryInput {
     pub id: String,
