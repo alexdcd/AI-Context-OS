@@ -488,6 +488,9 @@
       "idLabel": "ID",
       "l0Label": "L0 summary",
       "ontologyLabel": "Type",
+      "folderLabel": "Folder",
+      "folderPlaceholder": "Select a folder",
+      "folderRequired": "Choose a destination folder for the memory.",
       "idCollision": "A memory with this ID already exists.",
       "cancel": "Cancel",
       "confirm": "Create memory"

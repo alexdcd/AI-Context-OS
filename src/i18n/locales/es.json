@@ -488,6 +488,9 @@
       "idLabel": "ID",
       "l0Label": "Resumen L0",
       "ontologyLabel": "Tipo",
+      "folderLabel": "Carpeta",
+      "folderPlaceholder": "Selecciona una carpeta",
+      "folderRequired": "Elige una carpeta de destino para la memoria.",
       "idCollision": "Ya existe una memoria con este ID.",
       "cancel": "Cancelar",
       "confirm": "Crear memoria"

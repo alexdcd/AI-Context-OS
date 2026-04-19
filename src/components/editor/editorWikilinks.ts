@@ -19,6 +19,7 @@ import type { MemoryOntology } from "../../lib/types";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
+const MAX_RECOMMENDED_SUGGESTIONS = 8;
 
 export interface WikilinkTarget {
   id: string;
@@ -65,6 +66,39 @@ interface RankedTarget {
   score: number;
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactSearchText(value: string) {
+  return normalizeSearchText(value).replace(/\s+/g, "");
+}
+
+function textTokens(value: string) {
+  return normalizeSearchText(value).split(" ").filter(Boolean);
+}
+
+function isEquivalentSearchText(left: string, right: string) {
+  const normalizedLeft = normalizeSearchText(left);
+  const normalizedRight = normalizeSearchText(right);
+  if (!normalizedLeft || !normalizedRight) {
+    return false;
+  }
+
+  return (
+    normalizedLeft === normalizedRight
+    || compactSearchText(left) === compactSearchText(right)
+  );
+}
+
 function resolveWikilinkText(text: string, targets: WikilinkTarget[]): WikilinkMatchResult {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -84,49 +118,49 @@ function resolveWikilinkText(text: string, targets: WikilinkTarget[]): WikilinkM
     return { kind: "ambiguous", candidates: exactL0 };
   }
 
-  const lowered = trimmed.toLowerCase();
-  const fuzzyL0 = targets.filter((target) => target.l0.toLowerCase() === lowered);
-  if (fuzzyL0.length === 1) {
-    return { kind: "fuzzy_l0", target: fuzzyL0[0] };
+  const fuzzy = targets.filter(
+    (target) =>
+      isEquivalentSearchText(target.id, trimmed) || isEquivalentSearchText(target.l0, trimmed),
+  );
+  if (fuzzy.length === 1) {
+    return { kind: "fuzzy_l0", target: fuzzy[0] };
   }
-  if (fuzzyL0.length > 1) {
-    return { kind: "ambiguous", candidates: fuzzyL0 };
+  if (fuzzy.length > 1) {
+    return { kind: "ambiguous", candidates: fuzzy };
   }
 
   return { kind: "unresolved" };
 }
 
 function scoreTarget(query: string, target: WikilinkTarget): number {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) {
+  const normalizedQuery = normalizeSearchText(query);
+  const compactQuery = compactSearchText(query);
+  if (!normalizedQuery) {
     return 1;
   }
 
-  const id = target.id.toLowerCase();
-  const l0 = target.l0.toLowerCase();
+  const id = normalizeSearchText(target.id);
+  const l0 = normalizeSearchText(target.l0);
+  const compactId = compactSearchText(target.id);
+  const compactL0 = compactSearchText(target.l0);
+  const idTokens = textTokens(target.id);
+  const l0Tokens = textTokens(target.l0);
 
-  if (id === normalized) return 100;
-  if (l0 === normalized) return 95;
-  if (id.startsWith(normalized)) return 85;
-  if (l0.startsWith(normalized)) return 80;
-  if (id.includes(normalized)) return 60;
-  if (l0.includes(normalized)) return 55;
-  if (isSubsequence(normalized, id)) return 30;
-  if (isSubsequence(normalized, l0)) return 25;
+  if (target.id === query.trim()) return 120;
+  if (target.l0 === query.trim()) return 116;
+  if (id === normalizedQuery) return 108;
+  if (l0 === normalizedQuery) return 104;
+  if (compactId === compactQuery) return 100;
+  if (compactL0 === compactQuery) return 96;
+  if (l0.startsWith(normalizedQuery)) return 90;
+  if (id.startsWith(normalizedQuery)) return 88;
+  if (l0Tokens.some((token) => token.startsWith(normalizedQuery))) return 80;
+  if (idTokens.some((token) => token.startsWith(normalizedQuery))) return 78;
+  if (compactL0.includes(compactQuery)) return 70;
+  if (compactId.includes(compactQuery)) return 68;
+  if (l0.includes(normalizedQuery)) return 62;
+  if (id.includes(normalizedQuery)) return 60;
   return 0;
-}
-
-function isSubsequence(query: string, candidate: string): boolean {
-  let cursor = 0;
-  for (const char of candidate) {
-    if (query[cursor] === char) {
-      cursor += 1;
-      if (cursor === query.length) {
-        return true;
-      }
-    }
-  }
-  return query.length === 0;
 }
 
 function rankTargets(query: string, targets: WikilinkTarget[]): RankedTarget[] {
@@ -139,6 +173,13 @@ function rankTargets(query: string, targets: WikilinkTarget[]): RankedTarget[] {
       }
       return (a.target.l0 || a.target.id).localeCompare(b.target.l0 || b.target.id);
     });
+}
+
+function minimumRecommendationScore(query: string) {
+  const length = query.trim().length;
+  if (length <= 2) return 80;
+  if (length <= 4) return 60;
+  return 55;
 }
 
 export function slugifyMemoryId(value: string): string {
@@ -445,17 +486,18 @@ function createWikilinkCompletionSource(options: WikilinkEditorOptions) {
       return null;
     }
 
-    const ranked = rankTargets(query, options.targets).slice(
-      0,
-      trimmedQuery ? 20 : MAX_EMPTY_QUERY_SUGGESTIONS,
-    );
+    const ranked = rankTargets(query, options.targets)
+      .filter(({ score }) =>
+        !trimmedQuery || score >= minimumRecommendationScore(trimmedQuery),
+      )
+      .slice(0, trimmedQuery ? MAX_RECOMMENDED_SUGGESTIONS : MAX_EMPTY_QUERY_SUGGESTIONS);
     const completions: Completion[] = ranked.map(({ target, score }) => ({
       label: target.l0 || target.id,
       detail: formatCompletionDetail(target),
       type: completionTypeForOntology(target.ontology),
       boost: score,
       apply(view, _completion, applyFrom, applyTo) {
-        insertCanonicalWikilink(view, applyFrom, applyTo, target.id);
+        insertWikilinkText(view, applyFrom, applyTo, target.id);
       },
     }));
 
@@ -472,11 +514,11 @@ function createWikilinkCompletionSource(options: WikilinkEditorOptions) {
       const id = nextUniqueMemoryId(l0, options.targets);
       const draft = { id, l0 };
       completions.push({
-        label: options.getCreateMemoryLabel?.(draft) ?? `Create memory "${l0}"`,
+        label: options.getCreateMemoryLabel?.(draft) ?? "Create new memory",
         detail: options.getCreateMemoryDetail?.(draft) ?? `${id} · unknown`,
         type: "new",
         apply(view, _completion, applyFrom, applyTo) {
-          insertCanonicalWikilink(view, applyFrom, applyTo, id);
+          insertWikilinkText(view, applyFrom, applyTo, l0);
           closeCompletion(view);
           queueMicrotask(() => {
             void options.onCreateMemory?.({ id, l0 });
@@ -498,8 +540,8 @@ function createWikilinkCompletionSource(options: WikilinkEditorOptions) {
   };
 }
 
-function insertCanonicalWikilink(view: EditorView, from: number, to: number, id: string) {
-  const text = `[[${id}]]`;
+function insertWikilinkText(view: EditorView, from: number, to: number, value: string) {
+  const text = `[[${value}]]`;
   let replaceTo = to;
   const maxReplaceTo = Math.min(view.state.doc.length, to + 2);
 
