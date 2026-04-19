@@ -191,7 +191,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
         label: t("memoryEditor.toolbar.taskList"),
         keywords: ["task", "checkbox", "todo", "checklist"],
         icon: <ListChecks className="h-3.5 w-3.5" />,
-        run: (view) => toggleLinePrefix(view, "- [ ] "),
+        run: (view) => toggleLinePrefix(view, "- [ ] [#B] "),
       },
       {
         key: "quote",

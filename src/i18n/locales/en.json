@@ -436,6 +436,11 @@
       "codeBlock": "Code block",
       "divider": "Divider"
     },
+    "taskPriority": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
     "saveStatus": {
       "saving": "Saving...",
       "error": "Save error",

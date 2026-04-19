@@ -436,6 +436,11 @@
       "codeBlock": "Bloque de codigo",
       "divider": "Separador"
     },
+    "taskPriority": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
     "saveStatus": {
       "saving": "Guardando...",
       "error": "Error al guardar",

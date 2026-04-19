@@ -7,7 +7,7 @@ function getLinePrefixChange(line: { from: number; text: string }, prefix: strin
   const headingMatch = line.text.match(/^#{1,6}\s+/);
   const bulletMatch = line.text.match(/^(\s*)([-*+])\s+/);
   const orderedMatch = line.text.match(/^(\s*)\d+\.\s+/);
-  const taskMatch = line.text.match(/^(\s*)-\s\[[ xX]\]\s+/);
+  const taskMatch = line.text.match(/^(\s*)-\s\[[ xX]\]\s+(?:\[#(?:[ABCabc])\]\s+)?/);
   const quoteMatch = line.text.match(/^>\s?/);
 
   if (prefix.startsWith("#")) {
@@ -50,7 +50,7 @@ function getLinePrefixChange(line: { from: number; text: string }, prefix: strin
     return { from: line.from, insert: prefix };
   }
 
-  if (prefix === "- [ ] ") {
+  if (prefix.startsWith("- [ ]")) {
     if (taskMatch) {
       return { from: line.from, to: line.from + taskMatch[0].length, insert: "" };
     }
@@ -75,7 +75,9 @@ export function normalizeInlineRange(doc: Text, from: number, to: number) {
 
   const line = doc.lineAt(nextFrom);
   if (nextFrom === line.from && nextTo >= line.to) {
-    const prefixMatch = line.text.match(/^(\s*(?:[-*+]\s|\d+\.\s|- \[[ xX]\]\s|>\s))/);
+    const prefixMatch = line.text.match(
+      /^(\s*(?:[-*+]\s|\d+\.\s|- \[[ xX]\]\s+(?:\[#(?:[ABCabc])\]\s+)?|>\s))/,
+    );
     if (prefixMatch) {
       nextFrom += prefixMatch[0].length;
     }
