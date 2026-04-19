@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { FileText, PanelRightClose, PanelRightOpen, Trash2, ChevronRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  FileText,
+  Link2Off,
+  PanelRightClose,
+  PanelRightOpen,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { clsx } from "clsx";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../../lib/store";
@@ -16,9 +26,15 @@ import type {
   MemoryMeta,
   MemoryOntology,
   RawFileDocument,
+  WikilinkCandidate,
+  WikilinkSaveWarning,
 } from "../../lib/types";
 import { createMemory, getBacklinks } from "../../lib/tauri";
-import type { WikilinkDraftMemory } from "./editorWikilinks";
+import {
+  nextUniqueMemoryId,
+  slugifyMemoryId,
+  type WikilinkDraftMemory,
+} from "./editorWikilinks";
 
 type InspectorTab = "properties" | "links" | "history";
 type SaveStatus = "saved" | "dirty" | "saving" | "error";
@@ -77,6 +93,9 @@ export function MemoryEditor() {
   const [showInspector, setShowInspector] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("properties");
   const [l1Open, setL1Open] = useState(false);
+  const [wikilinkWarnings, setWikilinkWarnings] = useState<WikilinkSaveWarning[]>([]);
+  const [warningsCollapsed, setWarningsCollapsed] = useState(false);
+  const [brokenLinkDraft, setBrokenLinkDraft] = useState<WikilinkSaveWarning | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef<MemoryDraft | null>(null);
   const queuedDraftRef = useRef<MemoryDraft | null>(null);
@@ -95,6 +114,9 @@ export function MemoryEditor() {
       setDirty(false);
       setSaveStatus("saved");
       setInspectorTab("properties");
+      setWikilinkWarnings([]);
+      setWarningsCollapsed(false);
+      setBrokenLinkDraft(null);
       return;
     }
 
@@ -140,7 +162,7 @@ export function MemoryEditor() {
       setSaveStatus("saving");
 
       try {
-        await saveActiveMemory(
+        const result = await saveActiveMemory(
           draft.sourceId,
           draft.l1,
           draft.l2,
@@ -152,6 +174,10 @@ export function MemoryEditor() {
         if (currentActiveId === draft.sourceId || currentActiveId === draft.meta.id) {
           setDirty(false);
           setSaveStatus("saved");
+          setWikilinkWarnings(result.wikilink_warnings);
+          if (result.wikilink_warnings.length > 0) {
+            setWarningsCollapsed(false);
+          }
         }
       } catch {
         setSaveStatus("error");
@@ -347,6 +373,49 @@ export function MemoryEditor() {
     [loadFileTree, loadGraph, loadMemories, setError],
   );
 
+  const applyWikilinkCandidate = useCallback(
+    (warning: WikilinkSaveWarning, candidateId: string) => {
+      const rewrite = (body: string) => rewriteWikilinkText(body, warning.text, candidateId);
+      if (warning.level === "l1") {
+        setL1((prev) => rewrite(prev));
+      } else {
+        setL2((prev) => rewrite(prev));
+      }
+      setDirty(true);
+      setSaveStatus("dirty");
+      setWikilinkWarnings((prev) =>
+        prev.filter(
+          (w) => !(w.level === warning.level && w.text === warning.text),
+        ),
+      );
+    },
+    [],
+  );
+
+  const confirmBrokenLinkCreation = useCallback(
+    async (warning: WikilinkSaveWarning, draft: { id: string; l0: string; ontology: MemoryOntology }) => {
+      try {
+        await createMemory({
+          id: draft.id,
+          ontology: draft.ontology,
+          l0: draft.l0,
+          importance: 0.5,
+          tags: [],
+          l1_content: "",
+          l2_content: "",
+        });
+        await loadMemories();
+        await loadFileTree();
+        await loadGraph();
+        applyWikilinkCandidate(warning, draft.id);
+        setBrokenLinkDraft(null);
+      } catch (error) {
+        setError(String(error));
+      }
+    },
+    [applyWikilinkCandidate, loadFileTree, loadGraph, loadMemories, setError],
+  );
+
   if (!activeMemory || !meta) {
     if (activeRawFile) {
       return (
@@ -430,6 +499,16 @@ export function MemoryEditor() {
                 {` · ${t("memoryEditor.meta.l2Content")} · v${meta.version}`}
               </p>
 
+              {wikilinkWarnings.length > 0 && (
+                <WikilinkWarningsBanner
+                  warnings={wikilinkWarnings}
+                  collapsed={warningsCollapsed}
+                  onToggleCollapsed={() => setWarningsCollapsed((prev) => !prev)}
+                  onPickCandidate={applyWikilinkCandidate}
+                  onCreateMemory={(warning) => setBrokenLinkDraft(warning)}
+                />
+              )}
+
               <HybridMarkdownEditor
                 key={`${activeMemory.meta.id}-l2-${showMarkdownSyntax ? "raw" : "preview"}`}
                 content={l2}
@@ -447,6 +526,15 @@ export function MemoryEditor() {
                 onOpenWikilink={handleOpenMemory}
                 onCreateWikilinkMemory={handleCreateWikilinkMemory}
               />
+
+              {brokenLinkDraft && (
+                <BrokenLinkCreateDialog
+                  warning={brokenLinkDraft}
+                  targets={wikilinkTargets}
+                  onCancel={() => setBrokenLinkDraft(null)}
+                  onConfirm={(draft) => void confirmBrokenLinkCreation(brokenLinkDraft, draft)}
+                />
+              )}
 
               <div className="mt-10 border-t border-[color:color-mix(in_srgb,var(--accent)_12%,var(--border))] pt-4">
                 <button
