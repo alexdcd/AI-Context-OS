@@ -194,7 +194,7 @@ class WikilinkWidget extends WidgetType {
     button.style.border = "0";
     button.style.background = "transparent";
     button.style.font = "inherit";
-    button.style.cursor = this.resolution.kind === "unresolved" ? "text" : "pointer";
+    button.style.cursor = this.isClickable ? "pointer" : "text";
     button.style.whiteSpace = "nowrap";
 
     const label = document.createElement("span");
@@ -225,6 +225,15 @@ class WikilinkWidget extends WidgetType {
 
   ignoreEvent() {
     return false;
+  }
+
+  private get isClickable() {
+    return (
+      (this.resolution.kind === "exact_id" ||
+        this.resolution.kind === "exact_l0" ||
+        this.resolution.kind === "fuzzy_l0") &&
+      Boolean(this.onOpenMemory)
+    );
   }
 
   private get label() {
