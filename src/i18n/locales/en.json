@@ -470,6 +470,28 @@
       "pending": "Pending",
       "saved": "Saved"
     },
+    "warnings": {
+      "title": "Wikilink warnings",
+      "hint": "These wikilinks could not be resolved to a canonical memory. Resolve them to keep the graph consistent.",
+      "ambiguous": "Ambiguous",
+      "unresolved": "Broken",
+      "pickCandidate": "Pick the target memory:",
+      "createMemory": "Create new memory",
+      "hide": "Hide",
+      "show": "Show {{count}}",
+      "matchExact": "exact",
+      "matchFuzzy": "approx."
+    },
+    "brokenLink": {
+      "title": "Create memory from [[{{text}}]]",
+      "description": "This creates a new memory and rewrites the broken wikilink to the canonical ID.",
+      "idLabel": "ID",
+      "l0Label": "L0 summary",
+      "ontologyLabel": "Type",
+      "idCollision": "A memory with this ID already exists.",
+      "cancel": "Cancel",
+      "confirm": "Create memory"
+    },
     "links": {
       "outgoing": "Outgoing",
       "incoming": "Incoming",
