@@ -3,14 +3,21 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { FileText, PanelRightClose, PanelRightOpen, Trash2, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
+import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../../lib/store";
 import { useSettingsStore } from "../../lib/settingsStore";
 import { FrontmatterForm } from "./FrontmatterForm";
 import { HybridMarkdownEditor } from "./HybridMarkdownEditor";
 import { FormatToolbar } from "./FormatToolbar";
 import type { EditorView } from "@codemirror/view";
-import type { Memory, MemoryMeta, MemoryOntology, RawFileDocument } from "../../lib/types";
-import { createMemory } from "../../lib/tauri";
+import type {
+  BacklinkRef,
+  Memory,
+  MemoryMeta,
+  MemoryOntology,
+  RawFileDocument,
+} from "../../lib/types";
+import { createMemory, getBacklinks } from "../../lib/tauri";
 import type { WikilinkDraftMemory } from "./editorWikilinks";
 
 type InspectorTab = "properties" | "links" | "history";
@@ -514,6 +521,7 @@ export function MemoryEditor() {
               )}
               {inspectorTab === "links" && (
                 <LinksPanel
+                  memoryId={meta.id}
                   outgoing={outgoingLinks}
                   incoming={incomingLinks}
                   onOpenMemory={handleOpenMemory}

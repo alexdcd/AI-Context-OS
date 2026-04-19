@@ -474,7 +474,12 @@
       "outgoing": "Outgoing",
       "incoming": "Incoming",
       "noBacklinks": "No backlinks.",
-      "noLinks": "No links."
+      "noLinks": "No links.",
+      "backlinksTitle": "Wikilink backlinks",
+      "backlinksHint": "Memories referencing this one via [[wikilink]] in their body.",
+      "backlinksLoading": "Loading backlinks…",
+      "backlinksEmpty": "No memories link here yet.",
+      "backlinksLineLabel": "Line {{line}}"
     },
     "history": {
       "created": "Created",

@@ -474,7 +474,12 @@
       "outgoing": "Salientes",
       "incoming": "Entrantes",
       "noBacklinks": "Sin enlaces entrantes.",
-      "noLinks": "Sin enlaces."
+      "noLinks": "Sin enlaces.",
+      "backlinksTitle": "Retroenlaces de wikilinks",
+      "backlinksHint": "Memorias que referencian esta mediante [[wikilink]] en su cuerpo.",
+      "backlinksLoading": "Cargando retroenlaces…",
+      "backlinksEmpty": "Ninguna memoria enlaza aquí todavía.",
+      "backlinksLineLabel": "Línea {{line}}"
     },
     "history": {
       "created": "Creado",
