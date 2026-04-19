@@ -3,7 +3,6 @@
     "explorer": "Explorador",
     "inbox": "Inbox",
     "journal": "Diario",
-    "tasks": "Tareas",
     "graph": "Grafo",
     "simulation": "Simulación",
     "governance": "Gobernanza",
@@ -226,7 +225,7 @@
       "newHint": "La app creará una raíz nueva y añadirá algunas carpetas de arranque para ayudarte a empezar.",
       "systemFiles": "AI Context OS añadirá o actualizará sus archivos de sistema si faltan: .ai/, claude.md, .cursorrules, .windsurfrules, inbox/ y sources/.",
       "compatibility": "Un vault de Obsidian o Logseq puede usarse como raíz. Tus notas seguirán ahí; los archivos Markdown con frontmatter compatible podrán indexarse como memorias.",
-      "structure": "Infraestructura del sistema: inbox/ · sources/ · .ai/ (rules, journal, tasks, scratch)",
+      "structure": "Infraestructura del sistema: inbox/ · sources/ · .ai/ (rules, journal, scratch)",
       "modeValue": {
         "new": "Nueva carpeta",
         "existing": "Carpeta existente"
@@ -378,33 +377,6 @@
       "inferring": "IA pensando...",
       "working": "IA trabajando"
     }
-  },
-  "tasks": {
-    "filterAllStatuses": "Todos los estados",
-    "filterAllPriorities": "Todas las prioridades",
-    "newPlaceholder": "Nueva tarea...",
-    "noPriority": "Sin prioridad",
-    "priorityHigh": "A · Alta",
-    "priorityMedium": "B · Media",
-    "priorityLow": "C · Baja",
-    "create": "Crear",
-    "statusLabel": "Estado",
-    "priorityLabel": "Prioridad",
-    "dueLabel": "Fecha límite",
-    "notesLabel": "Notas",
-    "notesPlaceholder": "Añade notas, contexto, bullets...",
-    "notesHint": "Usa bullets (- ), listas o texto libre para ampliar el contexto.",
-    "save": "Guardar",
-    "saving": "Guardando...",
-    "unsaved": "Sin guardar",
-    "close": "Cerrar",
-    "deleteTask": "Eliminar tarea",
-    "emptyAll": "Sin tareas. Crea una nueva arriba.",
-    "emptyFilter": "Sin tareas con este filtro.",
-    "overdue": "Vencida {{n}}d",
-    "today": "Hoy",
-    "tomorrow": "Mañana",
-    "yesterday": "Ayer"
   },
   "journal": {
     "today": "Hoy",
@@ -786,17 +758,6 @@
   "systemRoles": {
     "rule": "Regla",
     "skill": "Habilidad"
-  },
-  "taskStates": {
-    "todo": "Pendiente",
-    "in_progress": "En progreso",
-    "done": "Hecho",
-    "cancelled": "Cancelado"
-  },
-  "taskPriorities": {
-    "a": "A · Alta",
-    "b": "B · Media",
-    "c": "C · Baja"
   },
   "connectors": {
     "title": "Conectores",

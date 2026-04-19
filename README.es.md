@@ -97,7 +97,6 @@ Notas:
 
 - La infraestructura del sistema es fija: `inbox/`, `sources/` y `.ai/`. Todo lo demás es definido por el usuario.
 - Las páginas del Journal viven en `.ai/journal/YYYY-MM-DD.md`.
-- Las tareas son archivos markdown en `.ai/tasks/` con frontmatter YAML.
 - `claude.md` existe por compatibilidad, pero el objetivo arquitectónico es core neutral + adapters.
 - Mover un archivo de memoria entre carpetas de usuario **no** rompe la indexación — la clasificación viene del campo `type:` en el frontmatter.
 

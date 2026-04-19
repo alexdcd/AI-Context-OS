@@ -3,7 +3,6 @@
     "explorer": "Explorer",
     "inbox": "Inbox",
     "journal": "Journal",
-    "tasks": "Tasks",
     "graph": "Graph",
     "simulation": "Simulation",
     "governance": "Governance",
@@ -226,7 +225,7 @@
       "newHint": "The app will create a new root and add a few starter folders to help you begin.",
       "systemFiles": "AI Context OS will add or update its system files if they are missing: .ai/, claude.md, .cursorrules, .windsurfrules, inbox/, and sources/.",
       "compatibility": "An Obsidian or Logseq vault can be used as the root. Your notes stay where they are; Markdown files with compatible frontmatter can be indexed as memories.",
-      "structure": "System infrastructure: inbox/ · sources/ · .ai/ (rules, journal, tasks, scratch)",
+      "structure": "System infrastructure: inbox/ · sources/ · .ai/ (rules, journal, scratch)",
       "modeValue": {
         "new": "New folder",
         "existing": "Existing folder"
@@ -378,33 +377,6 @@
       "inferring": "AI is thinking...",
       "working": "AI working"
     }
-  },
-  "tasks": {
-    "filterAllStatuses": "All statuses",
-    "filterAllPriorities": "All priorities",
-    "newPlaceholder": "New task...",
-    "noPriority": "No priority",
-    "priorityHigh": "A · High",
-    "priorityMedium": "B · Medium",
-    "priorityLow": "C · Low",
-    "create": "Create",
-    "statusLabel": "Status",
-    "priorityLabel": "Priority",
-    "dueLabel": "Due",
-    "notesLabel": "Notes",
-    "notesPlaceholder": "Add notes, context, bullets...",
-    "notesHint": "Use bullets (- ), lists, or free text to expand context.",
-    "save": "Save",
-    "saving": "Saving...",
-    "unsaved": "Unsaved",
-    "close": "Close",
-    "deleteTask": "Delete task",
-    "emptyAll": "No tasks. Create a new one above.",
-    "emptyFilter": "No tasks with this filter.",
-    "overdue": "Overdue {{n}}d",
-    "today": "Today",
-    "tomorrow": "Tomorrow",
-    "yesterday": "Yesterday"
   },
   "journal": {
     "today": "Today",
@@ -786,17 +758,6 @@
   "systemRoles": {
     "rule": "Rule",
     "skill": "Skill"
-  },
-  "taskStates": {
-    "todo": "Todo",
-    "in_progress": "In Progress",
-    "done": "Done",
-    "cancelled": "Cancelled"
-  },
-  "taskPriorities": {
-    "a": "A · High",
-    "b": "B · Medium",
-    "c": "C · Low"
   },
   "connectors": {
     "title": "Connectors",
