@@ -92,12 +92,12 @@ export const getRouterContent = () => invoke<string>("get_router_content");
 export const simulateContext = (query: string, tokenBudget: number) =>
   invoke<ScoredMemory[]>("simulate_context", {
     query,
-    token_budget: tokenBudget,
+    tokenBudget,
   });
 export const buildChatContext = (query: string, tokenBudget: number) =>
   invoke<ChatContextPayload>("build_chat_context", {
     query,
-    token_budget: tokenBudget,
+    tokenBudget,
   });
 
 // Graph
