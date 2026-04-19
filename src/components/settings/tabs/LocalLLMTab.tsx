@@ -38,6 +38,7 @@ export function LocalLLMTab({ config, onSaved }: Props) {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [busy, setBusy] = useState<BusyState>("idle");
+  const [showDiscoverFeedback, setShowDiscoverFeedback] = useState(false);
   const [pullInput, setPullInput] = useState("");
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -71,7 +72,9 @@ export function LocalLLMTab({ config, onSaved }: Props) {
   }, [config]);
 
   const handleDiscover = useCallback(async (keepExistingModels = false) => {
+    const startedAt = Date.now();
     setBusy("discovering");
+    setShowDiscoverFeedback(true);
     setStatusMsg(null);
     try {
       const found = await discoverLocalProviders();
@@ -88,7 +91,11 @@ export function LocalLLMTab({ config, onSaved }: Props) {
     } catch {
       // ignore
     } finally {
-      setBusy("idle");
+      const remaining = Math.max(0, 450 - (Date.now() - startedAt));
+      window.setTimeout(() => {
+        setBusy("idle");
+        setShowDiscoverFeedback(false);
+      }, remaining);
     }
   }, [activePreset, getPreferredModelId, selectedModel]);
 
@@ -289,14 +296,14 @@ export function LocalLLMTab({ config, onSaved }: Props) {
               </span>
               <button
                 onClick={() => void handleDiscover()}
-                disabled={busy !== "idle"}
+                disabled={busy !== "idle" || showDiscoverFeedback}
                 title={t("settings.localLLM.refresh")}
                 className="flex items-center gap-1.5 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-0)] px-2.5 py-1.5 text-xs text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)] disabled:opacity-60"
               >
-                {busy === "discovering"
+                {showDiscoverFeedback
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : <RefreshCw className="h-3.5 w-3.5" />}
-                {busy === "discovering" ? t("settings.localLLM.refreshing") : t("settings.localLLM.refresh")}
+                {showDiscoverFeedback ? t("settings.localLLM.refreshing") : t("settings.localLLM.refresh")}
               </button>
             </div>
           </div>
@@ -304,7 +311,7 @@ export function LocalLLMTab({ config, onSaved }: Props) {
           <div className="flex flex-col gap-1.5">
             {models.length === 0 ? (
               <div className="rounded-md border border-dashed border-[color:var(--border)] px-4 py-6 text-center text-sm text-[color:var(--text-2)]">
-                {busy === "discovering"
+                {showDiscoverFeedback
                   ? t("settings.localLLM.refreshing")
                   : t("settings.localLLM.noModels", {
                       provider: activePreset === "ollama" ? "Ollama" : "LM Studio",
@@ -401,10 +408,10 @@ export function LocalLLMTab({ config, onSaved }: Props) {
               <span className="text-[color:var(--border)]">|</span>
               <button
                 onClick={() => void handleDiscover()}
-                disabled={busy !== "idle"}
+                disabled={busy !== "idle" || showDiscoverFeedback}
                 className="text-xs text-[color:var(--text-2)] hover:text-[color:var(--text-1)] flex items-center gap-1 transition-colors disabled:opacity-60"
               >
-                <RefreshCw className={clsx("h-3.5 w-3.5", busy === "discovering" && "animate-spin")} />
+                <RefreshCw className={clsx("h-3.5 w-3.5", showDiscoverFeedback && "animate-spin")} />
                 {t("settings.localLLM.refresh")}
               </button>
             </div>

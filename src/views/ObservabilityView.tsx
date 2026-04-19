@@ -588,10 +588,13 @@ function OptimizationsTab() {
   const { t } = useTranslation();
   const [optimizations, setOptimizations] = useState<OptimizationRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showLoadingFeedback, setShowLoadingFeedback] = useState(false);
   const [lastAnalyzed, setLastAnalyzed] = useState<Date | null>(null);
 
   const runAnalysis = async () => {
+    const startedAt = Date.now();
     setLoading(true);
+    setShowLoadingFeedback(true);
     try {
       const result = await runOptimizationAnalysis();
       setOptimizations(result);
@@ -599,7 +602,11 @@ function OptimizationsTab() {
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
+    const remaining = Math.max(0, 450 - (Date.now() - startedAt));
+    window.setTimeout(() => {
+      setLoading(false);
+      setShowLoadingFeedback(false);
+    }, remaining);
   };
 
   // Auto-run on mount: first load pending, then run a fresh analysis
@@ -660,12 +667,12 @@ function OptimizationsTab() {
             color: "var(--text-1)",
             border: "1px solid var(--border)",
             borderRadius: 6,
-            cursor: loading ? "wait" : "pointer",
-            opacity: loading ? 0.6 : 1,
+            cursor: showLoadingFeedback ? "wait" : "pointer",
+            opacity: showLoadingFeedback ? 0.6 : 1,
           }}
         >
-          <RefreshCw size={12} className={loading ? "spin" : ""} />
-          {loading ? t("observability.optimizations.analyzing") : t("observability.optimizations.reAnalyze")}
+          <RefreshCw size={12} className={showLoadingFeedback ? "spin" : ""} />
+          {showLoadingFeedback ? t("observability.optimizations.analyzing") : t("observability.optimizations.reAnalyze")}
         </button>
       </div>
 

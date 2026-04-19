@@ -36,17 +36,21 @@ export function AppearanceTab() {
   const setCustomThemeId = useSettingsStore((s) => s.setCustomThemeId);
 
   const [themes, setThemes] = useState<VaultTheme[]>([]);
-  const [themesLoading, setThemesLoading] = useState(false);
+  const [themesRefreshing, setThemesRefreshing] = useState(false);
   const [themesPath, setThemesPath] = useState<string | null>(null);
 
   const refreshThemes = useCallback(async () => {
-    setThemesLoading(true);
+    const startedAt = Date.now();
+    setThemesRefreshing(true);
     try {
       const list = await listVaultThemes();
       setThemes(list);
       setThemesPath(list[0]?.path.replace(/\/[^/]+$/, "") ?? null);
     } finally {
-      setThemesLoading(false);
+      const remaining = Math.max(0, 450 - (Date.now() - startedAt));
+      window.setTimeout(() => {
+        setThemesRefreshing(false);
+      }, remaining);
     }
   }, []);
 
@@ -256,10 +260,10 @@ export function AppearanceTab() {
           </h2>
           <button
             onClick={() => void refreshThemes()}
-            disabled={themesLoading}
+            disabled={themesRefreshing}
             className="flex items-center gap-1.5 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1 text-xs text-[color:var(--text-1)] transition-colors hover:border-[color:var(--border-active)] disabled:opacity-50"
           >
-            <RefreshCcw className={clsx("h-3.5 w-3.5", themesLoading && "spin")} />
+            <RefreshCcw className={clsx("h-3.5 w-3.5", themesRefreshing && "spin")} />
             {t("settings.appearanceTab.refresh")}
           </button>
         </div>
