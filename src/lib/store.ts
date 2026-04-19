@@ -226,9 +226,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
   regenerateRouter: async () => {
     try {
       await api.regenerateRouter();
-      await get().loadMemories();
-      await get().loadFileTree();
-      await get().loadGraph();
     } catch (e) {
       set({ error: String(e) });
     }
