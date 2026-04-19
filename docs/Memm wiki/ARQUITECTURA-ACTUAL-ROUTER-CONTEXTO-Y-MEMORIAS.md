@@ -230,7 +230,6 @@ Crear memoria:
 No se permite crear memorias en:
 - `sources/`
 - `.ai/`
-- `.ai/tasks`
 - `.ai/journal`
 - `.ai/scratch`
 Las únicas ubicaciones MCP válidas dentro de `.ai/` son:

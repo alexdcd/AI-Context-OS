@@ -70,7 +70,7 @@ Two sub-phases:
 1. Log `(query, ranked_results, opened_memory_ids)` to `.ai/usage/queries.jsonl`.
 2. For each historical query, the "winning profile" is whichever weight configuration would have ranked the actually-opened memory highest.
 3. Train logistic regression over bag-of-stems → winning profile label.
-4. Retrain daily or on-demand via `tasks.rs`.
+4. Retrain daily or on-demand via a dedicated scoring maintenance command.
 
 **Phase 4 extension:** instead of discrete profiles, learn the six weight dimensions (`semantic`, `bm25`, `graph`, `recency`, `importance`, `access_frequency`) per cluster by optimizing NDCG@10 over the outcome log.
 
