@@ -166,6 +166,34 @@ pub struct SaveMemoryResult {
     pub memory: Memory,
     #[serde(default)]
     pub wikilink_warnings: Vec<WikilinkSaveWarning>,
+    #[serde(default)]
+    pub cascade: Option<CascadeRewriteOutcome>,
+}
+
+/// Summary of a `[[old_id]]` → `[[new_id]]` cascade across canonical memories.
+/// Emitted to the frontend under the `wikilinks-cascade` event so the UI can
+/// refresh derived state (graph, file tree, router) and display which memories
+/// changed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CascadeRewriteOutcome {
+    pub old_id: String,
+    pub new_id: String,
+    /// Total number of `[[...]]` occurrences rewritten across all files.
+    pub rewrite_count: u32,
+    /// Ids of canonical memories whose body was rewritten.
+    pub affected_ids: Vec<String>,
+    /// Ids of protected canonical memories that contain `[[old_id]]` and were
+    /// left untouched. The UI should surface these so the user can unprotect
+    /// and retry.
+    pub skipped_protected_ids: Vec<String>,
+}
+
+impl CascadeRewriteOutcome {
+    pub fn is_empty(&self) -> bool {
+        self.rewrite_count == 0
+            && self.affected_ids.is_empty()
+            && self.skipped_protected_ids.is_empty()
+    }
 }
 
 /// Outcome of normalizing a body: canonical form, warnings, and rewrite count.

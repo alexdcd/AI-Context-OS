@@ -10,7 +10,8 @@ use crate::core::paths::{enrich_memory_meta, SystemPaths};
 use crate::core::types::{CreateMemoryInput, Memory, MemoryFilter, MemoryMeta, SaveMemoryInput};
 use crate::core::usage::record_access;
 use crate::core::wikilinks::{
-    normalize_wikilinks, NormalizationOutcome, SaveMemoryResult, WikilinkSaveWarning,
+    normalize_wikilinks, rewrite_wikilink_target, CascadeRewriteOutcome, NormalizationOutcome,
+    SaveMemoryResult, WikilinkSaveWarning,
 };
 use crate::state::AppState;
 
@@ -57,6 +58,81 @@ fn normalize_memory_bodies(
     }
 
     (new_l1, new_l2, warnings)
+}
+
+/// Rewrite every `[[old_id]]` occurrence in every canonical memory's body to
+/// `[[new_id]]`. Runs *after* the renamed memory has been written, so the new
+/// file is already on disk with its new id.
+///
+/// Scope is limited to memories indexed by `scan_memories` — bare markdown
+/// files without valid frontmatter are not touched. Protected memories that
+/// would have been rewritten are skipped and reported; the user must
+/// unprotect them before the cascade can fix their links.
+fn apply_id_rename_cascade(
+    app: &AppHandle,
+    state: &State<AppState>,
+    old_id: &str,
+    new_id: &str,
+) -> Result<CascadeRewriteOutcome, String> {
+    let mut outcome = CascadeRewriteOutcome {
+        old_id: old_id.to_string(),
+        new_id: new_id.to_string(),
+        rewrite_count: 0,
+        affected_ids: Vec::new(),
+        skipped_protected_ids: Vec::new(),
+    };
+
+    if old_id == new_id {
+        return Ok(outcome);
+    }
+
+    let root = state.get_root();
+    let scanned = scan_memories(&root);
+
+    for (meta, path_str) in scanned {
+        let file_path = PathBuf::from(&path_str);
+        let mut memory = match read_memory(&root, &file_path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let (new_l1, n1) = rewrite_wikilink_target(&memory.l1_content, old_id, new_id);
+        let (new_l2, n2) = rewrite_wikilink_target(&memory.l2_content, old_id, new_id);
+        let rewrites = n1 + n2;
+        if rewrites == 0 {
+            continue;
+        }
+
+        if meta.protected {
+            outcome.skipped_protected_ids.push(meta.id.clone());
+            continue;
+        }
+
+        memory.l1_content = new_l1;
+        memory.l2_content = new_l2;
+        memory.meta.modified = Utc::now();
+        memory.meta.version = memory.meta.version.saturating_add(1);
+
+        write_memory(&file_path, &memory)?;
+        state.mark_recent_write(&file_path);
+
+        {
+            let mut index = state.memory_index.write().unwrap();
+            if let Some(entry) = index.get_mut(&meta.id) {
+                entry.0.modified = memory.meta.modified;
+                entry.0.version = memory.meta.version;
+            }
+        }
+
+        outcome.affected_ids.push(meta.id.clone());
+        outcome.rewrite_count += rewrites;
+    }
+
+    if !outcome.is_empty() {
+        let _ = app.emit("wikilinks-cascade", &outcome);
+    }
+
+    Ok(outcome)
 }
 
 fn should_regenerate_router(
@@ -361,6 +437,18 @@ pub fn save_memory(
     drop(index);
 
     let _ = app.emit("memory-changed", &memory.meta.id);
+
+    let cascade = if input.id != memory.meta.id {
+        let outcome = apply_id_rename_cascade(&app, &state, &input.id, &memory.meta.id)?;
+        if outcome.is_empty() {
+            None
+        } else {
+            Some(outcome)
+        }
+    } else {
+        None
+    };
+
     if should_regenerate_router(&old_meta, &memory.meta, &old_file_path, &target_file_path) {
         crate::commands::router::regenerate_router_internal(&app, &state)?;
     }
@@ -368,6 +456,7 @@ pub fn save_memory(
     Ok(SaveMemoryResult {
         memory,
         wikilink_warnings,
+        cascade,
     })
 }
 
