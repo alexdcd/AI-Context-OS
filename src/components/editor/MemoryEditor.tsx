@@ -564,10 +564,12 @@ function InspectorTabButton({
 }
 
 function LinksPanel({
+  memoryId,
   outgoing,
   incoming,
   onOpenMemory,
 }: {
+  memoryId: string;
   outgoing: OutgoingLink[];
   incoming: IncomingLink[];
   onOpenMemory: (id: string) => void;
@@ -611,7 +613,173 @@ function LinksPanel({
           </button>
         ))}
       </div>
+      <BacklinksPanel memoryId={memoryId} onOpenMemory={onOpenMemory} />
     </div>
+  );
+}
+
+const BACKLINKS_REFRESH_DEBOUNCE_MS = 250;
+
+function BacklinksPanel({
+  memoryId,
+  onOpenMemory,
+}: {
+  memoryId: string;
+  onOpenMemory: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [backlinks, setBacklinks] = useState<BacklinkRef[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(true);
+  const currentIdRef = useRef(memoryId);
+
+  useEffect(() => {
+    currentIdRef.current = memoryId;
+  }, [memoryId]);
+
+  const refetch = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      const next = await getBacklinks(id);
+      if (currentIdRef.current === id) {
+        setBacklinks(next);
+      }
+    } catch {
+      if (currentIdRef.current === id) {
+        setBacklinks([]);
+      }
+    } finally {
+      if (currentIdRef.current === id) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetch(memoryId);
+  }, [memoryId, refetch]);
+
+  useEffect(() => {
+    const unlisteners: Array<() => void> = [];
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void refetch(currentIdRef.current);
+      }, BACKLINKS_REFRESH_DEBOUNCE_MS);
+    };
+
+    const setup = async () => {
+      unlisteners.push(await listen("wikilinks-cascade", schedule));
+      unlisteners.push(await listen("memory-changed", schedule));
+      unlisteners.push(await listen("file-deleted", schedule));
+      unlisteners.push(await listen("router-regenerated", schedule));
+    };
+
+    void setup();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      for (const fn of unlisteners) fn();
+    };
+  }, [refetch]);
+
+  const occurrenceCount = useMemo(
+    () => backlinks.reduce((sum, item) => sum + item.occurrences.length, 0),
+    [backlinks],
+  );
+  const sourceCount = backlinks.length;
+  const isEmpty = !loading && sourceCount === 0;
+
+  return (
+    <div className="space-y-2 pt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-2)] transition-colors hover:text-[color:var(--text-1)]"
+      >
+        <ChevronRight
+          className={clsx(
+            "h-3 w-3 shrink-0 transition-transform",
+            open && "rotate-90",
+          )}
+        />
+        <span>{t("memoryEditor.links.backlinksTitle")}</span>
+        {sourceCount > 0 && (
+          <span className="ml-auto rounded-full border border-[var(--border)] bg-[color:var(--bg-2)] px-1.5 py-[1px] text-[9px] font-medium normal-case tracking-normal text-[color:var(--text-1)]">
+            {sourceCount} · {occurrenceCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="space-y-2">
+          <p className="text-[10px] leading-4 text-[color:var(--text-2)]">
+            {t("memoryEditor.links.backlinksHint")}
+          </p>
+          {loading && sourceCount === 0 && (
+            <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
+              {t("memoryEditor.links.backlinksLoading")}
+            </p>
+          )}
+          {isEmpty && (
+            <p className="rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-xs text-[color:var(--text-2)]">
+              {t("memoryEditor.links.backlinksEmpty")}
+            </p>
+          )}
+          {backlinks.map((backlink) => (
+            <BacklinkCard
+              key={backlink.source_id}
+              backlink={backlink}
+              onOpenMemory={onOpenMemory}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BacklinkCard({
+  backlink,
+  onOpenMemory,
+}: {
+  backlink: BacklinkRef;
+  onOpenMemory: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenMemory(backlink.source_id)}
+      className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-2 text-left transition-colors hover:bg-[color:var(--bg-3)]"
+    >
+      <p className="truncate text-xs font-semibold text-[color:var(--text-0)]">
+        {backlink.source_id}
+      </p>
+      {backlink.source_l0 && backlink.source_l0 !== backlink.source_id && (
+        <p className="mt-0.5 truncate text-[11px] text-[color:var(--text-2)]">
+          {backlink.source_l0}
+        </p>
+      )}
+      <ul className="mt-1.5 space-y-1">
+        {backlink.occurrences.map((occ, idx) => (
+          <li
+            key={`${occ.level}-${occ.line}-${idx}`}
+            className="flex items-start gap-1.5 text-[11px] leading-4 text-[color:var(--text-1)]"
+          >
+            <span
+              className="shrink-0 rounded bg-[color:var(--bg-3)] px-1 py-[1px] font-mono text-[9px] uppercase tracking-wide text-[color:var(--text-2)]"
+              title={t("memoryEditor.links.backlinksLineLabel", { line: occ.line })}
+            >
+              {occ.level}:{occ.line}
+            </span>
+            <span className="break-words">{occ.excerpt}</span>
+          </li>
+        ))}
+      </ul>
+    </button>
   );
 }
 
