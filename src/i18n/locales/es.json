@@ -470,6 +470,28 @@
       "pending": "Pendiente",
       "saved": "Guardado"
     },
+    "warnings": {
+      "title": "Avisos de wikilinks",
+      "hint": "Estos wikilinks no se pudieron resolver a una memoria canónica. Resuélvelos para mantener el grafo consistente.",
+      "ambiguous": "Ambiguo",
+      "unresolved": "Roto",
+      "pickCandidate": "Elige la memoria destino:",
+      "createMemory": "Crear nueva memoria",
+      "hide": "Ocultar",
+      "show": "Mostrar {{count}}",
+      "matchExact": "exacto",
+      "matchFuzzy": "aprox."
+    },
+    "brokenLink": {
+      "title": "Crear memoria desde [[{{text}}]]",
+      "description": "Esto crea una nueva memoria y reescribe el wikilink roto al ID canónico.",
+      "idLabel": "ID",
+      "l0Label": "Resumen L0",
+      "ontologyLabel": "Tipo",
+      "idCollision": "Ya existe una memoria con este ID.",
+      "cancel": "Cancelar",
+      "confirm": "Crear memoria"
+    },
     "links": {
       "outgoing": "Salientes",
       "incoming": "Entrantes",
