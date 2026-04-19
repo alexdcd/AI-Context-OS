@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Search, Zap, Copy, Check, Clock, Trash2 } from "lucide-react";
+import { Search, Zap, Copy, Check, Clock, Trash2, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { simulateContext } from "../lib/tauri";
+import { getConfig, simulateContext } from "../lib/tauri";
 import type { ScoredMemory } from "../lib/types";
 import { MEMORY_ONTOLOGY_COLORS } from "../lib/types";
+import { useAppStore } from "../lib/store";
 
 const HISTORY_KEY = "simulation_history";
 const MAX_HISTORY = 8;
@@ -30,11 +31,15 @@ function saveHistory(runs: SimulationRun[]) {
 
 export function SimulationView() {
   const { t } = useTranslation();
+  const indexedMemories = useAppStore((state) => state.memories.length);
   const [query, setQuery] = useState("");
   const [budget, setBudget] = useState(4000);
   const [results, setResults] = useState<ScoredMemory[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [hasSimulated, setHasSimulated] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [vaultRoot, setVaultRoot] = useState<string | null>(null);
   const [history, setHistory] = useState<SimulationRun[]>(loadHistory);
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
 
@@ -53,24 +58,42 @@ export function SimulationView() {
     saveHistory(history);
   }, [history]);
 
+  useEffect(() => {
+    getConfig()
+      .then((config) => setVaultRoot(config.root_dir))
+      .catch(() => setVaultRoot(null));
+  }, []);
+
   const handleSimulate = async () => {
     if (!query.trim()) return;
     setLoading(true);
+    setRunError(null);
     try {
-      const scored = await simulateContext(query, budget);
+      const normalizedQuery = query.trim();
+      const scored = await simulateContext(normalizedQuery, budget);
       setResults(scored);
+      setHasSimulated(true);
       setActiveHistoryId(null);
 
       const run: SimulationRun = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        query: query.trim(),
+        query: normalizedQuery,
         budget,
         timestamp: Date.now(),
         results: scored,
       };
-      setHistory((prev) => [run, ...prev.filter((r) => r.query !== query.trim()).slice(0, MAX_HISTORY - 1)]);
+      setHistory((prev) => [run, ...prev.filter((r) => r.query !== normalizedQuery).slice(0, MAX_HISTORY - 1)]);
     } catch (e) {
       console.error("Simulation failed:", e);
+      const message =
+        typeof e === "string"
+          ? e
+          : e instanceof Error
+            ? e.message
+            : JSON.stringify(e);
+      setResults([]);
+      setRunError(message);
+      setHasSimulated(true);
     } finally {
       setLoading(false);
     }
@@ -80,6 +103,8 @@ export function SimulationView() {
     setQuery(run.query);
     setBudget(run.budget);
     setResults(run.results);
+    setRunError(null);
+    setHasSimulated(true);
     setActiveHistoryId(run.id);
   };
 
@@ -165,6 +190,14 @@ export function SimulationView() {
               <Search className="h-3.5 w-3.5" />
               {loading ? t("simulation.running") : t("simulation.simulate")}
             </button>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[color:var(--text-2)]">
+            <span>{t("simulation.activeVaultStatus", { count: indexedMemories })}</span>
+            {vaultRoot && (
+              <span className="max-w-full truncate rounded border border-[var(--border)] px-1.5 py-0.5 font-mono">
+                {vaultRoot}
+              </span>
+            )}
           </div>
           {/* Example queries — shown when no results yet */}
           {results.length === 0 && !loading && (
@@ -290,8 +323,37 @@ export function SimulationView() {
           ))}
           {results.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center py-20 text-[color:var(--text-2)]">
-              <Zap className="mb-3 h-8 w-8" />
-              <p className="text-xs">{t("simulation.noResults")}</p>
+              {runError ? (
+                <>
+                  <AlertCircle className="mb-3 h-8 w-8 text-[color:var(--danger)]" />
+                  <p className="text-sm font-medium text-[color:var(--text-1)]">
+                    {t("simulation.errorTitle")}
+                  </p>
+                  <p className="mt-1 max-w-xl text-center text-xs">
+                    {t("simulation.errorBody")}
+                  </p>
+                  <p className="mt-3 max-w-2xl break-all rounded-md border border-[color:var(--danger)]/30 bg-[color:var(--bg-2)] px-3 py-2 text-left font-mono text-[11px] text-[color:var(--text-1)]">
+                    {runError}
+                  </p>
+                </>
+              ) : hasSimulated ? (
+                <>
+                  <Search className="mb-3 h-8 w-8" />
+                  <p className="text-sm font-medium text-[color:var(--text-1)]">
+                    {t("simulation.emptyTitle")}
+                  </p>
+                  <p className="mt-1 max-w-xl text-center text-xs">
+                    {indexedMemories === 0
+                      ? t("simulation.emptyVaultHint")
+                      : t("simulation.emptyBody", { query, budget })}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Zap className="mb-3 h-8 w-8" />
+                  <p className="text-xs">{t("simulation.noResults")}</p>
+                </>
+              )}
             </div>
           )}
         </div>
