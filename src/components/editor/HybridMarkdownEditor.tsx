@@ -1042,30 +1042,6 @@ function getParagraphSelection(
   };
 }
 
-/** CSS classes added to .cm-line that have pseudo-element decorations which
- * shift the visual content relative to the DOM text node positions. On these
- * lines CodeMirror's native click → cursor mapping fails, so we must
- * intercept and resolve the position ourselves. */
-const DECORATED_LINE_CLASSES = [
-  "cm-bullet-item",
-  "cm-task-item",
-  "cm-ordered-item",
-  "cm-blockquote",
-  "cm-hr",
-  "cm-h1",
-  "cm-h2",
-  "cm-h3",
-  "cm-h4",
-  "cm-h5",
-  "cm-h6",
-  "cm-codeblock-start",
-  "cm-codeblock-end",
-] as const;
-
-function isDecoratedLine(lineElement: HTMLElement): boolean {
-  return DECORATED_LINE_CLASSES.some((cls) => lineElement.classList.contains(cls));
-}
-
 function createDomHandlers(editable: boolean) {
   let dragging = false;
   let dragAnchor = 0;
