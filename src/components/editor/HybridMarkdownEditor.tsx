@@ -23,6 +23,13 @@ import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
 import {
+  frozenPreviewLinesField,
+  getActivePreviewLineNumbers,
+  getSelectionHeadLineNumbers,
+  PREVIEW_SETTLE_DELAY_MS,
+  setFrozenPreviewLinesEffect,
+} from "./editorPreviewState";
+import {
   createWikilinkExtensions,
   type WikilinkDraftMemory,
   type WikilinkTarget,
@@ -713,13 +720,7 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
       buildDecorations(view: EditorView) {
         const builder = new RangeSetBuilder<Decoration>();
         const state = view.state;
-
-        const activeLines = new Set<number>();
-        if (revealSyntaxOnActiveLine) {
-          for (const range of state.selection.ranges) {
-            activeLines.add(state.doc.lineAt(range.head).number);
-          }
-        }
+        const activeLines = new Set(getActivePreviewLineNumbers(state, revealSyntaxOnActiveLine));
 
         const hideDeco = Decoration.replace({});
         const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
@@ -967,7 +968,78 @@ function getParagraphSelection(
   };
 }
 
-function createDomHandlers(editable: boolean) {
+function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
+  let settleTimer: ReturnType<typeof window.setTimeout> | null = null;
+  let teardownInteractionListeners: (() => void) | null = null;
+
+  const sameLineNumbers = (left: readonly number[] | null, right: readonly number[] | null) => {
+    if (left === right) return true;
+    if (!left || !right) return left === right;
+    if (left.length !== right.length) return false;
+    return left.every((value, index) => value === right[index]);
+  };
+
+  const clearSettleTimer = () => {
+    if (settleTimer !== null) {
+      window.clearTimeout(settleTimer);
+      settleTimer = null;
+    }
+  };
+
+  const clearInteractionListeners = () => {
+    if (teardownInteractionListeners) {
+      teardownInteractionListeners();
+      teardownInteractionListeners = null;
+    }
+  };
+
+  const setFrozenPreviewLines = (view: EditorView, lineNumbers: readonly number[] | null) => {
+    if (!freezePreviewOnPointer) return;
+
+    const currentLineNumbers = view.state.field(frozenPreviewLinesField, false) ?? null;
+    if (sameLineNumbers(currentLineNumbers, lineNumbers)) return;
+
+    view.dispatch({ effects: setFrozenPreviewLinesEffect.of(lineNumbers) });
+  };
+
+  const releaseFrozenPreview = (view: EditorView) => {
+    clearSettleTimer();
+    clearInteractionListeners();
+    setFrozenPreviewLines(view, null);
+  };
+
+  const scheduleFrozenPreviewRelease = (view: EditorView) => {
+    if (!freezePreviewOnPointer) return;
+
+    clearSettleTimer();
+    settleTimer = window.setTimeout(() => {
+      settleTimer = null;
+      clearInteractionListeners();
+      setFrozenPreviewLines(view, null);
+    }, PREVIEW_SETTLE_DELAY_MS);
+  };
+
+  const watchPointerRelease = (view: EditorView) => {
+    if (!freezePreviewOnPointer || teardownInteractionListeners) return;
+
+    const controller = new AbortController();
+    const finishInteraction = () => {
+      clearInteractionListeners();
+      scheduleFrozenPreviewRelease(view);
+    };
+    const listenerOptions = { capture: true, signal: controller.signal } as const;
+
+    window.addEventListener("mouseup", finishInteraction, listenerOptions);
+    window.addEventListener("dragend", finishInteraction, listenerOptions);
+    window.addEventListener("pointercancel", finishInteraction, listenerOptions);
+    window.addEventListener("blur", finishInteraction, listenerOptions);
+
+    teardownInteractionListeners = () => {
+      controller.abort();
+      teardownInteractionListeners = null;
+    };
+  };
+
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
@@ -984,6 +1056,12 @@ function createDomHandlers(editable: boolean) {
           const lineNumber = view.state.doc.lineAt(view.posAtDOM(taskLineElement, 0)).number;
           return toggleTaskCheckboxOnLine(view, lineNumber);
         }
+      }
+
+      if (freezePreviewOnPointer) {
+        clearSettleTimer();
+        setFrozenPreviewLines(view, getSelectionHeadLineNumbers(view.state.selection, view.state.doc));
+        watchPointerRelease(view);
       }
 
       /* ── Triple+ click — line / paragraph selection ──── */
@@ -1058,6 +1136,16 @@ function createDomHandlers(editable: boolean) {
       return false;
     },
 
+    keydown(_event, view) {
+      releaseFrozenPreview(view);
+      return false;
+    },
+
+    blur(_event, view) {
+      releaseFrozenPreview(view);
+      return false;
+    },
+
     paste(event, view) {
       const data = event.clipboardData;
       if (!data) return false;
@@ -1109,6 +1197,7 @@ export function HybridMarkdownEditor({
   const createMemoryLabel = t("memoryEditor.warnings.createMemory");
   const stableWikilinkTargets =
     wikilinkTargets.length > 0 ? wikilinkTargets : EMPTY_WIKILINK_TARGETS;
+  const shouldFreezePreviewOnPointer = !showSyntax && revealSyntaxOnActiveLine;
 
   useEffect(
     () => () => {
@@ -1126,7 +1215,7 @@ export function HybridMarkdownEditor({
       drawSelection(),
       createEditorTheme(themeVariant),
       structuralDecorations,
-      ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
+      ...(showSyntax ? [] : [frozenPreviewLinesField, createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
       ...(showSyntax
         ? []
         : createWikilinkExtensions({
@@ -1141,7 +1230,7 @@ export function HybridMarkdownEditor({
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      createDomHandlers(editable),
+      createDomHandlers(editable, shouldFreezePreviewOnPointer),
     ],
     [
       themeVariant,
@@ -1149,6 +1238,7 @@ export function HybridMarkdownEditor({
       linkTextPlaceholder,
       createMemoryLabel,
       revealSyntaxOnActiveLine,
+      shouldFreezePreviewOnPointer,
       stableWikilinkTargets,
       onOpenWikilink,
       onCreateWikilinkMemory,

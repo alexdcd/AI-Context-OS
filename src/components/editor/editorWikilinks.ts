@@ -16,6 +16,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
+import { getActivePreviewLineNumbers } from "./editorPreviewState";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
@@ -431,13 +432,9 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
 
       buildDecorations(view: EditorView) {
         const builder = new RangeSetBuilder<Decoration>();
-        const activeLines = new Set<number>();
-
-        if (options.revealSyntaxOnActiveLine) {
-          for (const range of view.state.selection.ranges) {
-            activeLines.add(view.state.doc.lineAt(range.head).number);
-          }
-        }
+        const activeLines = new Set(
+          getActivePreviewLineNumbers(view.state, options.revealSyntaxOnActiveLine),
+        );
 
         for (const { from, to } of view.visibleRanges) {
           const segment = view.state.sliceDoc(from, to);
