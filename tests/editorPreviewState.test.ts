@@ -4,7 +4,11 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import {
   getActivePreviewLineNumbers,
   getSelectionHeadLineNumbers,
+  isPreviewSelectionMode,
+  previewSelectionModeField,
   selectionHasRange,
+  setPreviewSelectionModeEffect,
+  shouldDisablePreviewDecorations,
 } from "../src/components/editor/editorPreviewState.ts";
 
 test("getSelectionHeadLineNumbers uses selection heads instead of full ranges", () => {
@@ -59,4 +63,38 @@ test("getActivePreviewLineNumbers reveals multiple caret lines without selected 
   });
 
   assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 3]);
+});
+
+test("preview selection mode disables preview decorations before a range exists", () => {
+  const state = EditorState.create({
+    doc: "- **alpha**\n",
+    selection: EditorSelection.cursor(0),
+    extensions: [previewSelectionModeField],
+  });
+
+  const rawSelectionState = state.update({
+    effects: setPreviewSelectionModeEffect.of(true),
+  }).state;
+
+  assert.equal(isPreviewSelectionMode(rawSelectionState), true);
+  assert.equal(shouldDisablePreviewDecorations(rawSelectionState), true);
+  assert.deepEqual(getActivePreviewLineNumbers(rawSelectionState, true), []);
+});
+
+test("preview selection mode clears when the selection is collapsed", () => {
+  const state = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.range(0, 5),
+    extensions: [previewSelectionModeField],
+  }).update({
+    effects: setPreviewSelectionModeEffect.of(true),
+  }).state;
+
+  const collapsedState = state.update({
+    selection: EditorSelection.cursor(7),
+  }).state;
+
+  assert.equal(isPreviewSelectionMode(collapsedState), false);
+  assert.equal(shouldDisablePreviewDecorations(collapsedState), false);
+  assert.deepEqual(getActivePreviewLineNumbers(collapsedState, true), [2]);
 });

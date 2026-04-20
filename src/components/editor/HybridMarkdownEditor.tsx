@@ -21,7 +21,14 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
-import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import {
+  getActivePreviewLineNumbers,
+  isPreviewSelectionMode,
+  previewSelectionModeField,
+  selectionHasRange,
+  setPreviewSelectionModeEffect,
+  shouldDisablePreviewDecorations,
+} from "./editorPreviewState";
 import {
   getTripleClickSelectionRange,
   isTaskCheckboxHitOffset,
@@ -402,12 +409,20 @@ function createStructuralDecorations(editable: boolean) {
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        if (update.docChanged || update.viewportChanged || treeChanged) {
+        const previewDisabledChanged =
+          shouldDisablePreviewDecorations(update.startState)
+          !== shouldDisablePreviewDecorations(update.state);
+
+        if (update.docChanged || update.viewportChanged || treeChanged || previewDisabledChanged) {
           this.decorations = this.buildDecorations(update.view);
         }
       }
 
       buildDecorations(view: EditorView) {
+        if (shouldDisablePreviewDecorations(view.state)) {
+          return new RangeSetBuilder<Decoration>().finish();
+        }
+
         const decos: { from: number; to: number; deco: Decoration; isLine?: boolean }[] = [];
 
         const addLine = (from: number, deco: Decoration) => {
@@ -747,9 +762,16 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
+        const previewDisabledChanged =
+          shouldDisablePreviewDecorations(update.startState)
+          !== shouldDisablePreviewDecorations(update.state);
 
-        if (update.docChanged || update.viewportChanged || treeChanged) {
+        if (update.docChanged || update.viewportChanged || treeChanged || previewDisabledChanged) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        if (shouldDisablePreviewDecorations(update.state)) {
           return;
         }
 
@@ -762,6 +784,10 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
       }
 
       buildDecorations(view: EditorView) {
+        if (shouldDisablePreviewDecorations(view.state)) {
+          return new RangeSetBuilder<Decoration>().finish();
+        }
+
         const builder = new RangeSetBuilder<Decoration>();
         const state = view.state;
         const activeLines = new Set(getActivePreviewLineNumbers(state, revealSyntaxOnActiveLine));
@@ -959,6 +985,25 @@ function createDomHandlers(editable: boolean) {
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
 
+      const target = getEventTargetElement(event.target);
+      if (!target) return false;
+
+      /* ── Task checkbox toggle ─────────────────────────── */
+      const taskLineElement = target.closest(".cm-line.cm-task-item");
+      if (taskLineElement instanceof HTMLElement) {
+        const clickOffset = event.clientX - taskLineElement.getBoundingClientRect().left;
+        if (isTaskCheckboxHitOffset(clickOffset)) {
+          event.preventDefault();
+          event.stopPropagation();
+          const lineNumber = view.state.doc.lineAt(view.posAtDOM(taskLineElement, 0)).number;
+          return toggleTaskCheckboxOnLine(view, lineNumber);
+        }
+      }
+
+      if (!isPreviewSelectionMode(view.state)) {
+        view.dispatch({ effects: setPreviewSelectionModeEffect.of(true) });
+      }
+
       /* ── Triple-click: select the current structural paragraph ─ */
       if (
         shouldUseTripleClickLineSelection({
@@ -982,21 +1027,13 @@ function createDomHandlers(editable: boolean) {
         }
       }
 
-      const target = getEventTargetElement(event.target);
-      if (!target) return false;
+      return false;
+    },
 
-      /* ── Task checkbox toggle ─────────────────────────── */
-      const taskLineElement = target.closest(".cm-line.cm-task-item");
-      if (taskLineElement instanceof HTMLElement) {
-        const clickOffset = event.clientX - taskLineElement.getBoundingClientRect().left;
-        if (isTaskCheckboxHitOffset(clickOffset)) {
-          event.preventDefault();
-          event.stopPropagation();
-          const lineNumber = view.state.doc.lineAt(view.posAtDOM(taskLineElement, 0)).number;
-          return toggleTaskCheckboxOnLine(view, lineNumber);
-        }
+    mouseup(_event, view) {
+      if (isPreviewSelectionMode(view.state) && !selectionHasRange(view.state.selection)) {
+        view.dispatch({ effects: setPreviewSelectionModeEffect.of(false) });
       }
-
       return false;
     },
 
@@ -1065,6 +1102,7 @@ export function HybridMarkdownEditor({
     () => [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
+      previewSelectionModeField,
       createEditorTheme(themeVariant),
       createStructuralDecorations(editable),
       ...(showSyntax ? [] : [createLivePreviewPlugin(editable, revealSyntaxOnActiveLine)]),
