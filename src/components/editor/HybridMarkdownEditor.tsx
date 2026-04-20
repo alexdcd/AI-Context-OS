@@ -29,6 +29,7 @@ import {
   PREVIEW_SETTLE_DELAY_MS,
   setFrozenPreviewLinesEffect,
 } from "./editorPreviewState";
+import { shouldUseStructuralMouseSelection } from "./editorMouseSelection";
 import {
   createWikilinkExtensions,
   type WikilinkDraftMemory,
@@ -554,6 +555,165 @@ function getEventTargetElement(target: EventTarget | null): HTMLElement | null {
     return target.parentElement;
   }
   return null;
+}
+
+function getCaretPositionFromPoint(doc: Document, x: number, y: number) {
+  if (typeof doc.caretPositionFromPoint === "function") {
+    const caret = doc.caretPositionFromPoint(x, y);
+    if (caret) {
+      return { node: caret.offsetNode, offset: caret.offset };
+    }
+  }
+
+  const legacyDoc = doc as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+  };
+  if (typeof legacyDoc.caretRangeFromPoint === "function") {
+    const range = legacyDoc.caretRangeFromPoint(x, y);
+    if (range) {
+      return { node: range.startContainer, offset: range.startOffset };
+    }
+  }
+
+  return null;
+}
+
+function getLineTextRects(lineElement: HTMLElement) {
+  const rects: DOMRect[] = [];
+  const doc = lineElement.ownerDocument;
+  const walker = doc.createTreeWalker(lineElement, NodeFilter.SHOW_TEXT);
+
+  for (let current = walker.nextNode(); current; current = walker.nextNode()) {
+    if (!current.textContent?.trim()) continue;
+    const range = doc.createRange();
+    range.selectNodeContents(current);
+    rects.push(
+      ...Array.from(range.getClientRects()).filter((rect) => rect.width > 0 || rect.height > 0),
+    );
+  }
+
+  if (rects.length > 0) {
+    return rects;
+  }
+
+  return Array.from(lineElement.getClientRects()).filter((rect) => rect.width > 0 || rect.height > 0);
+}
+
+function distanceToRect(x: number, y: number, rect: DOMRect) {
+  const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
+  const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
+  return dx + dy * 1000;
+}
+
+function getLineElementAtPoint(view: EditorView, x: number, y: number) {
+  const element = view.dom.ownerDocument.elementFromPoint(x, y);
+  if (element instanceof HTMLElement) {
+    return element.closest(".cm-line");
+  }
+  if (element instanceof Node) {
+    return element.parentElement?.closest(".cm-line") ?? null;
+  }
+  return null;
+}
+
+function resolveDecoratedLineClickPosition(
+  view: EditorView,
+  lineElement: HTMLElement,
+  event: MouseEvent,
+) {
+  const doc = lineElement.ownerDocument;
+  const caret = getCaretPositionFromPoint(doc, event.clientX, event.clientY);
+
+  if (caret && lineElement.contains(caret.node)) {
+    try {
+      return view.posAtDOM(caret.node, caret.offset);
+    } catch {
+      // Fall through to line-level fallbacks below.
+    }
+  }
+
+  const nearestRect = getLineTextRects(lineElement)
+    .sort(
+      (left, right) =>
+        distanceToRect(event.clientX, event.clientY, left)
+        - distanceToRect(event.clientX, event.clientY, right),
+    )[0];
+  if (nearestRect) {
+    const x = Math.min(
+      Math.max(event.clientX, nearestRect.left + 1),
+      Math.max(nearestRect.left + 1, nearestRect.right - 1),
+    );
+    const y = Math.min(
+      Math.max(event.clientY, nearestRect.top + 1),
+      Math.max(nearestRect.top + 1, nearestRect.bottom - 1),
+    );
+    const pos = view.posAtCoords({ x, y }, false);
+    if (pos !== null) {
+      return pos;
+    }
+  }
+
+  const lineStart = view.posAtDOM(lineElement, 0);
+  const line = view.state.doc.lineAt(lineStart);
+  const lineRect = lineElement.getBoundingClientRect();
+  const midpoint = lineRect.left + lineRect.width / 2;
+
+  return event.clientX <= midpoint ? line.from : line.to;
+}
+
+function createStructuralMouseSelectionStyle(editable: boolean) {
+  return EditorView.mouseSelectionStyle.of((view, event) => {
+    if (!editable) return null;
+
+    const target = getEventTargetElement(event.target);
+    if (!target || target.closest(".cm-widget, .cm-tooltip, button, a")) {
+      return null;
+    }
+
+    const lineElement = target.closest(".cm-line") ?? getLineElementAtPoint(view, event.clientX, event.clientY);
+    if (!(lineElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    const clickOffset = event.clientX - lineElement.getBoundingClientRect().left;
+    if (
+      !shouldUseStructuralMouseSelection(
+        {
+          button: event.button,
+          detail: event.detail,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        },
+        lineElement.className,
+        clickOffset,
+      )
+    ) {
+      return null;
+    }
+
+    let anchor = resolveDecoratedLineClickPosition(view, lineElement, event);
+
+    return {
+      update(update: ViewUpdate) {
+        if (update.docChanged) {
+          anchor = update.changes.mapPos(anchor);
+        }
+        return false;
+      },
+
+      get(curEvent: MouseEvent) {
+        const currentLine = getLineElementAtPoint(view, curEvent.clientX, curEvent.clientY);
+        const head =
+          currentLine instanceof HTMLElement
+            ? resolveDecoratedLineClickPosition(view, currentLine, curEvent)
+            : (view.posAtCoords({ x: curEvent.clientX, y: curEvent.clientY }, false) ?? anchor);
+
+        return EditorSelection.create([EditorSelection.range(anchor, head)]);
+      },
+    };
+  });
 }
 
 
@@ -1230,6 +1390,7 @@ export function HybridMarkdownEditor({
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
+      createStructuralMouseSelectionStyle(editable),
       createDomHandlers(editable, shouldFreezePreviewOnPointer),
     ],
     [
