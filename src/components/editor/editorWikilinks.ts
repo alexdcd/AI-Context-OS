@@ -15,7 +15,10 @@ import {
   ViewPlugin,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
-import { getActivePreviewLineNumbers, shouldDisablePreviewDecorations } from "./editorPreviewState";
+import {
+  getActivePreviewLineNumbers,
+  shouldRefreshActivePreviewLines,
+} from "./editorPreviewState";
 import { hiddenSyntaxMark } from "./editorLivePreview";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
@@ -55,6 +58,7 @@ type WikilinkMatchResult =
 
 interface WikilinkEditorOptions {
   targets: WikilinkTarget[];
+  editable: boolean;
   revealSyntaxOnActiveLine: boolean;
   onOpenMemory?: (id: string) => void;
   onCreateMemory?: (draft: WikilinkDraftMemory) => void | Promise<void>;
@@ -332,32 +336,17 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
-        const previewDisabledChanged =
-          shouldDisablePreviewDecorations(update.startState)
-          !== shouldDisablePreviewDecorations(update.state);
-
-        if (update.docChanged || update.viewportChanged || previewDisabledChanged) {
+        if (update.docChanged || update.viewportChanged) {
           this.decorations = this.buildDecorations(update.view);
           return;
         }
 
-        if (shouldDisablePreviewDecorations(update.state)) {
-          return;
-        }
-
-        if (update.selectionSet) {
-          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
-          if (!hasActiveRange) {
-            this.decorations = this.buildDecorations(update.view);
-          }
+        if (shouldRefreshActivePreviewLines(update, options.revealSyntaxOnActiveLine)) {
+          this.decorations = this.buildDecorations(update.view);
         }
       }
 
       buildDecorations(view: EditorView) {
-        if (shouldDisablePreviewDecorations(view.state)) {
-          return new RangeSetBuilder<Decoration>().finish();
-        }
-
         const builder = new RangeSetBuilder<Decoration>();
         const activeLines = new Set(
           getActivePreviewLineNumbers(view.state, options.revealSyntaxOnActiveLine),
@@ -380,11 +369,15 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
             const innerFrom = matchFrom + 2;
             const innerTo = matchTo - 2;
 
-            builder.add(matchFrom, innerFrom, hiddenSyntaxMark);
-            if (innerTo > innerFrom) {
-              builder.add(innerFrom, innerTo, getWikilinkPreviewDecoration(inner, resolution));
+            if (options.editable) {
+              builder.add(matchFrom, matchTo, getWikilinkPreviewDecoration(inner, resolution));
+            } else {
+              builder.add(matchFrom, innerFrom, hiddenSyntaxMark);
+              if (innerTo > innerFrom) {
+                builder.add(innerFrom, innerTo, getWikilinkPreviewDecoration(inner, resolution));
+              }
+              builder.add(innerTo, matchTo, hiddenSyntaxMark);
             }
-            builder.add(innerTo, matchTo, hiddenSyntaxMark);
           }
         }
 

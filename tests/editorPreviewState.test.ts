@@ -1,14 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState, Transaction } from "@codemirror/state";
 import {
+  activePreviewLineNumbersChanged,
   getActivePreviewLineNumbers,
   getSelectionHeadLineNumbers,
-  isPreviewSelectionMode,
-  previewSelectionModeField,
   selectionHasRange,
-  setPreviewSelectionModeEffect,
-  shouldDisablePreviewDecorations,
+  shouldRefreshActivePreviewLines,
 } from "../src/components/editor/editorPreviewState.ts";
 
 test("getSelectionHeadLineNumbers uses selection heads instead of full ranges", () => {
@@ -65,36 +63,79 @@ test("getActivePreviewLineNumbers reveals multiple caret lines without selected 
   assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 3]);
 });
 
-test("preview selection mode disables preview decorations before a range exists", () => {
-  const state = EditorState.create({
-    doc: "- **alpha**\n",
-    selection: EditorSelection.cursor(0),
-    extensions: [previewSelectionModeField],
-  });
-
-  const rawSelectionState = state.update({
-    effects: setPreviewSelectionModeEffect.of(true),
-  }).state;
-
-  assert.equal(isPreviewSelectionMode(rawSelectionState), true);
-  assert.equal(shouldDisablePreviewDecorations(rawSelectionState), true);
-  assert.deepEqual(getActivePreviewLineNumbers(rawSelectionState, true), []);
-});
-
-test("preview selection mode clears when the selection is collapsed", () => {
-  const state = EditorState.create({
+test("activePreviewLineNumbersChanged tracks caret line transitions", () => {
+  const startState = EditorState.create({
     doc: "alpha\nbeta\n",
-    selection: EditorSelection.range(0, 5),
-    extensions: [previewSelectionModeField],
-  }).update({
-    effects: setPreviewSelectionModeEffect.of(true),
+    selection: EditorSelection.cursor(0),
+  });
+  const sameLineState = startState.update({
+    selection: EditorSelection.cursor(3),
   }).state;
-
-  const collapsedState = state.update({
+  const nextLineState = startState.update({
     selection: EditorSelection.cursor(7),
   }).state;
 
-  assert.equal(isPreviewSelectionMode(collapsedState), false);
-  assert.equal(shouldDisablePreviewDecorations(collapsedState), false);
-  assert.deepEqual(getActivePreviewLineNumbers(collapsedState, true), [2]);
+  assert.equal(activePreviewLineNumbersChanged(startState, sameLineState, true), false);
+  assert.equal(activePreviewLineNumbersChanged(startState, nextLineState, true), true);
+});
+
+test("activePreviewLineNumbersChanged tracks transitions into selected ranges", () => {
+  const startState = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.cursor(0),
+  });
+  const rangeState = startState.update({
+    selection: EditorSelection.range(0, 7),
+  }).state;
+
+  assert.equal(getActivePreviewLineNumbers(rangeState, true).length, 0);
+  assert.equal(activePreviewLineNumbersChanged(startState, rangeState, true), true);
+});
+
+test("shouldRefreshActivePreviewLines ignores pointer selection updates", () => {
+  const startState = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.cursor(0),
+  });
+  const transaction = startState.update({
+    selection: EditorSelection.cursor(7),
+    annotations: Transaction.userEvent.of("select.pointer"),
+  });
+
+  assert.equal(
+    shouldRefreshActivePreviewLines(
+      {
+        selectionSet: true,
+        startState,
+        state: transaction.state,
+        transactions: [transaction],
+      },
+      true,
+    ),
+    false,
+  );
+});
+
+test("shouldRefreshActivePreviewLines allows non-pointer caret line changes", () => {
+  const startState = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.cursor(0),
+  });
+  const transaction = startState.update({
+    selection: EditorSelection.cursor(7),
+    annotations: Transaction.userEvent.of("select"),
+  });
+
+  assert.equal(
+    shouldRefreshActivePreviewLines(
+      {
+        selectionSet: true,
+        startState,
+        state: transaction.state,
+        transactions: [transaction],
+      },
+      true,
+    ),
+    true,
+  );
 });

@@ -920,6 +920,30 @@ export function FileExplorer() {
     selectionLockRef.current = null;
   };
 
+  const clearStaleGlobalTextSelectionLock = () => {
+    if (selectionLockRef.current) return;
+
+    if (document.body.style.userSelect === "none") {
+      document.body.style.userSelect = "";
+    }
+    if (document.body.style.webkitUserSelect === "none") {
+      document.body.style.webkitUserSelect = "";
+    }
+    if (document.documentElement.style.userSelect === "none") {
+      document.documentElement.style.userSelect = "";
+    }
+    if (document.documentElement.style.webkitUserSelect === "none") {
+      document.documentElement.style.webkitUserSelect = "";
+    }
+  };
+
+  const releaseOrphanedTextSelectionLock = () => {
+    if (pointerDragRef.current) return;
+
+    restoreTextSelection();
+    clearStaleGlobalTextSelectionLock();
+  };
+
   const removePointerDragListeners = () => {
     const session = pointerDragRef.current;
     if (!session) return;
@@ -930,6 +954,33 @@ export function FileExplorer() {
     window.removeEventListener("blur", session.blurHandler);
     pointerDragRef.current = null;
   };
+
+  useEffect(() => {
+    clearStaleGlobalTextSelectionLock();
+
+    const release = () => releaseOrphanedTextSelectionLock();
+    const releaseWhenHidden = () => {
+      if (document.visibilityState !== "visible") {
+        releaseOrphanedTextSelectionLock();
+      }
+    };
+
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("mouseup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", releaseWhenHidden);
+
+    return () => {
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("mouseup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+      window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", releaseWhenHidden);
+      restoreTextSelection();
+      clearStaleGlobalTextSelectionLock();
+    };
+  }, []);
 
   const clearSuppressionTimer = () => {
     if (suppressClickTimeoutRef.current !== null) {

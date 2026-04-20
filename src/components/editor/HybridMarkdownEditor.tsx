@@ -23,16 +23,10 @@ import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
 import {
   getActivePreviewLineNumbers,
-  isPreviewSelectionMode,
-  previewSelectionModeField,
-  selectionHasRange,
-  setPreviewSelectionModeEffect,
-  shouldDisablePreviewDecorations,
+  shouldRefreshActivePreviewLines,
 } from "./editorPreviewState";
 import {
-  getTripleClickSelectionRange,
   isTaskCheckboxHitOffset,
-  shouldUseTripleClickLineSelection,
 } from "./editorMouseSelection";
 import {
   hiddenSyntaxMark,
@@ -142,10 +136,6 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     "& ::selection": {
       backgroundColor: "rgba(124, 138, 255, 0.25) !important",
     },
-    // Hidden syntax must keep its natural text metrics. Collapsing it with
-    // display:none, visibility:hidden, or font-size:0 breaks pointer-to-doc
-    // mapping during native selection. The !important color lives in
-    // hiddenSyntaxStyle so CodeMirror syntax highlighting cannot repaint it.
     ".cm-hidden-syntax": {
       ...hiddenSyntaxStyle,
     },
@@ -409,17 +399,13 @@ function createStructuralDecorations(editable: boolean) {
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        const previewDisabledChanged =
-          shouldDisablePreviewDecorations(update.startState)
-          !== shouldDisablePreviewDecorations(update.state);
-
-        if (update.docChanged || update.viewportChanged || treeChanged || previewDisabledChanged) {
+        if (update.docChanged || update.viewportChanged || treeChanged) {
           this.decorations = this.buildDecorations(update.view);
         }
       }
 
       buildDecorations(view: EditorView) {
-        if (shouldDisablePreviewDecorations(view.state)) {
+        if (editable) {
           return new RangeSetBuilder<Decoration>().finish();
         }
 
@@ -747,8 +733,9 @@ class ImagePreviewWidget extends WidgetType {
  * Live preview: hides markdown syntax marks on inactive lines and replaces
  * URLs inside links with compact icon widgets.
  *
- * Rebuilds on selection changes (in addition to doc/viewport/tree) so that
- * syntax marks are revealed on the active line as the cursor moves.
+ * Rebuilds on doc/viewport/tree changes, and on non-pointer caret movement
+ * when active-line reveal is explicitly enabled. Pointer selection must keep
+ * the DOM stable so native drag/double/triple-click selection can do its job.
  * See `createStructuralDecorations` for why this is a separate plugin.
  */
 function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: boolean) {
@@ -762,34 +749,24 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        const previewDisabledChanged =
-          shouldDisablePreviewDecorations(update.startState)
-          !== shouldDisablePreviewDecorations(update.state);
 
-        if (update.docChanged || update.viewportChanged || treeChanged || previewDisabledChanged) {
+        if (update.docChanged || update.viewportChanged || treeChanged) {
           this.decorations = this.buildDecorations(update.view);
           return;
         }
 
-        if (shouldDisablePreviewDecorations(update.state)) {
-          return;
-        }
-
-        if (update.selectionSet) {
-          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
-          if (!hasActiveRange) {
-            this.decorations = this.buildDecorations(update.view);
-          }
+        if (shouldRefreshActivePreviewLines(update, revealSyntaxOnActiveLine)) {
+          this.decorations = this.buildDecorations(update.view);
         }
       }
 
       buildDecorations(view: EditorView) {
-        if (shouldDisablePreviewDecorations(view.state)) {
-          return new RangeSetBuilder<Decoration>().finish();
-        }
-
         const builder = new RangeSetBuilder<Decoration>();
         const state = view.state;
+        if (editable) {
+          return builder.finish();
+        }
+
         const activeLines = new Set(getActivePreviewLineNumbers(state, revealSyntaxOnActiveLine));
 
         const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
@@ -984,6 +961,7 @@ function createDomHandlers(editable: boolean) {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
+      if (event.detail >= 2) return false;
 
       const target = getEventTargetElement(event.target);
       if (!target) return false;
@@ -1000,40 +978,6 @@ function createDomHandlers(editable: boolean) {
         }
       }
 
-      if (!isPreviewSelectionMode(view.state)) {
-        view.dispatch({ effects: setPreviewSelectionModeEffect.of(true) });
-      }
-
-      /* ── Triple-click: select the current structural paragraph ─ */
-      if (
-        shouldUseTripleClickLineSelection({
-          button: event.button,
-          detail: event.detail,
-          altKey: event.altKey,
-          ctrlKey: event.ctrlKey,
-          metaKey: event.metaKey,
-          shiftKey: event.shiftKey,
-        })
-      ) {
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        if (pos !== null) {
-          const range = getTripleClickSelectionRange(view.state.doc, pos);
-          view.dispatch({
-            selection: EditorSelection.range(range.from, range.to),
-            userEvent: "select.pointer",
-          });
-          event.preventDefault();
-          return true;
-        }
-      }
-
-      return false;
-    },
-
-    mouseup(_event, view) {
-      if (isPreviewSelectionMode(view.state) && !selectionHasRange(view.state.selection)) {
-        view.dispatch({ effects: setPreviewSelectionModeEffect.of(false) });
-      }
       return false;
     },
 
@@ -1077,7 +1021,7 @@ export function HybridMarkdownEditor({
   themeVariant = "classic",
   viewRef,
   showSyntax = false,
-  revealSyntaxOnActiveLine = true,
+  revealSyntaxOnActiveLine = false,
   wikilinkTargets = EMPTY_WIKILINK_TARGETS,
   onOpenWikilink,
   onCreateWikilinkMemory,
@@ -1102,7 +1046,6 @@ export function HybridMarkdownEditor({
     () => [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
-      previewSelectionModeField,
       createEditorTheme(themeVariant),
       createStructuralDecorations(editable),
       ...(showSyntax ? [] : [createLivePreviewPlugin(editable, revealSyntaxOnActiveLine)]),
@@ -1110,6 +1053,7 @@ export function HybridMarkdownEditor({
         ? []
         : createWikilinkExtensions({
             targets: stableWikilinkTargets,
+            editable,
             revealSyntaxOnActiveLine,
             onOpenMemory: onOpenWikilink,
             onCreateMemory: onCreateWikilinkMemory,
