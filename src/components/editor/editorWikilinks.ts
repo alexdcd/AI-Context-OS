@@ -15,7 +15,7 @@ import {
   ViewPlugin,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
-import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import { getActivePreviewLineNumbers, shouldDisablePreviewDecorations } from "./editorPreviewState";
 import { hiddenSyntaxMark } from "./editorLivePreview";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
@@ -332,8 +332,16 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
+        const previewDisabledChanged =
+          shouldDisablePreviewDecorations(update.startState)
+          !== shouldDisablePreviewDecorations(update.state);
+
+        if (update.docChanged || update.viewportChanged || previewDisabledChanged) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        if (shouldDisablePreviewDecorations(update.state)) {
           return;
         }
 
@@ -346,6 +354,10 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       buildDecorations(view: EditorView) {
+        if (shouldDisablePreviewDecorations(view.state)) {
+          return new RangeSetBuilder<Decoration>().finish();
+        }
+
         const builder = new RangeSetBuilder<Decoration>();
         const activeLines = new Set(
           getActivePreviewLineNumbers(view.state, options.revealSyntaxOnActiveLine),
