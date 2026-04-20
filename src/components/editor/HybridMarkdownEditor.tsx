@@ -1067,38 +1067,8 @@ function isDecoratedLine(lineElement: HTMLElement): boolean {
 }
 
 function createDomHandlers(editable: boolean) {
-  /** Whether we took over the current mousedown and therefore need to
-   *  synthesize selection-extension on mousemove/mouseup ourselves. */
   let dragging = false;
   let dragAnchor = 0;
-
-  function resolvePositionAtCoords(view: EditorView, event: MouseEvent): number | null {
-    const target = getEventTargetElement(event.target);
-    if (!target) return null;
-    const lineElement = target.closest(".cm-line");
-    if (lineElement instanceof HTMLElement && isDecoratedLine(lineElement)) {
-      return resolveDecoratedLineClickPosition(view, lineElement, event);
-    }
-    return view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
-  }
-
-  /**
-   * Reliably determine which document line a `.cm-line` element corresponds
-   * to.  This is the ONLY correct way to find the line for multi-click
-   * handlers because, between the first and subsequent clicks, decorations
-   * change (active-line reveals syntax markers, CSS pseudo-elements shift),
-   * the DOM re-renders, and pixel-based position resolution becomes
-   * unreliable.  `posAtDOM` maps the actual DOM node back to its document
-   * position, which is always accurate.
-   */
-  function lineFromElement(view: EditorView, lineElement: HTMLElement) {
-    try {
-      const pos = view.posAtDOM(lineElement, 0);
-      return view.state.doc.lineAt(pos);
-    } catch {
-      return null;
-    }
-  }
 
   return EditorView.domEventHandlers({
     mousedown(event, view) {
@@ -1113,7 +1083,6 @@ function createDomHandlers(editable: boolean) {
         if (clickOffset <= 28) {
           event.preventDefault();
           event.stopPropagation();
-
           const lineNumber = view.state.doc.lineAt(view.posAtDOM(taskLineElement, 0)).number;
           return toggleTaskCheckboxOnLine(view, lineNumber);
         }
@@ -1125,21 +1094,11 @@ function createDomHandlers(editable: boolean) {
       const lineElement = target.closest(".cm-line");
       if (!(lineElement instanceof HTMLElement)) return false;
 
-      const decorated = isDecoratedLine(lineElement);
-
       /* ── Single click ─────────────────────────────────── */
       if (event.detail === 1) {
-        if (!decorated) {
-          // Let CodeMirror handle single click natively – this preserves
-          // native drag-to-select, shift-click extend, etc.
-          dragging = false;
-          return false;
-        }
-
         const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
         dragAnchor = pos;
         dragging = true;
-
         view.dispatch({
           selection: EditorSelection.cursor(pos),
           scrollIntoView: false,
@@ -1150,59 +1109,40 @@ function createDomHandlers(editable: boolean) {
         return true;
       }
 
-      /* ── Double click — word selection ─────────────────── */
+      /* ── Double click — select word ───────────────────── */
       if (event.detail === 2) {
         dragging = false;
-
-        // Resolve position fresh — don't use a cached pos from click 1
-        // because decorations may have changed the DOM layout between clicks.
-        const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
-
+        // Use cursor position set by click 1 (already on the correct line
+        // before decorations shifted the DOM).
+        const pos = view.state.selection.main.head;
         const word = view.state.wordAt(pos);
-        if (word) {
-          view.dispatch({
-            selection: EditorSelection.range(word.from, word.to),
-            scrollIntoView: false,
-            userEvent: "select.pointer",
-          });
-        } else {
-          view.dispatch({
-            selection: EditorSelection.cursor(pos),
-            scrollIntoView: false,
-            userEvent: "select.pointer",
-          });
-        }
+        view.dispatch({
+          selection: word
+            ? EditorSelection.range(word.from, word.to)
+            : EditorSelection.cursor(pos),
+          scrollIntoView: false,
+          userEvent: "select.pointer",
+        });
         event.preventDefault();
         return true;
       }
 
-      /* ── Triple click — line / paragraph selection ────── */
+      /* ── Triple+ click — select line or paragraph ─────── */
       if (event.detail >= 3) {
         dragging = false;
-
-        // Determine the line directly from the DOM element.  This is far
-        // more reliable than pixel-based position resolution for line-level
-        // selection because between click 1 and click 3 the live-preview
-        // decorations may have reshuffled the DOM (e.g. revealing ** markers
-        // on the active line changes text length & wrapping), making the
-        // same screen coordinates map to a different line.
-        const line = lineFromElement(view, lineElement);
-        if (!line) return false;
+        // Use cursor position set by click 1 to find the correct doc line.
+        const line = view.state.doc.lineAt(view.state.selection.main.head);
 
         if (STRUCTURAL_LINE_RE.test(line.text)) {
-          // Structural line (heading, bullet, task, blockquote, etc.)
-          // → select exactly this one line.
           view.dispatch({
             selection: EditorSelection.range(line.from, line.to),
             scrollIntoView: false,
             userEvent: "select.pointer",
           });
         } else {
-          // Plain paragraph → expand to the full paragraph (contiguous
-          // non-blank, non-structural lines).
-          const paragraphSel = getParagraphSelection(view.state.doc, line.from);
+          const sel = getParagraphSelection(view.state.doc, line.from);
           view.dispatch({
-            selection: EditorSelection.range(paragraphSel.from, paragraphSel.to),
+            selection: EditorSelection.range(sel.from, sel.to),
             scrollIntoView: false,
             userEvent: "select.pointer",
           });
@@ -1214,14 +1154,8 @@ function createDomHandlers(editable: boolean) {
       return false;
     },
 
-    /**
-     * Prevent the browser's native double/triple-click "select word /
-     * select paragraph" from firing AFTER our mousedown handler has already
-     * set the correct selection.  Without this handler the browser's
-     * `click` default action overrides our dispatch — this was the root
-     * cause of the inconsistent triple-click behaviour ("sometimes one
-     * line, sometimes one-and-a-half, sometimes the whole block").
-     */
+    /* Suppress the browser's native click selection for double/triple clicks
+     * so it can't override the selection we already set in mousedown. */
     click(event) {
       if (!editable || event.button !== 0) return false;
       if (event.detail >= 2) {
@@ -1231,15 +1165,13 @@ function createDomHandlers(editable: boolean) {
       return false;
     },
 
-    /* ── Drag-to-select on decorated lines ───────────────── */
     mousemove(event, view) {
       if (!dragging || event.buttons !== 1) {
         dragging = false;
         return false;
       }
-      const pos = resolvePositionAtCoords(view, event);
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
       if (pos === null) return false;
-
       view.dispatch({
         selection: EditorSelection.range(dragAnchor, pos),
         scrollIntoView: false,
@@ -1249,10 +1181,11 @@ function createDomHandlers(editable: boolean) {
       return true;
     },
 
-    mouseup(_event, _view) {
+    mouseup() {
       dragging = false;
       return false;
     },
+
     paste(event, view) {
       const data = event.clipboardData;
       if (!data) return false;
