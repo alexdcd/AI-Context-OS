@@ -5,6 +5,7 @@ import {
   frozenPreviewLinesField,
   getActivePreviewLineNumbers,
   getSelectionHeadLineNumbers,
+  selectionHasRange,
   setFrozenPreviewLinesEffect,
 } from "../src/components/editor/editorPreviewState.ts";
 
@@ -50,4 +51,15 @@ test("getActivePreviewLineNumbers falls back to the current selection once the f
   }).state;
 
   assert.deepEqual(getActivePreviewLineNumbers(settledState, true), [2]);
+});
+
+test("getActivePreviewLineNumbers hides syntax while text is selected", () => {
+  const state = EditorState.create({
+    doc: "# heading\nplain\n[[memory]]\n",
+    selection: EditorSelection.range(0, 9),
+    extensions: [frozenPreviewLinesField],
+  });
+
+  assert.equal(selectionHasRange(state.selection), true);
+  assert.deepEqual(getActivePreviewLineNumbers(state, true), []);
 });

@@ -35,6 +35,10 @@ import {
   shouldUseTripleClickLineSelection,
 } from "./editorMouseSelection";
 import {
+  hiddenSyntaxMark,
+  shouldHideMarkdownNode,
+} from "./editorLivePreview";
+import {
   createWikilinkExtensions,
   type WikilinkDraftMemory,
   type WikilinkTarget,
@@ -141,6 +145,9 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     // it perfectly transparent so only CM's own selection blocks are visible.
     "& ::selection": {
       backgroundColor: "transparent !important",
+    },
+    ".cm-hidden-syntax": {
+      display: "none",
     },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
@@ -806,7 +813,16 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        if (update.docChanged || update.viewportChanged || update.selectionSet || treeChanged) {
+        const previewFreezeChanged = update.transactions.some((transaction) =>
+          transaction.effects.some((effect) => effect.is(setFrozenPreviewLinesEffect)),
+        );
+        if (
+          update.docChanged
+          || update.viewportChanged
+          || update.selectionSet
+          || treeChanged
+          || previewFreezeChanged
+        ) {
           this.decorations = this.buildDecorations(update.view);
         }
       }
@@ -816,7 +832,6 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
         const state = view.state;
         const activeLines = new Set(getActivePreviewLineNumbers(state, revealSyntaxOnActiveLine));
 
-        const hideDeco = Decoration.replace({});
         const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
         const decos: { from: number; to: number; deco: Decoration }[] = [];
 
@@ -825,30 +840,11 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
             from,
             to,
             enter(node) {
-              const alwaysHiddenMarkers = [
-                "QuoteMark",
-                "HorizontalRule",
-                "ListMark",
-                "TaskMarker",
-                "TableDelimiter",
-              ];
-              const activeLineHiddenMarkers = [
-                "HeaderMark",
-                "EmphasisMark",
-                "StrongEmphasisMark",
-                "StrikethroughMark",
-                "CodeMark",
-                "LinkMark",
-                "CodeInfo",
-              ];
-              const isAlwaysHiddenMarker = alwaysHiddenMarkers.includes(node.name);
-              const isActiveLineHiddenMarker = activeLineHiddenMarkers.includes(node.name);
-
               const line = state.doc.lineAt(node.from).number;
-              if (activeLines.has(line) && !isAlwaysHiddenMarker) return;
+              const lineIsActive = activeLines.has(line);
 
-              if (isAlwaysHiddenMarker || isActiveLineHiddenMarker) {
-                decos.push({ from: node.from, to: node.to, deco: hideDeco });
+              if (shouldHideMarkdownNode(node.name, lineIsActive)) {
+                decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
               } else if (node.name === "URL" && node.node.parent?.name === "Link") {
                 const urlText = state
                   .sliceDoc(node.from, node.to)

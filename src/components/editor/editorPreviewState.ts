@@ -33,11 +33,23 @@ export function getSelectionHeadLineNumbers(selection: EditorSelection, doc: Tex
   return Array.from(lineNumbers).sort((left, right) => left - right);
 }
 
+export function selectionHasRange(selection: EditorSelection) {
+  return selection.ranges.some((range) => !range.empty);
+}
+
 export function getActivePreviewLineNumbers(state: EditorState, revealSyntaxOnActiveLine: boolean) {
   if (!revealSyntaxOnActiveLine) {
     return [];
   }
 
-  return state.field(frozenPreviewLinesField, false)
-    ?? getSelectionHeadLineNumbers(state.selection, state.doc);
+  const frozenLines = state.field(frozenPreviewLinesField, false);
+  if (frozenLines) {
+    return frozenLines;
+  }
+
+  if (selectionHasRange(state.selection)) {
+    return [];
+  }
+
+  return getSelectionHeadLineNumbers(state.selection, state.doc);
 }
