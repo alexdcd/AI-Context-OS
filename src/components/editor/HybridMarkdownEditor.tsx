@@ -13,7 +13,6 @@ import {
   type DecorationSet,
   type ViewUpdate,
   WidgetType,
-  drawSelection,
 } from "@codemirror/view";
 import { useEffect, useMemo, useRef } from "react";
 import { tags as t } from "@lezer/highlight";
@@ -126,15 +125,9 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-activeLine": {
       backgroundColor: "transparent",
     },
-    // CodeMirror's internal logic calculates exact selection rectangles.
-    ".cm-selectionBackground": {
-      backgroundColor: "var(--bg-3) !important",
-    },
-    // The browser's native selection UI is notoriously buggy over complex 
-    // structured DOM elements like list item markers (::before). We make
-    // it perfectly transparent so only CM's own selection blocks are visible.
+    // Use native selection
     "& ::selection": {
-      backgroundColor: "transparent !important",
+      backgroundColor: "rgba(124, 138, 255, 0.25) !important",
     },
     ".cm-hidden-syntax": {
       display: "none",
@@ -1020,7 +1013,6 @@ export function HybridMarkdownEditor({
     () => [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
-      drawSelection(),
       createEditorTheme(themeVariant),
       structuralDecorations,
       ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
