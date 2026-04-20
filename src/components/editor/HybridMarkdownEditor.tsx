@@ -1088,9 +1088,7 @@ function createDomHandlers(editable: boolean) {
       /* ── Double click — select word ───────────────────── */
       if (event.detail === 2) {
         dragging = false;
-        // Use cursor position set by click 1 (already on the correct line
-        // before decorations shifted the DOM).
-        const pos = view.state.selection.main.head;
+        const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
         const word = view.state.wordAt(pos);
         view.dispatch({
           selection: word
@@ -1106,8 +1104,17 @@ function createDomHandlers(editable: boolean) {
       /* ── Triple+ click — select line or paragraph ─────── */
       if (event.detail >= 3) {
         dragging = false;
-        // Use cursor position set by click 1 to find the correct doc line.
-        const line = view.state.doc.lineAt(view.state.selection.main.head);
+        // Map the clicked .cm-line DOM node directly to the document line.
+        // This is immune to decoration shifts because posAtDOM accounts for
+        // replace-decorations, and we only need the line identity, not an
+        // exact character offset.
+        let line: { from: number; to: number; text: string };
+        try {
+          const lineStart = view.posAtDOM(lineElement, 0);
+          line = view.state.doc.lineAt(lineStart);
+        } catch {
+          return false;
+        }
 
         if (STRUCTURAL_LINE_RE.test(line.text)) {
           view.dispatch({
