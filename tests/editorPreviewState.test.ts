@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
-  commitLivePreviewEffect,
   getActivePreviewLineNumbers,
   getSelectionHeadLineNumbers,
   selectionHasRange,
@@ -39,36 +38,25 @@ test("getActivePreviewLineNumbers returns an empty list when reveal-on-active is
   assert.deepEqual(getActivePreviewLineNumbers(state, false), []);
 });
 
-test("getActivePreviewLineNumbers includes every line covered by a multi-line range", () => {
+test("getActivePreviewLineNumbers hides syntax reveal while a range is selected", () => {
   const state = EditorState.create({
     doc: "# heading\nplain\n[[memory]]\n",
     selection: EditorSelection.range(0, 17),
   });
 
   assert.equal(selectionHasRange(state.selection), true);
-  // Range 0..17 spans: line 1 ("# heading"), line 2 ("plain"), line 3
-  // starts at offset 16 so the "to" hits the beginning of the third line.
-  assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 2, 3]);
+  assert.deepEqual(getActivePreviewLineNumbers(state, true), []);
 });
 
-test("getActivePreviewLineNumbers deduplicates lines across multiple ranges", () => {
+test("getActivePreviewLineNumbers reveals multiple caret lines without selected ranges", () => {
   const state = EditorState.create({
     doc: "alpha\nbeta\ngamma\ndelta\n",
     selection: EditorSelection.create(
-      [EditorSelection.range(0, 10), EditorSelection.range(6, 16)],
+      [EditorSelection.cursor(0), EditorSelection.cursor(12)],
       1,
     ),
     extensions: [EditorState.allowMultipleSelections.of(true)],
   });
 
-  assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 2, 3]);
-});
-
-test("commitLivePreviewEffect is a StateEffect type that can be dispatched", () => {
-  const state = EditorState.create({ doc: "x" });
-  const transaction = state.update({ effects: commitLivePreviewEffect.of(null) });
-  assert.equal(
-    transaction.effects.some((effect) => effect.is(commitLivePreviewEffect)),
-    true,
-  );
+  assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 3]);
 });

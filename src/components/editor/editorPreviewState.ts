@@ -1,11 +1,8 @@
 import {
-  StateEffect,
   type EditorSelection,
   type EditorState,
   type Text,
 } from "@codemirror/state";
-
-export const commitLivePreviewEffect = StateEffect.define<null>();
 
 export function getSelectionHeadLineNumbers(selection: EditorSelection, doc: Text) {
   const lineNumbers = new Set<number>();
@@ -22,13 +19,10 @@ export function selectionHasRange(selection: EditorSelection) {
 }
 
 /**
- * Return every line that currently participates in the selection. For empty
- * ranges we surface just the caret line; for non-empty ranges we surface the
- * full span so that every line the user is selecting keeps its raw markdown
- * markers visible and therefore preserves the 1:1 mapping between the DOM
- * geometry and the document offsets. Without this, the hidden markers on
- * non-active lines desynchronise `posAtCoords` and the native browser
- * selection ends up pointing to the wrong characters.
+ * Return the lines whose raw markdown markers should be revealed. Empty
+ * selections reveal the caret line. Non-empty selections reveal nothing: the
+ * live-preview DOM must stay stable while text is selected, otherwise releasing
+ * the mouse can repaint hidden markers into the highlighted range.
  */
 export function getActivePreviewLineNumbers(
   state: EditorState,
@@ -38,18 +32,13 @@ export function getActivePreviewLineNumbers(
     return [];
   }
 
+  if (selectionHasRange(state.selection)) {
+    return [];
+  }
+
   const lineNumbers = new Set<number>();
   for (const range of state.selection.ranges) {
-    if (range.empty) {
-      lineNumbers.add(state.doc.lineAt(range.head).number);
-      continue;
-    }
-
-    const fromLine = state.doc.lineAt(range.from).number;
-    const toLine = state.doc.lineAt(range.to).number;
-    for (let line = fromLine; line <= toLine; line += 1) {
-      lineNumbers.add(line);
-    }
+    lineNumbers.add(state.doc.lineAt(range.head).number);
   }
 
   return Array.from(lineNumbers).sort((left, right) => left - right);
