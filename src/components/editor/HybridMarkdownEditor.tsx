@@ -1067,24 +1067,10 @@ function isDecoratedLine(lineElement: HTMLElement): boolean {
 }
 
 function createDomHandlers(editable: boolean) {
-  /** Position resolved on the most recent single-click, kept so that the
-   *  subsequent double/triple clicks on the *same* spot can reuse it instead
-   *  of re-resolving (which may give a different result because the decorations
-   *  may have changed between clicks). */
-  let lastResolvedPos: number | null = null;
-  let lastResolvedTime = 0;
-
   /** Whether we took over the current mousedown and therefore need to
    *  synthesize selection-extension on mousemove/mouseup ourselves. */
   let dragging = false;
   let dragAnchor = 0;
-
-  function getSavedOrResolvedPos(view: EditorView, lineElement: HTMLElement, event: MouseEvent) {
-    if (lastResolvedPos !== null && Date.now() - lastResolvedTime < 500) {
-      return lastResolvedPos;
-    }
-    return resolveDecoratedLineClickPosition(view, lineElement, event);
-  }
 
   function resolvePositionAtCoords(view: EditorView, event: MouseEvent): number | null {
     const target = getEventTargetElement(event.target);
@@ -1094,6 +1080,24 @@ function createDomHandlers(editable: boolean) {
       return resolveDecoratedLineClickPosition(view, lineElement, event);
     }
     return view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+  }
+
+  /**
+   * Reliably determine which document line a `.cm-line` element corresponds
+   * to.  This is the ONLY correct way to find the line for multi-click
+   * handlers because, between the first and subsequent clicks, decorations
+   * change (active-line reveals syntax markers, CSS pseudo-elements shift),
+   * the DOM re-renders, and pixel-based position resolution becomes
+   * unreliable.  `posAtDOM` maps the actual DOM node back to its document
+   * position, which is always accurate.
+   */
+  function lineFromElement(view: EditorView, lineElement: HTMLElement) {
+    try {
+      const pos = view.posAtDOM(lineElement, 0);
+      return view.state.doc.lineAt(pos);
+    } catch {
+      return null;
+    }
   }
 
   return EditorView.domEventHandlers({
@@ -1121,7 +1125,6 @@ function createDomHandlers(editable: boolean) {
       const lineElement = target.closest(".cm-line");
       if (!(lineElement instanceof HTMLElement)) return false;
 
-      /* ── Only intercept on decorated lines ────────────── */
       const decorated = isDecoratedLine(lineElement);
 
       /* ── Single click ─────────────────────────────────── */
@@ -1129,14 +1132,11 @@ function createDomHandlers(editable: boolean) {
         if (!decorated) {
           // Let CodeMirror handle single click natively – this preserves
           // native drag-to-select, shift-click extend, etc.
-          lastResolvedPos = null;
           dragging = false;
           return false;
         }
 
         const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
-        lastResolvedPos = pos;
-        lastResolvedTime = Date.now();
         dragAnchor = pos;
         dragging = true;
 
@@ -1153,9 +1153,10 @@ function createDomHandlers(editable: boolean) {
       /* ── Double click — word selection ─────────────────── */
       if (event.detail === 2) {
         dragging = false;
-        const pos = decorated
-          ? getSavedOrResolvedPos(view, lineElement, event)
-          : (view.posAtCoords({ x: event.clientX, y: event.clientY }, false) ?? getSavedOrResolvedPos(view, lineElement, event));
+
+        // Resolve position fresh — don't use a cached pos from click 1
+        // because decorations may have changed the DOM layout between clicks.
+        const pos = resolveDecoratedLineClickPosition(view, lineElement, event);
 
         const word = view.state.wordAt(pos);
         if (word) {
@@ -1165,8 +1166,6 @@ function createDomHandlers(editable: boolean) {
             userEvent: "select.pointer",
           });
         } else {
-          // No word found (e.g. clicked on whitespace) — select nothing extra,
-          // just place cursor so the user gets feedback.
           view.dispatch({
             selection: EditorSelection.cursor(pos),
             scrollIntoView: false,
@@ -1177,23 +1176,58 @@ function createDomHandlers(editable: boolean) {
         return true;
       }
 
-      /* ── Triple click — paragraph / line selection ────── */
+      /* ── Triple click — line / paragraph selection ────── */
       if (event.detail >= 3) {
         dragging = false;
-        const pos = decorated
-          ? getSavedOrResolvedPos(view, lineElement, event)
-          : (view.posAtCoords({ x: event.clientX, y: event.clientY }, false) ?? getSavedOrResolvedPos(view, lineElement, event));
 
-        const paragraphSel = getParagraphSelection(view.state.doc, pos);
-        view.dispatch({
-          selection: EditorSelection.range(paragraphSel.from, paragraphSel.to),
-          scrollIntoView: false,
-          userEvent: "select.pointer",
-        });
+        // Determine the line directly from the DOM element.  This is far
+        // more reliable than pixel-based position resolution for line-level
+        // selection because between click 1 and click 3 the live-preview
+        // decorations may have reshuffled the DOM (e.g. revealing ** markers
+        // on the active line changes text length & wrapping), making the
+        // same screen coordinates map to a different line.
+        const line = lineFromElement(view, lineElement);
+        if (!line) return false;
+
+        if (STRUCTURAL_LINE_RE.test(line.text)) {
+          // Structural line (heading, bullet, task, blockquote, etc.)
+          // → select exactly this one line.
+          view.dispatch({
+            selection: EditorSelection.range(line.from, line.to),
+            scrollIntoView: false,
+            userEvent: "select.pointer",
+          });
+        } else {
+          // Plain paragraph → expand to the full paragraph (contiguous
+          // non-blank, non-structural lines).
+          const paragraphSel = getParagraphSelection(view.state.doc, line.from);
+          view.dispatch({
+            selection: EditorSelection.range(paragraphSel.from, paragraphSel.to),
+            scrollIntoView: false,
+            userEvent: "select.pointer",
+          });
+        }
         event.preventDefault();
         return true;
       }
 
+      return false;
+    },
+
+    /**
+     * Prevent the browser's native double/triple-click "select word /
+     * select paragraph" from firing AFTER our mousedown handler has already
+     * set the correct selection.  Without this handler the browser's
+     * `click` default action overrides our dispatch — this was the root
+     * cause of the inconsistent triple-click behaviour ("sometimes one
+     * line, sometimes one-and-a-half, sometimes the whole block").
+     */
+    click(event) {
+      if (!editable || event.button !== 0) return false;
+      if (event.detail >= 2) {
+        event.preventDefault();
+        return true;
+      }
       return false;
     },
 
