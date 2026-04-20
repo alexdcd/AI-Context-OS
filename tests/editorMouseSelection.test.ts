@@ -1,16 +1,46 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  hasStructuralSelectionLineClass,
+  getTripleClickSelectionRange,
+  isPlainPrimaryMouseGesture,
+  isStructuralMarkdownLine,
   isTaskCheckboxHitOffset,
-  shouldUseStructuralMouseSelection,
+  shouldUseTripleClickLineSelection,
 } from "../src/components/editor/editorMouseSelection.ts";
 
-test("hasStructuralSelectionLineClass matches list, ordered, and task lines", () => {
-  assert.equal(hasStructuralSelectionLineClass("cm-line cm-bullet-item cm-list-depth-1"), true);
-  assert.equal(hasStructuralSelectionLineClass("cm-line cm-ordered-item"), true);
-  assert.equal(hasStructuralSelectionLineClass("cm-line cm-task-item cm-task-checked"), true);
-  assert.equal(hasStructuralSelectionLineClass("cm-line cm-blockquote"), false);
+function createDoc(text: string) {
+  const lines = text.split("\n");
+  const starts: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1;
+  }
+
+  return {
+    lines: lines.length,
+    line(number: number) {
+      const text = lines[number - 1];
+      const from = starts[number - 1];
+      return { from, to: from + text.length, text, number };
+    },
+    lineAt(pos: number) {
+      let index = 0;
+      for (let i = 0; i < starts.length; i += 1) {
+        if (starts[i] <= pos) index = i;
+      }
+      return this.line(index + 1);
+    },
+  };
+}
+
+test("isStructuralMarkdownLine matches markdown block boundaries", () => {
+  assert.equal(isStructuralMarkdownLine("- **+2,000 suscriptores**"), true);
+  assert.equal(isStructuralMarkdownLine("1. Ordered item"), true);
+  assert.equal(isStructuralMarkdownLine("> quote"), true);
+  assert.equal(isStructuralMarkdownLine("## Heading"), true);
+  assert.equal(isStructuralMarkdownLine("| Table | Row |"), true);
+  assert.equal(isStructuralMarkdownLine("Plain paragraph text"), false);
 });
 
 test("isTaskCheckboxHitOffset reserves the left checkbox hit area", () => {
@@ -19,34 +49,47 @@ test("isTaskCheckboxHitOffset reserves the left checkbox hit area", () => {
   assert.equal(isTaskCheckboxHitOffset(29), false);
 });
 
-test("shouldUseStructuralMouseSelection only activates on plain single-click gestures", () => {
+test("shouldUseTripleClickLineSelection only activates on plain triple-click gestures", () => {
   const baseGesture = {
     button: 0,
-    detail: 1,
+    detail: 3,
     altKey: false,
     ctrlKey: false,
     metaKey: false,
     shiftKey: false,
   };
 
-  assert.equal(
-    shouldUseStructuralMouseSelection(baseGesture, "cm-line cm-bullet-item", 40),
-    true,
-  );
-  assert.equal(
-    shouldUseStructuralMouseSelection(baseGesture, "cm-line cm-task-item", 12),
-    false,
-  );
-  assert.equal(
-    shouldUseStructuralMouseSelection({ ...baseGesture, detail: 2 }, "cm-line cm-bullet-item", 40),
-    false,
-  );
-  assert.equal(
-    shouldUseStructuralMouseSelection({ ...baseGesture, shiftKey: true }, "cm-line cm-bullet-item", 40),
-    false,
-  );
-  assert.equal(
-    shouldUseStructuralMouseSelection(baseGesture, "cm-line cm-paragraph", 40),
-    false,
-  );
+  assert.equal(isPlainPrimaryMouseGesture(baseGesture), true);
+  assert.equal(shouldUseTripleClickLineSelection(baseGesture), true);
+  assert.equal(shouldUseTripleClickLineSelection({ ...baseGesture, detail: 2 }), false);
+  assert.equal(shouldUseTripleClickLineSelection({ ...baseGesture, shiftKey: true }), false);
+  assert.equal(shouldUseTripleClickLineSelection({ ...baseGesture, button: 1 }), false);
+});
+
+test("getTripleClickSelectionRange selects structural lines exactly", () => {
+  const doc = createDoc([
+    "intro paragraph",
+    "- **+2,000 suscriptores** en el canal",
+    "next paragraph",
+  ].join("\n"));
+
+  assert.deepEqual(getTripleClickSelectionRange(doc, doc.line(2).from + 8), {
+    from: doc.line(2).from,
+    to: doc.line(2).to,
+  });
+});
+
+test("getTripleClickSelectionRange expands plain paragraphs between structural lines", () => {
+  const doc = createDoc([
+    "- list boundary",
+    "plain paragraph one",
+    "plain paragraph two",
+    "",
+    "after blank",
+  ].join("\n"));
+
+  assert.deepEqual(getTripleClickSelectionRange(doc, doc.line(3).from + 6), {
+    from: doc.line(2).from,
+    to: doc.line(3).to,
+  });
 });

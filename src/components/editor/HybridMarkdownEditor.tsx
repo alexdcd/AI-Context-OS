@@ -29,7 +29,11 @@ import {
   PREVIEW_SETTLE_DELAY_MS,
   setFrozenPreviewLinesEffect,
 } from "./editorPreviewState";
-import { shouldUseStructuralMouseSelection } from "./editorMouseSelection";
+import {
+  getTripleClickSelectionRange,
+  isTaskCheckboxHitOffset,
+  shouldUseTripleClickLineSelection,
+} from "./editorMouseSelection";
 import {
   createWikilinkExtensions,
   type WikilinkDraftMemory,
@@ -557,54 +561,6 @@ function getEventTargetElement(target: EventTarget | null): HTMLElement | null {
   return null;
 }
 
-function getCaretPositionFromPoint(doc: Document, x: number, y: number) {
-  if (typeof doc.caretPositionFromPoint === "function") {
-    const caret = doc.caretPositionFromPoint(x, y);
-    if (caret) {
-      return { node: caret.offsetNode, offset: caret.offset };
-    }
-  }
-
-  const legacyDoc = doc as Document & {
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-  };
-  if (typeof legacyDoc.caretRangeFromPoint === "function") {
-    const range = legacyDoc.caretRangeFromPoint(x, y);
-    if (range) {
-      return { node: range.startContainer, offset: range.startOffset };
-    }
-  }
-
-  return null;
-}
-
-function getLineTextRects(lineElement: HTMLElement) {
-  const rects: DOMRect[] = [];
-  const doc = lineElement.ownerDocument;
-  const walker = doc.createTreeWalker(lineElement, NodeFilter.SHOW_TEXT);
-
-  for (let current = walker.nextNode(); current; current = walker.nextNode()) {
-    if (!current.textContent?.trim()) continue;
-    const range = doc.createRange();
-    range.selectNodeContents(current);
-    rects.push(
-      ...Array.from(range.getClientRects()).filter((rect) => rect.width > 0 || rect.height > 0),
-    );
-  }
-
-  if (rects.length > 0) {
-    return rects;
-  }
-
-  return Array.from(lineElement.getClientRects()).filter((rect) => rect.width > 0 || rect.height > 0);
-}
-
-function distanceToRect(x: number, y: number, rect: DOMRect) {
-  const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
-  const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
-  return dx + dy * 1000;
-}
-
 function getLineElementAtPoint(view: EditorView, x: number, y: number) {
   const element = view.dom.ownerDocument.elementFromPoint(x, y);
   if (element instanceof HTMLElement) {
@@ -616,52 +572,25 @@ function getLineElementAtPoint(view: EditorView, x: number, y: number) {
   return null;
 }
 
-function resolveDecoratedLineClickPosition(
-  view: EditorView,
-  lineElement: HTMLElement,
-  event: MouseEvent,
-) {
-  const doc = lineElement.ownerDocument;
-  const caret = getCaretPositionFromPoint(doc, event.clientX, event.clientY);
+function getMouseEventLine(view: EditorView, event: MouseEvent) {
+  const target = getEventTargetElement(event.target);
+  const lineElement =
+    target?.closest(".cm-line") ?? getLineElementAtPoint(view, event.clientX, event.clientY);
 
-  if (caret && lineElement.contains(caret.node)) {
+  if (lineElement instanceof HTMLElement) {
     try {
-      return view.posAtDOM(caret.node, caret.offset);
+      return view.state.doc.lineAt(view.posAtDOM(lineElement, 0));
     } catch {
-      // Fall through to line-level fallbacks below.
+      // Fall through to CodeMirror's coordinate resolver.
     }
   }
 
-  const nearestRect = getLineTextRects(lineElement)
-    .sort(
-      (left, right) =>
-        distanceToRect(event.clientX, event.clientY, left)
-        - distanceToRect(event.clientX, event.clientY, right),
-    )[0];
-  if (nearestRect) {
-    const x = Math.min(
-      Math.max(event.clientX, nearestRect.left + 1),
-      Math.max(nearestRect.left + 1, nearestRect.right - 1),
-    );
-    const y = Math.min(
-      Math.max(event.clientY, nearestRect.top + 1),
-      Math.max(nearestRect.top + 1, nearestRect.bottom - 1),
-    );
-    const pos = view.posAtCoords({ x, y }, false);
-    if (pos !== null) {
-      return pos;
-    }
-  }
-
-  const lineStart = view.posAtDOM(lineElement, 0);
-  const line = view.state.doc.lineAt(lineStart);
-  const lineRect = lineElement.getBoundingClientRect();
-  const midpoint = lineRect.left + lineRect.width / 2;
-
-  return event.clientX <= midpoint ? line.from : line.to;
+  return view.state.doc.lineAt(
+    view.posAtCoords({ x: event.clientX, y: event.clientY }, false),
+  );
 }
 
-function createStructuralMouseSelectionStyle(editable: boolean) {
+function createTripleClickMouseSelectionStyle(editable: boolean) {
   return EditorView.mouseSelectionStyle.of((view, event) => {
     if (!editable) return null;
 
@@ -670,47 +599,52 @@ function createStructuralMouseSelectionStyle(editable: boolean) {
       return null;
     }
 
-    const lineElement = target.closest(".cm-line") ?? getLineElementAtPoint(view, event.clientX, event.clientY);
-    if (!(lineElement instanceof HTMLElement)) {
-      return null;
-    }
-
-    const clickOffset = event.clientX - lineElement.getBoundingClientRect().left;
     if (
-      !shouldUseStructuralMouseSelection(
-        {
-          button: event.button,
-          detail: event.detail,
-          altKey: event.altKey,
-          ctrlKey: event.ctrlKey,
-          metaKey: event.metaKey,
-          shiftKey: event.shiftKey,
-        },
-        lineElement.className,
-        clickOffset,
-      )
+      !shouldUseTripleClickLineSelection({
+        button: event.button,
+        detail: event.detail,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      })
     ) {
       return null;
     }
 
-    let anchor = resolveDecoratedLineClickPosition(view, lineElement, event);
+    let startSelection = view.state.selection;
+    const startLine = getMouseEventLine(view, event);
+    let anchor = getTripleClickSelectionRange(view.state.doc, startLine.from);
 
     return {
       update(update: ViewUpdate) {
         if (update.docChanged) {
-          anchor = update.changes.mapPos(anchor);
+          startSelection = startSelection.map(update.changes);
+          anchor = {
+            from: update.changes.mapPos(anchor.from),
+            to: update.changes.mapPos(anchor.to),
+          };
         }
         return false;
       },
 
-      get(curEvent: MouseEvent) {
-        const currentLine = getLineElementAtPoint(view, curEvent.clientX, curEvent.clientY);
-        const head =
-          currentLine instanceof HTMLElement
-            ? resolveDecoratedLineClickPosition(view, currentLine, curEvent)
-            : (view.posAtCoords({ x: curEvent.clientX, y: curEvent.clientY }, false) ?? anchor);
+      get(curEvent: MouseEvent, extend: boolean, multiple: boolean) {
+        const headLine = getMouseEventLine(view, curEvent);
+        const head = getTripleClickSelectionRange(view.state.doc, headLine.from);
+        const range =
+          anchor.from <= head.from
+            ? EditorSelection.range(anchor.from, head.to)
+            : EditorSelection.range(anchor.to, head.from);
 
-        return EditorSelection.create([EditorSelection.range(anchor, head)]);
+        if (extend) {
+          return startSelection.replaceRange(
+            startSelection.main.extend(range.from, range.to),
+          );
+        }
+        if (multiple) {
+          return startSelection.addRange(range);
+        }
+        return EditorSelection.create([range]);
       },
     };
   });
@@ -1086,48 +1020,6 @@ const turndownService = new TurndownService({
   strongDelimiter: "**",
 });
 
-const STRUCTURAL_LINE_RE =
-  /^(\s*([-*+]|\d+[.)]) (\[[ xX]\] )?|#{1,6} |> |---+\s*$|\*\*\*+\s*$|___+\s*$|\|)/;
-
-function getParagraphSelection(
-  doc: {
-    lineAt: (pos: number) => { from: number; to: number; text: string; number: number };
-    line: (number: number) => { from: number; to: number; text: string; number: number };
-    lines: number;
-  },
-  pos: number,
-) {
-  const currentLine = doc.lineAt(pos);
-
-  if (currentLine.text.trim().length === 0) {
-    return { from: currentLine.from, to: currentLine.to };
-  }
-
-  if (STRUCTURAL_LINE_RE.test(currentLine.text)) {
-    return { from: currentLine.from, to: currentLine.to };
-  }
-
-  let startLine = currentLine.number;
-  let endLine = currentLine.number;
-
-  while (startLine > 1) {
-    const prevLine = doc.line(startLine - 1);
-    if (prevLine.text.trim().length === 0 || STRUCTURAL_LINE_RE.test(prevLine.text)) break;
-    startLine -= 1;
-  }
-
-  while (endLine < doc.lines) {
-    const nextLine = doc.line(endLine + 1);
-    if (nextLine.text.trim().length === 0 || STRUCTURAL_LINE_RE.test(nextLine.text)) break;
-    endLine += 1;
-  }
-
-  return {
-    from: doc.line(startLine).from,
-    to: doc.line(endLine).to,
-  };
-}
-
 function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
   let settleTimer: ReturnType<typeof window.setTimeout> | null = null;
   let teardownInteractionListeners: (() => void) | null = null;
@@ -1200,6 +1092,17 @@ function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
     };
   };
 
+  const freezePreviewForPointerGesture = (view: EditorView) => {
+    if (!freezePreviewOnPointer) return;
+
+    clearSettleTimer();
+    const currentLineNumbers = view.state.field(frozenPreviewLinesField, false) ?? null;
+    if (currentLineNumbers === null) {
+      setFrozenPreviewLines(view, getSelectionHeadLineNumbers(view.state.selection, view.state.doc));
+    }
+    watchPointerRelease(view);
+  };
+
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
@@ -1210,7 +1113,7 @@ function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
       const taskLineElement = target.closest(".cm-line.cm-task-item");
       if (taskLineElement instanceof HTMLElement) {
         const clickOffset = event.clientX - taskLineElement.getBoundingClientRect().left;
-        if (clickOffset <= 28) {
+        if (isTaskCheckboxHitOffset(clickOffset)) {
           event.preventDefault();
           event.stopPropagation();
           const lineNumber = view.state.doc.lineAt(view.posAtDOM(taskLineElement, 0)).number;
@@ -1218,54 +1121,12 @@ function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
         }
       }
 
-      if (freezePreviewOnPointer) {
-        clearSettleTimer();
-        setFrozenPreviewLines(view, getSelectionHeadLineNumbers(view.state.selection, view.state.doc));
-        watchPointerRelease(view);
-      }
-
-      /* ── Triple+ click — line / paragraph selection ──── */
-      if (event.detail >= 3) {
-        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false;
-        if (target.closest(".cm-widget, .cm-tooltip, button, a")) return false;
-
-        const lineElement = target.closest(".cm-line");
-        if (!(lineElement instanceof HTMLElement)) return false;
-
-        // Map the clicked .cm-line DOM node → document line.
-        // posAtDOM is always accurate because CM knows its own DOM structure.
-        let line: { from: number; to: number; text: string };
-        try {
-          line = view.state.doc.lineAt(view.posAtDOM(lineElement, 0));
-        } catch {
-          return false;
-        }
-
-        if (STRUCTURAL_LINE_RE.test(line.text)) {
-          // Structural line (bullet, heading, task, blockquote, etc.)
-          // → select exactly this one line.
-          view.dispatch({
-            selection: EditorSelection.range(line.from, line.to),
-            scrollIntoView: false,
-            userEvent: "select.pointer",
-          });
-        } else {
-          // Plain paragraph → expand to full contiguous paragraph.
-          const sel = getParagraphSelection(view.state.doc, line.from);
-          view.dispatch({
-            selection: EditorSelection.range(sel.from, sel.to),
-            scrollIntoView: false,
-            userEvent: "select.pointer",
-          });
-        }
-        event.preventDefault();
-        return true;
-      }
+      freezePreviewForPointerGesture(view);
 
       /*
-       * All other interactions (single-click cursor placement, double-click
-       * word selection, drag-to-select, shift-click range extension) are
-       * handled NATIVELY by CodeMirror.
+       * Regular interactions (single-click cursor placement, double-click
+       * word selection, drag-to-select, shift-click range extension) stay in
+       * CodeMirror's native mouse-selection pipeline.
        *
        * CM's posAtCoords correctly accounts for line-level CSS
        * (paddingLeft, ::before pseudo-elements) and inline replace
@@ -1282,10 +1143,8 @@ function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
 
     /**
      * Suppress the browser's native triple-click "select paragraph"
-     * default action, which fires as a `click` event AFTER our mousedown
-     * handler has already set the correct selection.  Without this, the
-     * browser overwrites our selection — this was a major source of
-     * inconsistent triple-click behaviour.
+     * default action, which fires as a `click` event after CodeMirror has
+     * already applied our triple-click selection style.
      */
     click(event) {
       if (!editable || event.button !== 0) return false;
@@ -1390,12 +1249,13 @@ export function HybridMarkdownEditor({
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      createStructuralMouseSelectionStyle(editable),
+      createTripleClickMouseSelectionStyle(editable),
       createDomHandlers(editable, shouldFreezePreviewOnPointer),
     ],
     [
       themeVariant,
       showSyntax,
+      editable,
       linkTextPlaceholder,
       createMemoryLabel,
       revealSyntaxOnActiveLine,
