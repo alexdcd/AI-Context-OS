@@ -29,6 +29,7 @@ import {
 } from "./editorMouseSelection";
 import {
   hiddenSyntaxMark,
+  shouldRenderReplacePreviewWidget,
   shouldHideMarkdownNode,
 } from "./editorLivePreview";
 import {
@@ -387,33 +388,34 @@ function getListDepth(node: { parent: { name: string; parent: any } | null }) {
   return Math.min(Math.max(depth, 1), 4);
 }
 
-const structuralDecorations = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+function createStructuralDecorations(editable: boolean) {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = this.buildDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-      if (update.docChanged || update.viewportChanged || treeChanged) {
-        this.decorations = this.buildDecorations(update.view);
+      constructor(view: EditorView) {
+        this.decorations = this.buildDecorations(view);
       }
-    }
 
-    buildDecorations(view: EditorView) {
-      const decos: { from: number; to: number; deco: Decoration; isLine?: boolean }[] = [];
+      update(update: ViewUpdate) {
+        const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
+        if (update.docChanged || update.viewportChanged || treeChanged) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
 
-      const addLine = (from: number, deco: Decoration) => {
-        decos.push({ from, to: from, deco, isLine: true });
-      };
+      buildDecorations(view: EditorView) {
+        const decos: { from: number; to: number; deco: Decoration; isLine?: boolean }[] = [];
 
-      for (const { from, to } of view.visibleRanges) {
-        syntaxTree(view.state).iterate({
-          from,
-          to,
-          enter: (node) => {
+        const addLine = (from: number, deco: Decoration) => {
+          decos.push({ from, to: from, deco, isLine: true });
+        };
+
+        for (const { from, to } of view.visibleRanges) {
+          syntaxTree(view.state).iterate({
+            from,
+            to,
+            enter: (node) => {
             if (node.name.includes("Heading")) {
               const match = node.name.match(/Heading(\d)/);
               if (match) {
@@ -525,7 +527,7 @@ const structuralDecorations = ViewPlugin.fromClass(
               return;
             }
 
-            if (node.name === "Image") {
+            if (node.name === "Image" && shouldRenderReplacePreviewWidget(editable, false)) {
               const raw = view.state.doc.sliceString(node.from, node.to);
               const match = raw.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
               if (match) {
@@ -536,9 +538,9 @@ const structuralDecorations = ViewPlugin.fromClass(
                 });
               }
             }
-          },
-        });
-      }
+            },
+          });
+        }
 
       decos.sort((a, b) => {
         if (a.from !== b.from) return a.from - b.from;
@@ -556,9 +558,10 @@ const structuralDecorations = ViewPlugin.fromClass(
       }
       return builder.finish();
     }
-  },
-  { decorations: (value) => value.decorations },
-);
+    },
+    { decorations: (value) => value.decorations },
+  );
+}
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -719,7 +722,7 @@ class ImagePreviewWidget extends WidgetType {
   }
 }
 
-function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
+function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: boolean) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
@@ -771,7 +774,11 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
 
               if (shouldHideMarkdownNode(node.name, lineIsActive)) {
                 decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
-              } else if (node.name === "URL" && node.node.parent?.name === "Link") {
+              } else if (
+                shouldRenderReplacePreviewWidget(editable, lineIsActive)
+                && node.name === "URL"
+                && node.node.parent?.name === "Link"
+              ) {
                 const urlText = state
                   .sliceDoc(node.from, node.to)
                   .replace(/^[(<]/, "")
@@ -1067,8 +1074,8 @@ export function HybridMarkdownEditor({
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       createEditorTheme(themeVariant),
-      structuralDecorations,
-      ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
+      createStructuralDecorations(editable),
+      ...(showSyntax ? [] : [createLivePreviewPlugin(editable, revealSyntaxOnActiveLine)]),
       ...(showSyntax
         ? []
         : createWikilinkExtensions({

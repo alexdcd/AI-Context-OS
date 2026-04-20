@@ -20,6 +20,16 @@ export const ACTIVE_LINE_HIDDEN_MARKERS = [
 
 export const hiddenSyntaxMark = Decoration.mark({ class: "cm-hidden-syntax" });
 
+/**
+ * Replace widgets are safe in richer read-only previews, but they break the
+ * browser-to-document mapping in editable live preview because the DOM no
+ * longer mirrors the source text. Keep them out of editable surfaces and off
+ * active lines.
+ */
+export function shouldRenderReplacePreviewWidget(editable: boolean, lineIsActive: boolean) {
+  return !editable && !lineIsActive;
+}
+
 export function shouldHideMarkdownNode(nodeName: string, lineIsActive: boolean) {
   if (ALWAYS_HIDDEN_MARKERS.includes(nodeName as (typeof ALWAYS_HIDDEN_MARKERS)[number])) {
     return true;
