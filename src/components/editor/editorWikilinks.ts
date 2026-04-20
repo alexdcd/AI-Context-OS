@@ -15,7 +15,7 @@ import {
   ViewPlugin,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
-import { commitLivePreviewEffect, getActivePreviewLineNumbers } from "./editorPreviewState";
+import { getActivePreviewLineNumbers } from "./editorPreviewState";
 import { hiddenSyntaxMark } from "./editorLivePreview";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
@@ -245,17 +245,8 @@ function getWikilinkPreviewDecoration(innerText: string, resolution: WikilinkMat
 
 const wikilinkEditorTheme = EditorView.baseTheme({
   ".cm-wikilink-chip": {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    maxWidth: "100%",
-    padding: "0.05rem 0.42rem",
     borderRadius: "999px",
     backgroundColor: "transparent",
-    verticalAlign: "baseline",
-    whiteSpace: "nowrap",
-    lineHeight: "1.35",
-    fontWeight: "560",
     cursor: "text",
     transition: "background-color 140ms ease, color 140ms ease",
   },
@@ -341,23 +332,8 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
-        const commitRequested = update.transactions.some((tr) =>
-          tr.effects.some((effect) => effect.is(commitLivePreviewEffect)),
-        );
-
-        if (update.docChanged || update.viewportChanged || commitRequested) {
+        if (update.docChanged || update.viewportChanged || update.selectionSet) {
           this.decorations = this.buildDecorations(update.view);
-          return;
-        }
-
-        // Mirror the live-preview plugin: skip rebuilding while the user is
-        // dragging a selection to prevent preview spans from being reshaped
-        // under the pointer and pulling the native selection off-track.
-        if (update.selectionSet) {
-          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
-          if (!hasActiveRange) {
-            this.decorations = this.buildDecorations(update.view);
-          }
         }
       }
 

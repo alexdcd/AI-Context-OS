@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   hiddenSyntaxMark,
+  hiddenSyntaxStyle,
   shouldHideMarkdownNode,
   shouldRenderReplacePreviewWidget,
 } from "../src/components/editor/editorLivePreview.ts";
@@ -9,6 +10,16 @@ import {
 test("hidden markdown syntax uses a mark decoration instead of a replace decoration", () => {
   assert.equal((hiddenSyntaxMark as { isReplace?: boolean }).isReplace, undefined);
   assert.equal(hiddenSyntaxMark.spec.class, "cm-hidden-syntax");
+});
+
+test("hidden markdown syntax preserves text metrics for native selection", () => {
+  assert.equal(hiddenSyntaxStyle.color, "transparent");
+  assert.equal("display" in hiddenSyntaxStyle, false);
+  assert.equal("visibility" in hiddenSyntaxStyle, false);
+  assert.equal("fontSize" in hiddenSyntaxStyle, false);
+  assert.equal("lineHeight" in hiddenSyntaxStyle, false);
+  assert.equal("letterSpacing" in hiddenSyntaxStyle, false);
+  assert.equal("wordSpacing" in hiddenSyntaxStyle, false);
 });
 
 test("always-hidden markdown markers stay hidden even on the active line", () => {

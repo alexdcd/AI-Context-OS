@@ -1,16 +1,8 @@
 import {
-  StateEffect,
   type EditorSelection,
   type EditorState,
   type Text,
 } from "@codemirror/state";
-
-/**
- * Emitted after the user commits a mouse-driven selection (on `mouseup`), so
- * the live-preview plugins can refresh their decorations without having to
- * rebuild them on every intermediate `selectionSet` tick during the drag.
- */
-export const commitLivePreviewEffect = StateEffect.define<null>();
 
 export function getSelectionHeadLineNumbers(selection: EditorSelection, doc: Text) {
   const lineNumbers = new Set<number>();

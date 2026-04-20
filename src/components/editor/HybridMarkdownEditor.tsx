@@ -21,7 +21,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
-import { commitLivePreviewEffect, getActivePreviewLineNumbers } from "./editorPreviewState";
+import { getActivePreviewLineNumbers } from "./editorPreviewState";
 import {
   getTripleClickSelectionRange,
   isTaskCheckboxHitOffset,
@@ -29,6 +29,7 @@ import {
 } from "./editorMouseSelection";
 import {
   hiddenSyntaxMark,
+  hiddenSyntaxStyle,
   shouldRenderReplacePreviewWidget,
   shouldHideMarkdownNode,
 } from "./editorLivePreview";
@@ -134,19 +135,11 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     "& ::selection": {
       backgroundColor: "rgba(124, 138, 255, 0.25) !important",
     },
-    // IMPORTANT: do NOT use `display: none` here. Pulling the markers out of
-    // the layout desynchronises the DOM geometry from the underlying document
-    // offsets, which breaks `posAtCoords` and therefore every native browser
-    // selection (click, drag, double / triple click) that lands near a hidden
-    // span. By collapsing the glyphs to zero size we keep the characters in
-    // the DOM flow so the browser can still map pointer coordinates to the
-    // correct document positions while the markers stay visually invisible.
+    // Hidden syntax must keep its natural text metrics. Collapsing it with
+    // display:none, visibility:hidden, or font-size:0 breaks pointer-to-doc
+    // mapping during native selection.
     ".cm-hidden-syntax": {
-      fontSize: "0",
-      lineHeight: "0",
-      letterSpacing: "0",
-      wordSpacing: "0",
-      color: "transparent",
+      ...hiddenSyntaxStyle,
     },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
@@ -733,26 +726,14 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        const commitRequested = update.transactions.some((tr) =>
-          tr.effects.some((effect) => effect.is(commitLivePreviewEffect)),
-        );
 
-        // Rebuild whenever the document / viewport / tree changes, or when the
-        // user explicitly commits a selection via `mouseup`.
-        if (update.docChanged || update.viewportChanged || treeChanged || commitRequested) {
+        if (
+          update.docChanged
+          || update.viewportChanged
+          || update.selectionSet
+          || treeChanged
+        ) {
           this.decorations = this.buildDecorations(update.view);
-          return;
-        }
-
-        // Selection-only updates: avoid rebuilding while the user is actively
-        // dragging a selection. Constantly swapping decorations while the
-        // mouse is down reshapes the DOM under the pointer and the native
-        // selection drifts to the wrong characters (bug 3).
-        if (update.selectionSet) {
-          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
-          if (!hasActiveRange) {
-            this.decorations = this.buildDecorations(update.view);
-          }
         }
       }
 
@@ -971,7 +952,6 @@ function createDomHandlers(editable: boolean) {
           view.dispatch({
             selection: EditorSelection.range(range.from, range.to),
             userEvent: "select.pointer",
-            effects: commitLivePreviewEffect.of(null),
           });
           event.preventDefault();
           return true;
@@ -993,18 +973,6 @@ function createDomHandlers(editable: boolean) {
         }
       }
 
-      return false;
-    },
-
-    mouseup(_event, view) {
-      // When the user releases the mouse after a drag-to-select we need to
-      // refresh the live-preview decorations so the newly selected lines
-      // reveal their raw markdown markers. We deliberately only dispatch when
-      // there is an actual range to avoid churn on plain clicks (where the
-      // selection-set branch of `update()` already handles the rebuild).
-      if (view.state.selection.ranges.some((range) => !range.empty)) {
-        view.dispatch({ effects: commitLivePreviewEffect.of(null) });
-      }
       return false;
     },
 

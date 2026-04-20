@@ -20,6 +20,10 @@ export const ACTIVE_LINE_HIDDEN_MARKERS = [
 
 export const hiddenSyntaxMark = Decoration.mark({ class: "cm-hidden-syntax" });
 
+export const hiddenSyntaxStyle = {
+  color: "transparent",
+} as const;
+
 /**
  * Replace widgets are safe in richer read-only previews, but they break the
  * browser-to-document mapping in editable live preview because the DOM no

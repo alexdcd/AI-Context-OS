@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
-  commitLivePreviewEffect,
   getActivePreviewLineNumbers,
   getSelectionHeadLineNumbers,
   selectionHasRange,
@@ -62,13 +61,4 @@ test("getActivePreviewLineNumbers deduplicates lines across multiple ranges", ()
   });
 
   assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 2, 3]);
-});
-
-test("commitLivePreviewEffect is a StateEffect type that can be dispatched", () => {
-  const state = EditorState.create({ doc: "x" });
-  const transaction = state.update({ effects: commitLivePreviewEffect.of(null) });
-  assert.equal(
-    transaction.effects.some((effect) => effect.is(commitLivePreviewEffect)),
-    true,
-  );
 });
