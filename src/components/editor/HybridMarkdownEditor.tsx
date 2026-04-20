@@ -381,6 +381,15 @@ function getListDepth(node: { parent: { name: string; parent: any } | null }) {
   return Math.min(Math.max(depth, 1), 4);
 }
 
+/**
+ * Structural decorations: heading sizes, list styles, code blocks, tables, etc.
+ *
+ * This plugin is intentionally separate from `createLivePreviewPlugin` because
+ * it only rebuilds on doc/viewport/tree changes, whereas live-preview also
+ * rebuilds on selection changes (cursor movement). Merging them would force a
+ * full structural rebuild on every keystroke or click — a performance
+ * regression for large documents.
+ */
 function createStructuralDecorations(editable: boolean) {
   return ViewPlugin.fromClass(
     class {
@@ -535,13 +544,16 @@ function createStructuralDecorations(editable: boolean) {
           });
         }
 
+      // RangeSetBuilder requires decorations in strictly ascending `from`
+      // order, with line decorations (from === to) before range decorations
+      // at the same position.  The syntax-tree iteration visits nodes in
+      // document order but interleaves leaf nodes (Image replace widgets)
+      // with parent nodes (Heading line decorations), so we must sort here.
       decos.sort((a, b) => {
         if (a.from !== b.from) return a.from - b.from;
-        
         const aIsLine = a.isLine ? -1 : 1;
         const bIsLine = b.isLine ? -1 : 1;
         if (aIsLine !== bIsLine) return aIsLine - bIsLine;
-
         return a.to - b.to;
       });
 
@@ -615,12 +627,12 @@ class LinkIconWidget extends WidgetType {
     span.style.cursor = "pointer";
     span.appendChild(buildLinkIconSvg());
 
+    // `ignoreEvent()` tells CodeMirror to skip processing, but we still
+    // need preventDefault on mousedown to avoid starting a text selection,
+    // and the click handler to actually open the link.
     span.addEventListener("mousedown", stopWidgetEvent);
-    span.addEventListener("mouseup", stopWidgetEvent);
-    span.addEventListener("pointerdown", stopWidgetEvent);
-    span.addEventListener("pointerup", stopWidgetEvent);
     span.addEventListener("click", (e) => {
-      stopWidgetEvent(e);
+      e.stopPropagation();
       open(this.url).catch(console.error);
     });
 
@@ -715,6 +727,14 @@ class ImagePreviewWidget extends WidgetType {
   }
 }
 
+/**
+ * Live preview: hides markdown syntax marks on inactive lines and replaces
+ * URLs inside links with compact icon widgets.
+ *
+ * Rebuilds on selection changes (in addition to doc/viewport/tree) so that
+ * syntax marks are revealed on the active line as the cursor moves.
+ * See `createStructuralDecorations` for why this is a separate plugin.
+ */
 function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: boolean) {
   return ViewPlugin.fromClass(
     class {
