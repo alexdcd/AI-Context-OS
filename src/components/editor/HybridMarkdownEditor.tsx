@@ -21,8 +21,12 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
-import { getActivePreviewLineNumbers } from "./editorPreviewState";
-import { isTaskCheckboxHitOffset } from "./editorMouseSelection";
+import { commitLivePreviewEffect, getActivePreviewLineNumbers } from "./editorPreviewState";
+import {
+  getTripleClickSelectionRange,
+  isTaskCheckboxHitOffset,
+  shouldUseTripleClickLineSelection,
+} from "./editorMouseSelection";
 import {
   hiddenSyntaxMark,
   shouldHideMarkdownNode,
@@ -129,8 +133,19 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     "& ::selection": {
       backgroundColor: "rgba(124, 138, 255, 0.25) !important",
     },
+    // IMPORTANT: do NOT use `display: none` here. Pulling the markers out of
+    // the layout desynchronises the DOM geometry from the underlying document
+    // offsets, which breaks `posAtCoords` and therefore every native browser
+    // selection (click, drag, double / triple click) that lands near a hidden
+    // span. By collapsing the glyphs to zero size we keep the characters in
+    // the DOM flow so the browser can still map pointer coordinates to the
+    // correct document positions while the markers stay visually invisible.
     ".cm-hidden-syntax": {
-      display: "none",
+      fontSize: "0",
+      lineHeight: "0",
+      letterSpacing: "0",
+      wordSpacing: "0",
+      color: "transparent",
     },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
@@ -560,18 +575,6 @@ function getEventTargetElement(target: EventTarget | null): HTMLElement | null {
   return null;
 }
 
-function getLineElementAtPoint(view: EditorView, x: number, y: number) {
-  const element = view.dom.ownerDocument.elementFromPoint(x, y);
-  if (element instanceof HTMLElement) {
-    return element.closest(".cm-line");
-  }
-  if (element instanceof Node) {
-    return element.parentElement?.closest(".cm-line") ?? null;
-  }
-  return null;
-}
-
-
 function buildLinkIconSvg(): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("width", "12");
@@ -727,13 +730,26 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        if (
-          update.docChanged
-          || update.viewportChanged
-          || update.selectionSet
-          || treeChanged
-        ) {
+        const commitRequested = update.transactions.some((tr) =>
+          tr.effects.some((effect) => effect.is(commitLivePreviewEffect)),
+        );
+
+        // Rebuild whenever the document / viewport / tree changes, or when the
+        // user explicitly commits a selection via `mouseup`.
+        if (update.docChanged || update.viewportChanged || treeChanged || commitRequested) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        // Selection-only updates: avoid rebuilding while the user is actively
+        // dragging a selection. Constantly swapping decorations while the
+        // mouse is down reshapes the DOM under the pointer and the native
+        // selection drifts to the wrong characters (bug 3).
+        if (update.selectionSet) {
+          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
+          if (!hasActiveRange) {
+            this.decorations = this.buildDecorations(update.view);
+          }
         }
       }
 
@@ -930,6 +946,31 @@ function createDomHandlers(editable: boolean) {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
+
+      /* ── Triple-click: select the current structural paragraph ─ */
+      if (
+        shouldUseTripleClickLineSelection({
+          button: event.button,
+          detail: event.detail,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        })
+      ) {
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos !== null) {
+          const range = getTripleClickSelectionRange(view.state.doc, pos);
+          view.dispatch({
+            selection: EditorSelection.range(range.from, range.to),
+            userEvent: "select.pointer",
+            effects: commitLivePreviewEffect.of(null),
+          });
+          event.preventDefault();
+          return true;
+        }
+      }
+
       const target = getEventTargetElement(event.target);
       if (!target) return false;
 
@@ -945,6 +986,18 @@ function createDomHandlers(editable: boolean) {
         }
       }
 
+      return false;
+    },
+
+    mouseup(_event, view) {
+      // When the user releases the mouse after a drag-to-select we need to
+      // refresh the live-preview decorations so the newly selected lines
+      // reveal their raw markdown markers. We deliberately only dispatch when
+      // there is an actual range to avoid churn on plain clicks (where the
+      // selection-set branch of `update()` already handles the rebuild).
+      if (view.state.selection.ranges.some((range) => !range.empty)) {
+        view.dispatch({ effects: commitLivePreviewEffect.of(null) });
+      }
       return false;
     },
 

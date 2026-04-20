@@ -16,7 +16,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
-import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import { commitLivePreviewEffect, getActivePreviewLineNumbers } from "./editorPreviewState";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
@@ -425,8 +425,23 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged || update.selectionSet) {
+        const commitRequested = update.transactions.some((tr) =>
+          tr.effects.some((effect) => effect.is(commitLivePreviewEffect)),
+        );
+
+        if (update.docChanged || update.viewportChanged || commitRequested) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        // Mirror the live-preview plugin: skip rebuilding while the user is
+        // dragging a selection to prevent the wikilink widgets from popping
+        // in/out under the pointer and pulling the native selection off-track.
+        if (update.selectionSet) {
+          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
+          if (!hasActiveRange) {
+            this.decorations = this.buildDecorations(update.view);
+          }
         }
       }
 
