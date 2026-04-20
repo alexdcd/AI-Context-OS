@@ -22,9 +22,15 @@ import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
 import { getActivePreviewLineNumbers } from "./editorPreviewState";
-import { isTaskCheckboxHitOffset } from "./editorMouseSelection";
+import {
+  getTripleClickSelectionRange,
+  isTaskCheckboxHitOffset,
+  shouldUseTripleClickLineSelection,
+} from "./editorMouseSelection";
 import {
   hiddenSyntaxMark,
+  hiddenSyntaxStyle,
+  shouldRenderReplacePreviewWidget,
   shouldHideMarkdownNode,
 } from "./editorLivePreview";
 import {
@@ -129,8 +135,12 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     "& ::selection": {
       backgroundColor: "rgba(124, 138, 255, 0.25) !important",
     },
+    // Hidden syntax must keep its natural text metrics. Collapsing it with
+    // display:none, visibility:hidden, or font-size:0 breaks pointer-to-doc
+    // mapping during native selection. The !important color lives in
+    // hiddenSyntaxStyle so CodeMirror syntax highlighting cannot repaint it.
     ".cm-hidden-syntax": {
-      display: "none",
+      ...hiddenSyntaxStyle,
     },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
@@ -372,33 +382,43 @@ function getListDepth(node: { parent: { name: string; parent: any } | null }) {
   return Math.min(Math.max(depth, 1), 4);
 }
 
-const structuralDecorations = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+/**
+ * Structural decorations: heading sizes, list styles, code blocks, tables, etc.
+ *
+ * This plugin is intentionally separate from `createLivePreviewPlugin` because
+ * it only rebuilds on doc/viewport/tree changes, whereas live-preview also
+ * rebuilds on selection changes (cursor movement). Merging them would force a
+ * full structural rebuild on every keystroke or click — a performance
+ * regression for large documents.
+ */
+function createStructuralDecorations(editable: boolean) {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = this.buildDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-      if (update.docChanged || update.viewportChanged || treeChanged) {
-        this.decorations = this.buildDecorations(update.view);
+      constructor(view: EditorView) {
+        this.decorations = this.buildDecorations(view);
       }
-    }
 
-    buildDecorations(view: EditorView) {
-      const decos: { from: number; to: number; deco: Decoration; isLine?: boolean }[] = [];
+      update(update: ViewUpdate) {
+        const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
+        if (update.docChanged || update.viewportChanged || treeChanged) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
 
-      const addLine = (from: number, deco: Decoration) => {
-        decos.push({ from, to: from, deco, isLine: true });
-      };
+      buildDecorations(view: EditorView) {
+        const decos: { from: number; to: number; deco: Decoration; isLine?: boolean }[] = [];
 
-      for (const { from, to } of view.visibleRanges) {
-        syntaxTree(view.state).iterate({
-          from,
-          to,
-          enter: (node) => {
+        const addLine = (from: number, deco: Decoration) => {
+          decos.push({ from, to: from, deco, isLine: true });
+        };
+
+        for (const { from, to } of view.visibleRanges) {
+          syntaxTree(view.state).iterate({
+            from,
+            to,
+            enter: (node) => {
             if (node.name.includes("Heading")) {
               const match = node.name.match(/Heading(\d)/);
               if (match) {
@@ -510,7 +530,7 @@ const structuralDecorations = ViewPlugin.fromClass(
               return;
             }
 
-            if (node.name === "Image") {
+            if (node.name === "Image" && shouldRenderReplacePreviewWidget(editable, false)) {
               const raw = view.state.doc.sliceString(node.from, node.to);
               const match = raw.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
               if (match) {
@@ -521,17 +541,20 @@ const structuralDecorations = ViewPlugin.fromClass(
                 });
               }
             }
-          },
-        });
-      }
+            },
+          });
+        }
 
+      // RangeSetBuilder requires decorations in strictly ascending `from`
+      // order, with line decorations (from === to) before range decorations
+      // at the same position.  The syntax-tree iteration visits nodes in
+      // document order but interleaves leaf nodes (Image replace widgets)
+      // with parent nodes (Heading line decorations), so we must sort here.
       decos.sort((a, b) => {
         if (a.from !== b.from) return a.from - b.from;
-        
         const aIsLine = a.isLine ? -1 : 1;
         const bIsLine = b.isLine ? -1 : 1;
         if (aIsLine !== bIsLine) return aIsLine - bIsLine;
-
         return a.to - b.to;
       });
 
@@ -541,9 +564,10 @@ const structuralDecorations = ViewPlugin.fromClass(
       }
       return builder.finish();
     }
-  },
-  { decorations: (value) => value.decorations },
-);
+    },
+    { decorations: (value) => value.decorations },
+  );
+}
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -559,18 +583,6 @@ function getEventTargetElement(target: EventTarget | null): HTMLElement | null {
   }
   return null;
 }
-
-function getLineElementAtPoint(view: EditorView, x: number, y: number) {
-  const element = view.dom.ownerDocument.elementFromPoint(x, y);
-  if (element instanceof HTMLElement) {
-    return element.closest(".cm-line");
-  }
-  if (element instanceof Node) {
-    return element.parentElement?.closest(".cm-line") ?? null;
-  }
-  return null;
-}
-
 
 function buildLinkIconSvg(): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -616,12 +628,12 @@ class LinkIconWidget extends WidgetType {
     span.style.cursor = "pointer";
     span.appendChild(buildLinkIconSvg());
 
+    // `ignoreEvent()` tells CodeMirror to skip processing, but we still
+    // need preventDefault on mousedown to avoid starting a text selection,
+    // and the click handler to actually open the link.
     span.addEventListener("mousedown", stopWidgetEvent);
-    span.addEventListener("mouseup", stopWidgetEvent);
-    span.addEventListener("pointerdown", stopWidgetEvent);
-    span.addEventListener("pointerup", stopWidgetEvent);
     span.addEventListener("click", (e) => {
-      stopWidgetEvent(e);
+      e.stopPropagation();
       open(this.url).catch(console.error);
     });
 
@@ -716,7 +728,15 @@ class ImagePreviewWidget extends WidgetType {
   }
 }
 
-function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
+/**
+ * Live preview: hides markdown syntax marks on inactive lines and replaces
+ * URLs inside links with compact icon widgets.
+ *
+ * Rebuilds on selection changes (in addition to doc/viewport/tree) so that
+ * syntax marks are revealed on the active line as the cursor moves.
+ * See `createStructuralDecorations` for why this is a separate plugin.
+ */
+function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: boolean) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
@@ -727,13 +747,17 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        if (
-          update.docChanged
-          || update.viewportChanged
-          || update.selectionSet
-          || treeChanged
-        ) {
+
+        if (update.docChanged || update.viewportChanged || treeChanged) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        if (update.selectionSet) {
+          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
+          if (!hasActiveRange) {
+            this.decorations = this.buildDecorations(update.view);
+          }
         }
       }
 
@@ -755,7 +779,11 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
 
               if (shouldHideMarkdownNode(node.name, lineIsActive)) {
                 decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
-              } else if (node.name === "URL" && node.node.parent?.name === "Link") {
+              } else if (
+                shouldRenderReplacePreviewWidget(editable, lineIsActive)
+                && node.name === "URL"
+                && node.node.parent?.name === "Link"
+              ) {
                 const urlText = state
                   .sliceDoc(node.from, node.to)
                   .replace(/^[(<]/, "")
@@ -930,6 +958,30 @@ function createDomHandlers(editable: boolean) {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
+
+      /* ── Triple-click: select the current structural paragraph ─ */
+      if (
+        shouldUseTripleClickLineSelection({
+          button: event.button,
+          detail: event.detail,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        })
+      ) {
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos !== null) {
+          const range = getTripleClickSelectionRange(view.state.doc, pos);
+          view.dispatch({
+            selection: EditorSelection.range(range.from, range.to),
+            userEvent: "select.pointer",
+          });
+          event.preventDefault();
+          return true;
+        }
+      }
+
       const target = getEventTargetElement(event.target);
       if (!target) return false;
 
@@ -1014,8 +1066,8 @@ export function HybridMarkdownEditor({
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       createEditorTheme(themeVariant),
-      structuralDecorations,
-      ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
+      createStructuralDecorations(editable),
+      ...(showSyntax ? [] : [createLivePreviewPlugin(editable, revealSyntaxOnActiveLine)]),
       ...(showSyntax
         ? []
         : createWikilinkExtensions({

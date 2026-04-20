@@ -13,10 +13,10 @@ import {
   type DecorationSet,
   type ViewUpdate,
   ViewPlugin,
-  WidgetType,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
 import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import { hiddenSyntaxMark } from "./editorLivePreview";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
@@ -213,135 +213,48 @@ export function nextUniqueMemoryId(text: string, targets: ReadonlyArray<Wikilink
   return `${base}-${suffix}`;
 }
 
-class WikilinkWidget extends WidgetType {
-  constructor(
-    private readonly innerText: string,
-    private readonly resolution: WikilinkMatchResult,
-    private readonly onOpenMemory?: (id: string) => void,
-  ) {
-    super();
-  }
+function getWikilinkPreviewDecoration(innerText: string, resolution: WikilinkMatchResult) {
+  let title: string;
 
-  eq(other: WikilinkWidget) {
-    return (
-      this.innerText === other.innerText &&
-      JSON.stringify(this.resolution) === JSON.stringify(other.resolution)
-    );
-  }
-
-  toDOM() {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "cm-wikilink-chip";
-    button.tabIndex = -1;
-    button.dataset.wikilinkState = this.resolution.kind;
-    button.dataset.clickable = this.isClickable ? "true" : "false";
-
-    const label = document.createElement("span");
-    label.className = "cm-wikilink-chip-label";
-    label.textContent = this.label;
-    button.appendChild(label);
-
-    button.title = this.tooltip;
-
-    if (
-      (this.resolution.kind === "exact_id" ||
-        this.resolution.kind === "exact_l0" ||
-        this.resolution.kind === "fuzzy_l0") &&
-      this.onOpenMemory
-    ) {
-      const targetId = this.resolution.target.id;
-      const stopEditorEvent = (event: Event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      };
-
-      button.setAttribute("aria-label", `Open ${targetId}`);
-      button.addEventListener("mousedown", stopEditorEvent);
-      button.addEventListener("mouseup", stopEditorEvent);
-      button.addEventListener("pointerdown", stopEditorEvent);
-      button.addEventListener("pointerup", stopEditorEvent);
-      button.addEventListener("click", (event) => {
-        stopEditorEvent(event);
-        this.onOpenMemory?.(targetId);
-      });
+  switch (resolution.kind) {
+    case "exact_id":
+    case "exact_l0":
+    case "fuzzy_l0": {
+      const target = resolution.target;
+      title = [target.l0 || target.id, target.id, target.ontology, target.folderCategory]
+        .filter(Boolean)
+        .join(" · ");
+      break;
     }
-
-    return button;
+    case "ambiguous":
+      title = `Multiple memories match [[${innerText.trim()}]]`;
+      break;
+    case "unresolved":
+      title = `No memory matches [[${innerText.trim()}]]`;
+      break;
   }
 
-  ignoreEvent(event?: Event) {
-    return this.isClickable || event?.type === "dragstart";
-  }
-
-  private get isClickable() {
-    return (
-      (this.resolution.kind === "exact_id" ||
-        this.resolution.kind === "exact_l0" ||
-        this.resolution.kind === "fuzzy_l0") &&
-      Boolean(this.onOpenMemory)
-    );
-  }
-
-  private get label() {
-    switch (this.resolution.kind) {
-      case "exact_id":
-      case "exact_l0":
-      case "fuzzy_l0":
-        return this.resolution.target.l0 || this.resolution.target.id;
-      case "ambiguous":
-      case "unresolved":
-        return this.innerText.trim();
-    }
-  }
-
-  private get tooltip() {
-    switch (this.resolution.kind) {
-      case "exact_id":
-      case "exact_l0":
-      case "fuzzy_l0": {
-        const target = this.resolution.target;
-        return [target.l0 || target.id, target.id, target.ontology, target.folderCategory]
-          .filter(Boolean)
-          .join(" · ");
-      }
-      case "ambiguous":
-        return `Multiple memories match [[${this.innerText.trim()}]]`;
-      case "unresolved":
-        return `No memory matches [[${this.innerText.trim()}]]`;
-    }
-  }
+  return Decoration.mark({
+    class: "cm-wikilink-chip",
+    attributes: {
+      "data-wikilink-state": resolution.kind,
+      title,
+    },
+  });
 }
 
 const wikilinkEditorTheme = EditorView.baseTheme({
   ".cm-wikilink-chip": {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    maxWidth: "100%",
-    padding: "0.05rem 0.42rem",
     borderRadius: "999px",
-    border: "0",
     backgroundColor: "transparent",
-    font: "inherit",
-    verticalAlign: "baseline",
-    whiteSpace: "nowrap",
-    lineHeight: "1.35",
     cursor: "text",
-    transition: "background-color 140ms ease, color 140ms ease, box-shadow 140ms ease",
-  },
-  ".cm-wikilink-chip[data-clickable='true']": {
-    cursor: "pointer",
+    transition: "background-color 140ms ease, color 140ms ease",
   },
   ".cm-wikilink-chip[data-wikilink-state='exact_id'], .cm-wikilink-chip[data-wikilink-state='exact_l0'], .cm-wikilink-chip[data-wikilink-state='fuzzy_l0']":
     {
       color: "var(--accent)",
       backgroundColor: "color-mix(in srgb, var(--accent-muted) 72%, transparent)",
     },
-  ".cm-wikilink-chip[data-clickable='true']:hover": {
-    backgroundColor: "color-mix(in srgb, var(--accent-muted) 92%, transparent)",
-    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent)",
-  },
   ".cm-wikilink-chip[data-wikilink-state='ambiguous']": {
     color: "var(--warning)",
     backgroundColor: "color-mix(in srgb, var(--warning) 14%, transparent)",
@@ -349,12 +262,6 @@ const wikilinkEditorTheme = EditorView.baseTheme({
   ".cm-wikilink-chip[data-wikilink-state='unresolved']": {
     color: "var(--danger)",
     backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)",
-  },
-  ".cm-wikilink-chip-label": {
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    textDecoration: "none",
-    fontWeight: "560",
   },
   ".cm-tooltip.cm-wikilink-completions": {
     border: "1px solid color-mix(in srgb, var(--border) 86%, transparent)",
@@ -425,8 +332,16 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged || update.selectionSet) {
+        if (update.docChanged || update.viewportChanged) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        if (update.selectionSet) {
+          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
+          if (!hasActiveRange) {
+            this.decorations = this.buildDecorations(update.view);
+          }
         }
       }
 
@@ -450,13 +365,14 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
 
             const inner = match[1].trim();
             const resolution = resolveWikilinkText(inner, options.targets);
-            builder.add(
-              matchFrom,
-              matchTo,
-              Decoration.replace({
-                widget: new WikilinkWidget(inner, resolution, options.onOpenMemory),
-              }),
-            );
+            const innerFrom = matchFrom + 2;
+            const innerTo = matchTo - 2;
+
+            builder.add(matchFrom, innerFrom, hiddenSyntaxMark);
+            if (innerTo > innerFrom) {
+              builder.add(innerFrom, innerTo, getWikilinkPreviewDecoration(inner, resolution));
+            }
+            builder.add(innerTo, matchTo, hiddenSyntaxMark);
           }
         }
 

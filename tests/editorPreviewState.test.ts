@@ -2,11 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
-  frozenPreviewLinesField,
   getActivePreviewLineNumbers,
   getSelectionHeadLineNumbers,
   selectionHasRange,
-  setFrozenPreviewLinesEffect,
 } from "../src/components/editor/editorPreviewState.ts";
 
 test("getSelectionHeadLineNumbers uses selection heads instead of full ranges", () => {
@@ -22,44 +20,43 @@ test("getSelectionHeadLineNumbers uses selection heads instead of full ranges", 
   assert.deepEqual(getSelectionHeadLineNumbers(state.selection, state.doc), [2, 3]);
 });
 
-test("getActivePreviewLineNumbers keeps the previously revealed lines while frozen", () => {
-  const baseState = EditorState.create({
-    doc: "# heading\nplain\n[[memory]]\n",
-    selection: EditorSelection.cursor(0),
-    extensions: [frozenPreviewLinesField],
-  });
-  const frozenState = baseState.update({
-    effects: setFrozenPreviewLinesEffect.of([1]),
-    selection: EditorSelection.cursor(12),
-  }).state;
-
-  assert.deepEqual(getActivePreviewLineNumbers(frozenState, true), [1]);
-});
-
-test("getActivePreviewLineNumbers falls back to the current selection once the freeze clears", () => {
-  const baseState = EditorState.create({
-    doc: "# heading\nplain\n[[memory]]\n",
-    selection: EditorSelection.cursor(0),
-    extensions: [frozenPreviewLinesField],
-  });
-  const frozenState = baseState.update({
-    effects: setFrozenPreviewLinesEffect.of([1]),
-    selection: EditorSelection.cursor(12),
-  }).state;
-  const settledState = frozenState.update({
-    effects: setFrozenPreviewLinesEffect.of(null),
-  }).state;
-
-  assert.deepEqual(getActivePreviewLineNumbers(settledState, true), [2]);
-});
-
-test("getActivePreviewLineNumbers hides syntax while text is selected", () => {
+test("getActivePreviewLineNumbers returns the caret line for empty selections", () => {
   const state = EditorState.create({
     doc: "# heading\nplain\n[[memory]]\n",
-    selection: EditorSelection.range(0, 9),
-    extensions: [frozenPreviewLinesField],
+    selection: EditorSelection.cursor(12),
+  });
+
+  assert.deepEqual(getActivePreviewLineNumbers(state, true), [2]);
+});
+
+test("getActivePreviewLineNumbers returns an empty list when reveal-on-active is disabled", () => {
+  const state = EditorState.create({
+    doc: "# heading\nplain\n",
+    selection: EditorSelection.cursor(0),
+  });
+
+  assert.deepEqual(getActivePreviewLineNumbers(state, false), []);
+});
+
+test("getActivePreviewLineNumbers hides syntax reveal while a range is selected", () => {
+  const state = EditorState.create({
+    doc: "# heading\nplain\n[[memory]]\n",
+    selection: EditorSelection.range(0, 17),
   });
 
   assert.equal(selectionHasRange(state.selection), true);
   assert.deepEqual(getActivePreviewLineNumbers(state, true), []);
+});
+
+test("getActivePreviewLineNumbers reveals multiple caret lines without selected ranges", () => {
+  const state = EditorState.create({
+    doc: "alpha\nbeta\ngamma\ndelta\n",
+    selection: EditorSelection.create(
+      [EditorSelection.cursor(0), EditorSelection.cursor(12)],
+      1,
+    ),
+    extensions: [EditorState.allowMultipleSelections.of(true)],
+  });
+
+  assert.deepEqual(getActivePreviewLineNumbers(state, true), [1, 3]);
 });

@@ -18,12 +18,28 @@ export function selectionHasRange(selection: EditorSelection) {
   return selection.ranges.some((range) => !range.empty);
 }
 
-export function getActivePreviewLineNumbers(state: EditorState, revealSyntaxOnActiveLine: boolean) {
+/**
+ * Return the lines whose raw markdown markers should be revealed. Empty
+ * selections reveal the caret line. Non-empty selections reveal nothing: the
+ * live-preview DOM must stay stable while text is selected, otherwise releasing
+ * the mouse can repaint hidden markers into the highlighted range.
+ */
+export function getActivePreviewLineNumbers(
+  state: EditorState,
+  revealSyntaxOnActiveLine: boolean,
+) {
   if (!revealSyntaxOnActiveLine) {
     return [];
   }
 
-  // Base active line purely on the main anchor to ensure stability
-  // during mouse drags, preventing layout jumping & selection glitches.
-  return [state.doc.lineAt(state.selection.main.anchor).number];
+  if (selectionHasRange(state.selection)) {
+    return [];
+  }
+
+  const lineNumbers = new Set<number>();
+  for (const range of state.selection.ranges) {
+    lineNumbers.add(state.doc.lineAt(range.head).number);
+  }
+
+  return Array.from(lineNumbers).sort((left, right) => left - right);
 }
