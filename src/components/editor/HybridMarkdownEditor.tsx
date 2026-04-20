@@ -368,21 +368,6 @@ const markdownHighlightStyle = HighlightStyle.define([
   { tag: [t.processingInstruction, t.meta, t.punctuation], color: "var(--text-2)" },
 ]);
 
-function addLineClass(
-  builder: RangeSetBuilder<Decoration>,
-  lineFrom: number,
-  className: string,
-) {
-  builder.add(lineFrom, lineFrom, Decoration.line({ class: className }));
-}
-
-function addLineAttributes(
-  builder: RangeSetBuilder<Decoration>,
-  lineFrom: number,
-  attributes: Record<string, string>,
-) {
-  builder.add(lineFrom, lineFrom, Decoration.line({ attributes }));
-}
 
 function getListDepth(node: { parent: { name: string; parent: any } | null }) {
   let depth = 0;
@@ -410,7 +395,12 @@ const structuralDecorations = ViewPlugin.fromClass(
     }
 
     buildDecorations(view: EditorView) {
-      const builder = new RangeSetBuilder<Decoration>();
+      const decos: { from: number; to: number; deco: Decoration; isLine?: boolean }[] = [];
+
+      const addLine = (from: number, deco: Decoration) => {
+        decos.push({ from, to: from, deco, isLine: true });
+      };
+
       for (const { from, to } of view.visibleRanges) {
         syntaxTree(view.state).iterate({
           from,
@@ -418,8 +408,9 @@ const structuralDecorations = ViewPlugin.fromClass(
           enter: (node) => {
             if (node.name.includes("Heading")) {
               const match = node.name.match(/Heading(\d)/);
-              if (!match) return;
-              addLineClass(builder, node.from, `cm-h${match[1]}`);
+              if (match) {
+                addLine(view.state.doc.lineAt(node.from).from, Decoration.line({ class: `cm-h${match[1]}` }));
+              }
               return;
             }
 
@@ -427,7 +418,7 @@ const structuralDecorations = ViewPlugin.fromClass(
               let line = view.state.doc.lineAt(node.from);
               const endLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1));
               while (line.number <= endLine.number) {
-                addLineClass(builder, line.from, "cm-blockquote");
+                addLine(line.from, Decoration.line({ class: "cm-blockquote" }));
                 if (line.number === endLine.number) break;
                 line = view.state.doc.line(line.number + 1);
               }
@@ -450,15 +441,16 @@ const structuralDecorations = ViewPlugin.fromClass(
                   break;
                 }
               }
+              const lineFrom = view.state.doc.lineAt(node.from).from;
               if (hasTaskChild) {
-                addLineClass(builder, node.from, "cm-task-item");
-                addLineClass(builder, node.from, `cm-list-depth-${depth}`);
+                addLine(lineFrom, Decoration.line({ class: "cm-task-item" }));
+                addLine(lineFrom, Decoration.line({ class: `cm-list-depth-${depth}` }));
                 if (taskMarker?.toLowerCase().includes("x")) {
-                  addLineClass(builder, node.from, "cm-task-checked");
+                  addLine(lineFrom, Decoration.line({ class: "cm-task-checked" }));
                 }
               } else {
-                addLineClass(builder, node.from, "cm-bullet-item");
-                addLineClass(builder, node.from, `cm-list-depth-${depth}`);
+                addLine(lineFrom, Decoration.line({ class: "cm-bullet-item" }));
+                addLine(lineFrom, Decoration.line({ class: `cm-list-depth-${depth}` }));
               }
               return;
             }
@@ -470,27 +462,28 @@ const structuralDecorations = ViewPlugin.fromClass(
                 listMark?.name === "ListMark"
                   ? view.state.doc.sliceString(listMark.from, listMark.to).replace(/\.$/, "")
                   : "";
-              addLineClass(builder, node.from, "cm-ordered-item");
-              addLineClass(builder, node.from, `cm-list-depth-${depth}`);
-              addLineAttributes(builder, node.from, { "data-list-index": markerText });
+              const lineFrom = view.state.doc.lineAt(node.from).from;
+              addLine(lineFrom, Decoration.line({ class: "cm-ordered-item" }));
+              addLine(lineFrom, Decoration.line({ class: `cm-list-depth-${depth}` }));
+              addLine(lineFrom, Decoration.line({ attributes: { "data-list-index": markerText } }));
               return;
             }
 
             if (node.name === "TableHeader") {
-              addLineClass(builder, node.from, "cm-table-header");
+              addLine(view.state.doc.lineAt(node.from).from, Decoration.line({ class: "cm-table-header" }));
               return;
             }
 
             if (node.name === "TableDelimiter") {
               const line = view.state.doc.lineAt(node.from);
               if (line.from === node.from) {
-                addLineClass(builder, node.from, "cm-table-separator");
+                addLine(line.from, Decoration.line({ class: "cm-table-separator" }));
               }
               return;
             }
 
             if (node.name === "TableRow") {
-              addLineClass(builder, node.from, "cm-table-row");
+              addLine(view.state.doc.lineAt(node.from).from, Decoration.line({ class: "cm-table-row" }));
               return;
             }
 
@@ -506,36 +499,52 @@ const structuralDecorations = ViewPlugin.fromClass(
               }
               for (let lineNumber = startLine.number; lineNumber <= endLine.number; lineNumber += 1) {
                 const line = view.state.doc.line(lineNumber);
-                addLineClass(builder, line.from, "cm-codeblock");
+                addLine(line.from, Decoration.line({ class: "cm-codeblock" }));
                 if (lineNumber === startLine.number) {
-                  addLineClass(builder, line.from, "cm-codeblock-start");
-                  addLineAttributes(builder, line.from, { "data-code-language": language || "code" });
+                  addLine(line.from, Decoration.line({ class: "cm-codeblock-start" }));
+                  addLine(line.from, Decoration.line({ attributes: { "data-code-language": language || "code" } }));
                 } else if (lineNumber === endLine.number) {
-                  addLineClass(builder, line.from, "cm-codeblock-end");
+                  addLine(line.from, Decoration.line({ class: "cm-codeblock-end" }));
                 } else {
-                  addLineClass(builder, line.from, "cm-codeblock-body");
+                  addLine(line.from, Decoration.line({ class: "cm-codeblock-body" }));
                 }
               }
               return;
             }
 
             if (node.name === "HorizontalRule") {
-              addLineClass(builder, node.from, "cm-hr");
+              addLine(view.state.doc.lineAt(node.from).from, Decoration.line({ class: "cm-hr" }));
               return;
             }
 
             if (node.name === "Image") {
               const raw = view.state.doc.sliceString(node.from, node.to);
               const match = raw.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
-              if (!match) return;
-              builder.add(
-                node.from,
-                node.to,
-                Decoration.replace({ widget: new ImagePreviewWidget(match[1], match[2]) }),
-              );
+              if (match) {
+                decos.push({
+                  from: node.from,
+                  to: node.to,
+                  deco: Decoration.replace({ widget: new ImagePreviewWidget(match[1], match[2]) }),
+                });
+              }
             }
           },
         });
+      }
+
+      decos.sort((a, b) => {
+        if (a.from !== b.from) return a.from - b.from;
+        
+        const aIsLine = a.isLine ? -1 : 1;
+        const bIsLine = b.isLine ? -1 : 1;
+        if (aIsLine !== bIsLine) return aIsLine - bIsLine;
+
+        return a.to - b.to;
+      });
+
+      const builder = new RangeSetBuilder<Decoration>();
+      for (const d of decos) {
+        builder.add(d.from, d.to, d.deco);
       }
       return builder.finish();
     }
