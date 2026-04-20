@@ -13,7 +13,7 @@ test("hidden markdown syntax uses a mark decoration instead of a replace decorat
 });
 
 test("hidden markdown syntax preserves text metrics for native selection", () => {
-  assert.equal(hiddenSyntaxStyle.color, "transparent");
+  assert.equal(hiddenSyntaxStyle.color, "transparent !important");
   assert.equal("display" in hiddenSyntaxStyle, false);
   assert.equal("visibility" in hiddenSyntaxStyle, false);
   assert.equal("fontSize" in hiddenSyntaxStyle, false);

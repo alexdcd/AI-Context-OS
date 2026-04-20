@@ -21,7 +21,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
-import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import { commitLivePreviewEffect, getActivePreviewLineNumbers } from "./editorPreviewState";
 import {
   getTripleClickSelectionRange,
   isTaskCheckboxHitOffset,
@@ -137,7 +137,8 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     },
     // Hidden syntax must keep its natural text metrics. Collapsing it with
     // display:none, visibility:hidden, or font-size:0 breaks pointer-to-doc
-    // mapping during native selection.
+    // mapping during native selection. The !important color lives in
+    // hiddenSyntaxStyle so CodeMirror syntax highlighting cannot repaint it.
     ".cm-hidden-syntax": {
       ...hiddenSyntaxStyle,
     },
@@ -746,14 +747,20 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
+        const commitRequested = update.transactions.some((tr) =>
+          tr.effects.some((effect) => effect.is(commitLivePreviewEffect)),
+        );
 
-        if (
-          update.docChanged
-          || update.viewportChanged
-          || update.selectionSet
-          || treeChanged
-        ) {
+        if (update.docChanged || update.viewportChanged || treeChanged || commitRequested) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        if (update.selectionSet) {
+          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
+          if (!hasActiveRange) {
+            this.decorations = this.buildDecorations(update.view);
+          }
         }
       }
 
@@ -972,6 +979,7 @@ function createDomHandlers(editable: boolean) {
           view.dispatch({
             selection: EditorSelection.range(range.from, range.to),
             userEvent: "select.pointer",
+            effects: commitLivePreviewEffect.of(null),
           });
           event.preventDefault();
           return true;
@@ -993,6 +1001,13 @@ function createDomHandlers(editable: boolean) {
         }
       }
 
+      return false;
+    },
+
+    mouseup(_event, view) {
+      if (view.state.selection.ranges.some((range) => !range.empty)) {
+        view.dispatch({ effects: commitLivePreviewEffect.of(null) });
+      }
       return false;
     },
 

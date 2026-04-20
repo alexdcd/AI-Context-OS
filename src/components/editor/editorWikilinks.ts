@@ -15,7 +15,7 @@ import {
   ViewPlugin,
 } from "@codemirror/view";
 import type { MemoryOntology } from "../../lib/types";
-import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import { commitLivePreviewEffect, getActivePreviewLineNumbers } from "./editorPreviewState";
 import { hiddenSyntaxMark } from "./editorLivePreview";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
@@ -332,8 +332,20 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged || update.selectionSet) {
+        const commitRequested = update.transactions.some((tr) =>
+          tr.effects.some((effect) => effect.is(commitLivePreviewEffect)),
+        );
+
+        if (update.docChanged || update.viewportChanged || commitRequested) {
           this.decorations = this.buildDecorations(update.view);
+          return;
+        }
+
+        if (update.selectionSet) {
+          const hasActiveRange = update.state.selection.ranges.some((range) => !range.empty);
+          if (!hasActiveRange) {
+            this.decorations = this.buildDecorations(update.view);
+          }
         }
       }
 

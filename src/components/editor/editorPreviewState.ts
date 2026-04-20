@@ -1,8 +1,11 @@
 import {
+  StateEffect,
   type EditorSelection,
   type EditorState,
   type Text,
 } from "@codemirror/state";
+
+export const commitLivePreviewEffect = StateEffect.define<null>();
 
 export function getSelectionHeadLineNumbers(selection: EditorSelection, doc: Text) {
   const lineNumbers = new Set<number>();
