@@ -22,18 +22,8 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
-import {
-  frozenPreviewLinesField,
-  getActivePreviewLineNumbers,
-  getSelectionHeadLineNumbers,
-  PREVIEW_SETTLE_DELAY_MS,
-  setFrozenPreviewLinesEffect,
-} from "./editorPreviewState";
-import {
-  getTripleClickSelectionRange,
-  isTaskCheckboxHitOffset,
-  shouldUseTripleClickLineSelection,
-} from "./editorMouseSelection";
+import { getActivePreviewLineNumbers } from "./editorPreviewState";
+import { isTaskCheckboxHitOffset } from "./editorMouseSelection";
 import {
   hiddenSyntaxMark,
   shouldHideMarkdownNode,
@@ -579,84 +569,6 @@ function getLineElementAtPoint(view: EditorView, x: number, y: number) {
   return null;
 }
 
-function getMouseEventLine(view: EditorView, event: MouseEvent) {
-  const target = getEventTargetElement(event.target);
-  const lineElement =
-    target?.closest(".cm-line") ?? getLineElementAtPoint(view, event.clientX, event.clientY);
-
-  if (lineElement instanceof HTMLElement) {
-    try {
-      return view.state.doc.lineAt(view.posAtDOM(lineElement, 0));
-    } catch {
-      // Fall through to CodeMirror's coordinate resolver.
-    }
-  }
-
-  return view.state.doc.lineAt(
-    view.posAtCoords({ x: event.clientX, y: event.clientY }, false),
-  );
-}
-
-function createTripleClickMouseSelectionStyle(editable: boolean) {
-  return EditorView.mouseSelectionStyle.of((view, event) => {
-    if (!editable) return null;
-
-    const target = getEventTargetElement(event.target);
-    if (!target || target.closest(".cm-widget, .cm-tooltip, button, a")) {
-      return null;
-    }
-
-    if (
-      !shouldUseTripleClickLineSelection({
-        button: event.button,
-        detail: event.detail,
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-        shiftKey: event.shiftKey,
-      })
-    ) {
-      return null;
-    }
-
-    let startSelection = view.state.selection;
-    const startLine = getMouseEventLine(view, event);
-    let anchor = getTripleClickSelectionRange(view.state.doc, startLine.from);
-
-    return {
-      update(update: ViewUpdate) {
-        if (update.docChanged) {
-          startSelection = startSelection.map(update.changes);
-          anchor = {
-            from: update.changes.mapPos(anchor.from),
-            to: update.changes.mapPos(anchor.to),
-          };
-        }
-        return false;
-      },
-
-      get(curEvent: MouseEvent, extend: boolean, multiple: boolean) {
-        const headLine = getMouseEventLine(view, curEvent);
-        const head = getTripleClickSelectionRange(view.state.doc, headLine.from);
-        const range =
-          anchor.from <= head.from
-            ? EditorSelection.range(anchor.from, head.to)
-            : EditorSelection.range(anchor.to, head.from);
-
-        if (extend) {
-          return startSelection.replaceRange(
-            startSelection.main.extend(range.from, range.to),
-          );
-        }
-        if (multiple) {
-          return startSelection.addRange(range);
-        }
-        return EditorSelection.create([range]);
-      },
-    };
-  });
-}
-
 
 function buildLinkIconSvg(): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -813,15 +725,11 @@ function createLivePreviewPlugin(revealSyntaxOnActiveLine: boolean) {
 
       update(update: ViewUpdate) {
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
-        const previewFreezeChanged = update.transactions.some((transaction) =>
-          transaction.effects.some((effect) => effect.is(setFrozenPreviewLinesEffect)),
-        );
         if (
           update.docChanged
           || update.viewportChanged
           || update.selectionSet
           || treeChanged
-          || previewFreezeChanged
         ) {
           this.decorations = this.buildDecorations(update.view);
         }
@@ -1016,89 +924,7 @@ const turndownService = new TurndownService({
   strongDelimiter: "**",
 });
 
-function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
-  let settleTimer: ReturnType<typeof window.setTimeout> | null = null;
-  let teardownInteractionListeners: (() => void) | null = null;
-
-  const sameLineNumbers = (left: readonly number[] | null, right: readonly number[] | null) => {
-    if (left === right) return true;
-    if (!left || !right) return left === right;
-    if (left.length !== right.length) return false;
-    return left.every((value, index) => value === right[index]);
-  };
-
-  const clearSettleTimer = () => {
-    if (settleTimer !== null) {
-      window.clearTimeout(settleTimer);
-      settleTimer = null;
-    }
-  };
-
-  const clearInteractionListeners = () => {
-    if (teardownInteractionListeners) {
-      teardownInteractionListeners();
-      teardownInteractionListeners = null;
-    }
-  };
-
-  const setFrozenPreviewLines = (view: EditorView, lineNumbers: readonly number[] | null) => {
-    if (!freezePreviewOnPointer) return;
-
-    const currentLineNumbers = view.state.field(frozenPreviewLinesField, false) ?? null;
-    if (sameLineNumbers(currentLineNumbers, lineNumbers)) return;
-
-    view.dispatch({ effects: setFrozenPreviewLinesEffect.of(lineNumbers) });
-  };
-
-  const releaseFrozenPreview = (view: EditorView) => {
-    clearSettleTimer();
-    clearInteractionListeners();
-    setFrozenPreviewLines(view, null);
-  };
-
-  const scheduleFrozenPreviewRelease = (view: EditorView) => {
-    if (!freezePreviewOnPointer) return;
-
-    clearSettleTimer();
-    settleTimer = window.setTimeout(() => {
-      settleTimer = null;
-      clearInteractionListeners();
-      setFrozenPreviewLines(view, null);
-    }, PREVIEW_SETTLE_DELAY_MS);
-  };
-
-  const watchPointerRelease = (view: EditorView) => {
-    if (!freezePreviewOnPointer || teardownInteractionListeners) return;
-
-    const controller = new AbortController();
-    const finishInteraction = () => {
-      clearInteractionListeners();
-      scheduleFrozenPreviewRelease(view);
-    };
-    const listenerOptions = { capture: true, signal: controller.signal } as const;
-
-    window.addEventListener("mouseup", finishInteraction, listenerOptions);
-    window.addEventListener("dragend", finishInteraction, listenerOptions);
-    window.addEventListener("pointercancel", finishInteraction, listenerOptions);
-    window.addEventListener("blur", finishInteraction, listenerOptions);
-
-    teardownInteractionListeners = () => {
-      controller.abort();
-      teardownInteractionListeners = null;
-    };
-  };
-
-  const freezePreviewForPointerGesture = (view: EditorView) => {
-    if (!freezePreviewOnPointer) return;
-
-    clearSettleTimer();
-    const currentLineNumbers = view.state.field(frozenPreviewLinesField, false) ?? null;
-    if (currentLineNumbers === null) {
-      setFrozenPreviewLines(view, getSelectionHeadLineNumbers(view.state.selection, view.state.doc));
-    }
-    watchPointerRelease(view);
-  };
-
+function createDomHandlers(editable: boolean) {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
@@ -1117,47 +943,6 @@ function createDomHandlers(editable: boolean, freezePreviewOnPointer: boolean) {
         }
       }
 
-      freezePreviewForPointerGesture(view);
-
-      /*
-       * Regular interactions (single-click cursor placement, double-click
-       * word selection, drag-to-select, shift-click range extension) stay in
-       * CodeMirror's native mouse-selection pipeline.
-       *
-       * CM's posAtCoords correctly accounts for line-level CSS
-       * (paddingLeft, ::before pseudo-elements) and inline replace
-       * decorations (hidden markdown markers like **, #, -, etc.).
-       *
-       * Intercepting these events was the root cause of selection bugs:
-       * our dispatch triggered live-preview decoration changes (revealing
-       * syntax markers on the active line), which re-rendered the DOM
-       * during an active mouse interaction, causing position drift and
-       * incorrect selections.
-       */
-      return false;
-    },
-
-    /**
-     * Suppress the browser's native triple-click "select paragraph"
-     * default action, which fires as a `click` event after CodeMirror has
-     * already applied our triple-click selection style.
-     */
-    click(event) {
-      if (!editable || event.button !== 0) return false;
-      if (event.detail >= 3) {
-        event.preventDefault();
-        return true;
-      }
-      return false;
-    },
-
-    keydown(_event, view) {
-      releaseFrozenPreview(view);
-      return false;
-    },
-
-    blur(_event, view) {
-      releaseFrozenPreview(view);
       return false;
     },
 
@@ -1212,7 +997,6 @@ export function HybridMarkdownEditor({
   const createMemoryLabel = t("memoryEditor.warnings.createMemory");
   const stableWikilinkTargets =
     wikilinkTargets.length > 0 ? wikilinkTargets : EMPTY_WIKILINK_TARGETS;
-  const shouldFreezePreviewOnPointer = !showSyntax && revealSyntaxOnActiveLine;
 
   useEffect(
     () => () => {
@@ -1230,7 +1014,7 @@ export function HybridMarkdownEditor({
       drawSelection(),
       createEditorTheme(themeVariant),
       structuralDecorations,
-      ...(showSyntax ? [] : [frozenPreviewLinesField, createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
+      ...(showSyntax ? [] : [createLivePreviewPlugin(revealSyntaxOnActiveLine)]),
       ...(showSyntax
         ? []
         : createWikilinkExtensions({
@@ -1245,8 +1029,7 @@ export function HybridMarkdownEditor({
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      createTripleClickMouseSelectionStyle(editable),
-      createDomHandlers(editable, shouldFreezePreviewOnPointer),
+      createDomHandlers(editable),
     ],
     [
       themeVariant,
@@ -1255,7 +1038,6 @@ export function HybridMarkdownEditor({
       linkTextPlaceholder,
       createMemoryLabel,
       revealSyntaxOnActiveLine,
-      shouldFreezePreviewOnPointer,
       stableWikilinkTargets,
       onOpenWikilink,
       onCreateWikilinkMemory,
