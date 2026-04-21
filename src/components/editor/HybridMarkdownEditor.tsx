@@ -20,7 +20,11 @@ import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/lang
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
-import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
+import {
+  applyLinePrefixToggle,
+  insertMarkdownLink,
+  normalizeMarkdownInlineRange,
+} from "./editorCommands";
 import {
   getActivePreviewLineNumbers,
 } from "./editorPreviewState";
@@ -825,7 +829,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 function applyToggleMark(view: EditorView, mark: string) {
   const { state } = view;
   const changes = state.changeByRange((range) => {
-    const normalized = normalizeInlineRange(state.doc, range.from, range.to);
+    const normalized = normalizeMarkdownInlineRange(state.doc, range.from, range.to);
 
     if (range.empty) {
       return {
@@ -905,7 +909,7 @@ function wrapWith(mark: string): StateCommand {
 
     const changes = state.changeByRange((range) => {
       if (range.empty) return { range };
-      const normalized = normalizeInlineRange(state.doc, range.from, range.to);
+      const normalized = normalizeMarkdownInlineRange(state.doc, range.from, range.to);
       return {
         changes: [
           { from: normalized.from, insert: mark },

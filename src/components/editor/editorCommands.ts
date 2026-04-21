@@ -86,6 +86,22 @@ export function normalizeInlineRange(doc: Text, from: number, to: number) {
   return nextTo < nextFrom ? { from, to } : { from: nextFrom, to: nextTo };
 }
 
+export function normalizeMarkdownInlineRange(doc: Text, from: number, to: number) {
+  const normalized = normalizeInlineRange(doc, from, to);
+  let nextFrom = normalized.from;
+  let nextTo = normalized.to;
+
+  while (nextFrom < nextTo && /[ \t]/.test(doc.sliceString(nextFrom, nextFrom + 1))) {
+    nextFrom += 1;
+  }
+
+  while (nextTo > nextFrom && /[ \t]/.test(doc.sliceString(nextTo - 1, nextTo))) {
+    nextTo -= 1;
+  }
+
+  return nextTo < nextFrom ? normalized : { from: nextFrom, to: nextTo };
+}
+
 export function applyLinePrefixToggle(view: EditorView, prefix: string) {
   const { state } = view;
   const lineNumbers = new Set<number>();

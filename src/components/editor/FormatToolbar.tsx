@@ -25,7 +25,7 @@ import {
   applyLinePrefixToggle,
   insertFencedCodeBlock,
   insertMarkdownLink,
-  normalizeInlineRange,
+  normalizeMarkdownInlineRange,
 } from "./editorCommands";
 
 interface Props {
@@ -36,7 +36,7 @@ interface Props {
 function wrapSelection(view: EditorView, mark: string, placeholder = "") {
   const { state } = view;
   const changes = state.changeByRange((range) => {
-    const normalized = normalizeInlineRange(state.doc, range.from, range.to);
+    const normalized = normalizeMarkdownInlineRange(state.doc, range.from, range.to);
     const text = state.sliceDoc(normalized.from, normalized.to) || placeholder;
     const inserted = `${mark}${text}${mark}`;
     return {

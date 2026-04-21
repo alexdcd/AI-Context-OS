@@ -1,7 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Text } from "@codemirror/state";
-import { getFencedCodeBlockInsertion } from "../src/components/editor/editorCommands.ts";
+import {
+  getFencedCodeBlockInsertion,
+  normalizeMarkdownInlineRange,
+} from "../src/components/editor/editorCommands.ts";
+
+test("markdown inline range trims surrounding spaces before adding marks", () => {
+  const doc = Text.of([" texto "]);
+
+  assert.deepEqual(normalizeMarkdownInlineRange(doc, 0, 7), { from: 1, to: 6 });
+});
+
+test("markdown inline range skips list prefix and trims item text spaces", () => {
+  const doc = Text.of(["-  texto "]);
+
+  assert.deepEqual(normalizeMarkdownInlineRange(doc, 0, 9), { from: 3, to: 8 });
+});
 
 test("fenced code block insertion wraps selected text", () => {
   const doc = Text.of(["texto"]);
