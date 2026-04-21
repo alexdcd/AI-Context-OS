@@ -166,6 +166,23 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
       fontWeight: "700",
     },
+    ".cm-link-preview": {
+      color: "var(--accent)",
+      textDecoration: "underline",
+      textDecorationThickness: "0.08em",
+      textUnderlineOffset: "0.18em",
+      cursor: "pointer",
+    },
+    ".cm-link-preview::after": {
+      content: '"↗"',
+      display: "inline-block",
+      marginLeft: "0.16em",
+      fontSize: "0.72em",
+      lineHeight: "1",
+      verticalAlign: "text-top",
+      color: "color-mix(in srgb, var(--accent) 76%, var(--text-2))",
+      pointerEvents: "none",
+    },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
     },
@@ -761,7 +778,6 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 
         const activeLines = new Set(getActivePreviewLineNumbers(state, revealSyntaxOnActiveLine));
 
-        const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
         const decos: { from: number; to: number; deco: Decoration }[] = [];
 
         for (const { from, to } of view.visibleRanges) {
@@ -800,12 +816,31 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                 const firstChild = node.node.firstChild;
                 const lastChild = node.node.lastChild;
                 if (firstChild && lastChild) {
+                  let urlText = "";
+                  let child = node.node.firstChild;
+                  while (child) {
+                    if (child.name === "URL") {
+                      urlText = state
+                        .sliceDoc(child.from, child.to)
+                        .replace(/^[(<]/, "")
+                        .replace(/[)>]$/, "");
+                      break;
+                    }
+                    child = child.nextSibling;
+                  }
                   const textFrom = firstChild.to;
                   const textTo =
                     firstChild.nextSibling?.name === "LinkMark"
                       ? firstChild.nextSibling.from
                       : lastChild.from;
-                  if (textTo > textFrom) {
+                  if (textTo > textFrom && urlText) {
+                    const linkPreviewMark = Decoration.mark({
+                      class: "cm-link-preview",
+                      attributes: {
+                        "data-link-url": urlText,
+                        title: urlText,
+                      },
+                    });
                     decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
                   }
                 }
@@ -957,8 +992,45 @@ const turndownService = new TurndownService({
   strongDelimiter: "**",
 });
 
-function createDomHandlers(editable: boolean) {
+function selectionIsRange(state: EditorView["state"]) {
+  return state.selection.ranges.some((range) => !range.empty);
+}
+
+function createDomHandlers(editable: boolean, onOpenWikilink?: (id: string) => void) {
   return EditorView.domEventHandlers({
+    click(event, view) {
+      if (event.button !== 0 || event.detail !== 1 || selectionIsRange(view.state)) {
+        return false;
+      }
+
+      const target = getEventTargetElement(event.target);
+      if (!target) return false;
+
+      const wikilinkElement = target.closest(".cm-wikilink-chip[data-wikilink-target]");
+      if (wikilinkElement instanceof HTMLElement) {
+        const targetId = wikilinkElement.dataset.wikilinkTarget;
+        if (targetId && onOpenWikilink) {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenWikilink(targetId);
+          return true;
+        }
+      }
+
+      const linkElement = target.closest(".cm-link-preview[data-link-url]");
+      if (linkElement instanceof HTMLElement) {
+        const url = linkElement.dataset.linkUrl;
+        if (url) {
+          event.preventDefault();
+          event.stopPropagation();
+          open(url).catch(console.error);
+          return true;
+        }
+      }
+
+      return false;
+    },
+
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
       if (event.detail >= 2) return false;
@@ -1064,7 +1136,7 @@ export function HybridMarkdownEditor({
       history(),
       keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      createDomHandlers(editable),
+      createDomHandlers(editable, onOpenWikilink),
     ],
     [
       themeVariant,

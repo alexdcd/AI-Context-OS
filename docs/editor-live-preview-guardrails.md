@@ -32,6 +32,7 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - task checkbox decoration is intentionally kept separate from that fallback because it has behaved well so far
 - editable line decorations must not add margins, fake heights, or generated text before source content; use paint-only styles such as color, background, and inset box-shadows for blockquote/code/table chrome
 - fenced code `CodeInfo` is only safe to hide when the block has real `CodeText`; if a user writes text on the opening fence line, CodeMirror classifies that text as `CodeInfo`, and hiding it makes the block look empty
+- external links and wikilinks stay clickable through `Decoration.mark` attributes plus editor DOM handlers; do not bring back `Decoration.replace` link widgets in editable mode just to add an icon or click target
 - validate on real `.md` pages, not only isolated checklist examples
 - compare against `main` if the editor starts showing raw syntax outside the active paragraph
 
