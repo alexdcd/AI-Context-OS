@@ -28,6 +28,9 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - avoid overlapping `Decoration.replace`, `Decoration.mark`, and `Decoration.widget` ranges on task lines unless the behavior is verified manually
 - keep inline marker hiding on `Decoration.mark`; do not replace source text inside editable live preview
 - do not use `display: none` for editable hidden tokens; phase 5 collapses token width with monospace `1px` text and `letter-spacing: -1ch` while keeping source text in DOM flow
+- regular/ordered list markers keep the raw source marker visible with subtle styling, while inline syntax inside list text still uses live preview; wrapped list lines were the first place where hidden marker geometry caused click/drag hit-testing regressions
+- task checkbox decoration is intentionally kept separate from that fallback because it has behaved well so far
+- editable line decorations must not add margins, fake heights, or generated text before source content; use paint-only styles such as color, background, and inset box-shadows for blockquote/code/table chrome
 - validate on real `.md` pages, not only isolated checklist examples
 - compare against `main` if the editor starts showing raw syntax outside the active paragraph
 

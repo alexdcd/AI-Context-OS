@@ -4,8 +4,11 @@ import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
+  getVisibleListMarkerDecoration,
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
+  listSourceMarkerMark,
+  shouldKeepListMarkerVisible,
   shouldHideMarkdownNode,
   shouldRenderReplacePreviewWidget,
 } from "../src/components/editor/editorLivePreview.ts";
@@ -24,6 +27,25 @@ function collectNodeNames(doc: string) {
   });
 
   return names;
+}
+
+function findNode(doc: string, nodeName: string) {
+  const state = EditorState.create({
+    doc,
+    extensions: [markdown({ base: markdownLanguage })],
+  });
+  let found: { parent: { name: string; parent: any } | null } | null = null;
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (!found && node.name === nodeName) {
+        found = node.node;
+      }
+    },
+  });
+
+  assert.ok(found, `Expected ${nodeName} in test document`);
+  return found;
 }
 
 test("hidden markdown syntax uses a mark decoration instead of a replace decoration", () => {
@@ -53,6 +75,20 @@ test("always-hidden markdown markers stay hidden even on the active line", () =>
 test("inline syntax markers are only hidden when the line is inactive", () => {
   assert.equal(shouldHideMarkdownNode("StrongEmphasisMark", false), true);
   assert.equal(shouldHideMarkdownNode("StrongEmphasisMark", true), false);
+});
+
+test("list source markers stay visible while inline list syntax can still preview", () => {
+  const listMark = findNode("- **bold** item", "ListMark");
+  const taskListMark = findNode("- [ ] task", "ListMark");
+  const taskMarker = findNode("- [ ] task", "TaskMarker");
+  const emphasisMark = findNode("- **bold** item", "EmphasisMark");
+
+  assert.equal(shouldKeepListMarkerVisible("ListMark", listMark), true);
+  assert.equal(getVisibleListMarkerDecoration("ListMark", listMark), listSourceMarkerMark);
+  assert.equal(shouldKeepListMarkerVisible("ListMark", taskListMark), false);
+  assert.equal(shouldKeepListMarkerVisible("TaskMarker", taskMarker), false);
+  assert.equal(shouldKeepListMarkerVisible("EmphasisMark", emphasisMark), false);
+  assert.equal(shouldHideMarkdownNode("EmphasisMark", false), true);
 });
 
 test("live preview hiding covers the marker node names emitted by CodeMirror markdown", () => {

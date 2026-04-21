@@ -37,6 +37,7 @@ import {
   hiddenSyntaxStyle,
   shouldRenderReplacePreviewWidget,
   shouldHideMarkdownNode,
+  getVisibleListMarkerDecoration,
 } from "./editorLivePreview";
 import {
   createWikilinkExtensions,
@@ -155,6 +156,11 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-hidden-syntax *": {
       ...hiddenSyntaxStyle,
     },
+    ".cm-list-source-marker": {
+      color: "var(--accent) !important",
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      fontWeight: "700",
+    },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
     },
@@ -165,7 +171,7 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       letterSpacing: "-0.025em",
       paddingTop: "0.75em",
       paddingBottom: "0.32em",
-      borderBottom: preset.headingBorderStrong,
+      boxShadow: `inset 0 -${preset.headingBorderStrong.startsWith("2px") ? "2px" : "1px"} 0 color-mix(in srgb, var(--accent) 16%, var(--border))`,
     },
     ".cm-line.cm-h2": {
       fontSize: preset.heading2Size,
@@ -174,7 +180,7 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       color: preset.heading2Color,
       paddingTop: "0.65em",
       paddingBottom: "0.22em",
-      borderBottom: preset.headingBorderSoft,
+      boxShadow: "inset 0 -1px 0 color-mix(in srgb, var(--accent) 12%, var(--border))",
     },
     ".cm-line.cm-h3": {
       fontSize: "1.24em",
@@ -199,54 +205,33 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       letterSpacing: "0.04em",
     },
     ".cm-line.cm-blockquote": {
-      marginLeft: "0.1rem",
-      paddingLeft: "0.95rem",
-      borderLeft: "3px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
       color: "var(--text-1)",
       backgroundColor: "color-mix(in srgb, var(--accent-muted) 55%, transparent)",
+      boxShadow: "inset 3px 0 0 color-mix(in srgb, var(--accent) 28%, var(--border))",
     },
     ".cm-line.cm-bullet-item": {
       position: "relative",
-      paddingLeft: "1.15rem",
     },
     ".cm-line.cm-list-depth-1": {
       marginLeft: "0",
     },
     ".cm-line.cm-list-depth-2": {
-      marginLeft: "1rem",
+      marginLeft: "0",
     },
     ".cm-line.cm-list-depth-3": {
-      marginLeft: "2rem",
+      marginLeft: "0",
     },
     ".cm-line.cm-list-depth-4": {
-      marginLeft: "3rem",
+      marginLeft: "0",
     },
     ".cm-line.cm-bullet-item::before": {
-      content: '""',
-      position: "absolute",
-      left: "0.2rem",
-      top: "0.9em",
-      width: "0.36rem",
-      height: "0.36rem",
-      borderRadius: "999px",
-      backgroundColor: "color-mix(in srgb, var(--text-1) 88%, transparent)",
-      transform: "translateY(-50%)",
+      content: "none",
     },
     ".cm-line.cm-ordered-item": {
       position: "relative",
-      paddingLeft: "2rem",
     },
     ".cm-line.cm-ordered-item::before": {
-      content: "attr(data-list-index) '.'",
-      position: "absolute",
-      left: "0",
-      top: "0.12rem",
-      width: "1.5rem",
-      color: "var(--text-2)",
-      fontSize: "0.88em",
-      fontWeight: "700",
-      textAlign: "right",
-      fontVariantNumeric: "tabular-nums",
+      content: "none",
     },
     ".cm-line.cm-task-item": {
       position: "relative",
@@ -283,81 +268,60 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     },
     ".cm-line.cm-codeblock": {
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
-      fontSize: "0.92em",
       backgroundColor: "color-mix(in srgb, var(--bg-2) 92%, transparent)",
       color: "var(--text-0)",
-      paddingLeft: "0.95rem",
-      paddingRight: "0.95rem",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-codeblock-start": {
-      marginTop: "0.7rem",
-      paddingTop: "0.55rem",
       borderTopLeftRadius: "14px",
       borderTopRightRadius: "14px",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       color: "var(--text-2)",
-      fontSize: "0.76em",
-      letterSpacing: "0.06em",
-      textTransform: "uppercase",
+      boxShadow:
+        "inset 1px 1px 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-codeblock-start::before": {
-      content: "attr(data-code-language)",
+      content: "none",
     },
     ".cm-line.cm-codeblock-body": {
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-codeblock-end": {
-      paddingBottom: "0.55rem",
       borderBottomLeftRadius: "14px",
       borderBottomRightRadius: "14px",
-      borderBottom: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       color: "var(--text-2)",
-      fontSize: "0.76em",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-hr": {
-      height: "0",
-      paddingTop: "1rem",
-      marginTop: "0.4rem",
-      marginBottom: "1.1rem",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 88%, transparent)",
+      color: "transparent",
+      boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--border) 88%, transparent)",
     },
     ".cm-line.cm-table-header, .cm-line.cm-table-row": {
-      paddingLeft: "0.75rem",
-      paddingRight: "0.75rem",
       backgroundColor: "color-mix(in srgb, var(--bg-2) 78%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
-      fontSize: "0.92em",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-table-header": {
-      marginTop: "0.7rem",
-      paddingTop: "0.55rem",
-      paddingBottom: "0.45rem",
       fontWeight: "700",
       borderTopLeftRadius: "12px",
       borderTopRightRadius: "12px",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      boxShadow:
+        "inset 1px 1px 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-table-separator": {
-      height: "0",
-      paddingTop: "0",
-      marginBottom: "0",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      color: "transparent",
       backgroundColor: "color-mix(in srgb, var(--bg-2) 78%, transparent)",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset 0 1px 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-table-row:last-of-type": {
-      borderBottom: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       borderBottomLeftRadius: "12px",
       borderBottomRightRadius: "12px",
-      paddingBottom: "0.55rem",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
   });
 }
@@ -799,8 +763,14 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
             enter(node) {
               const line = state.doc.lineAt(node.from).number;
               const lineIsActive = activeLines.has(line);
+              const visibleListMarkerDecoration = getVisibleListMarkerDecoration(
+                node.name,
+                node.node,
+              );
 
-              if (shouldHideMarkdownNode(node.name, lineIsActive)) {
+              if (visibleListMarkerDecoration) {
+                decos.push({ from: node.from, to: node.to, deco: visibleListMarkerDecoration });
+              } else if (shouldHideMarkdownNode(node.name, lineIsActive)) {
                 decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
               } else if (
                 shouldRenderReplacePreviewWidget(editable, lineIsActive)

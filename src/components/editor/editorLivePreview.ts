@@ -19,6 +19,7 @@ export const ACTIVE_LINE_HIDDEN_MARKERS = [
 ] as const;
 
 export const hiddenSyntaxMark = Decoration.mark({ class: "cm-hidden-syntax" });
+export const listSourceMarkerMark = Decoration.mark({ class: "cm-list-source-marker" });
 
 export const hiddenSyntaxStyle = {
   color: "transparent !important",
@@ -49,4 +50,51 @@ export function shouldHideMarkdownNode(nodeName: string, lineIsActive: boolean) 
   return ACTIVE_LINE_HIDDEN_MARKERS.includes(
     nodeName as (typeof ACTIVE_LINE_HIDDEN_MARKERS)[number],
   );
+}
+
+export function isInsideMarkdownListItem(node: { parent: { name: string; parent: any } | null }) {
+  let current = node.parent;
+  while (current) {
+    if (current.name === "ListItem") {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function listItemHasTask(node: { parent: { name: string; firstChild?: any; parent: any } | null }) {
+  let current = node.parent;
+  while (current && current.name !== "ListItem") {
+    current = current.parent;
+  }
+  if (!current) return false;
+
+  for (let child = current.firstChild; child; child = child.nextSibling) {
+    if (child.name === "Task") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function shouldKeepListMarkerVisible(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any; parent: any } | null },
+) {
+  return nodeName === "ListMark"
+    && isInsideMarkdownListItem(node)
+    && !listItemHasTask(node);
+}
+
+export function getVisibleListMarkerDecoration(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any; parent: any } | null },
+) {
+  if (!shouldKeepListMarkerVisible(nodeName, node)) {
+    return null;
+  }
+
+  return listSourceMarkerMark;
 }
