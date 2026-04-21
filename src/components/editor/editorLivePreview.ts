@@ -22,6 +22,9 @@ export const hiddenSyntaxMark = Decoration.mark({ class: "cm-hidden-syntax" });
 
 export const hiddenSyntaxStyle = {
   color: "transparent !important",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important",
+  fontSize: "1px !important",
+  letterSpacing: "-1ch !important",
 } as const;
 
 /**

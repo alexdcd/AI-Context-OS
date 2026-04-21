@@ -31,13 +31,17 @@ test("hidden markdown syntax uses a mark decoration instead of a replace decorat
   assert.equal(hiddenSyntaxMark.spec.class, "cm-hidden-syntax");
 });
 
-test("hidden markdown syntax preserves text metrics for native selection", () => {
+test("hidden markdown syntax collapses tokens without removing them from editable flow", () => {
   assert.equal(hiddenSyntaxStyle.color, "transparent !important");
+  assert.equal(
+    hiddenSyntaxStyle.fontFamily,
+    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important",
+  );
+  assert.equal(hiddenSyntaxStyle.fontSize, "1px !important");
+  assert.equal(hiddenSyntaxStyle.letterSpacing, "-1ch !important");
   assert.equal("display" in hiddenSyntaxStyle, false);
   assert.equal("visibility" in hiddenSyntaxStyle, false);
-  assert.equal("fontSize" in hiddenSyntaxStyle, false);
   assert.equal("lineHeight" in hiddenSyntaxStyle, false);
-  assert.equal("letterSpacing" in hiddenSyntaxStyle, false);
   assert.equal("wordSpacing" in hiddenSyntaxStyle, false);
 });
 

@@ -152,6 +152,9 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-hidden-syntax": {
       ...hiddenSyntaxStyle,
     },
+    ".cm-hidden-syntax *": {
+      ...hiddenSyntaxStyle,
+    },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
     },

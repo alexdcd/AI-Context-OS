@@ -27,6 +27,7 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - preserve the existing marker-hiding flow used in `main`
 - avoid overlapping `Decoration.replace`, `Decoration.mark`, and `Decoration.widget` ranges on task lines unless the behavior is verified manually
 - keep inline marker hiding on `Decoration.mark`; do not replace source text inside editable live preview
+- do not use `display: none` for editable hidden tokens; phase 5 collapses token width with monospace `1px` text and `letter-spacing: -1ch` while keeping source text in DOM flow
 - validate on real `.md` pages, not only isolated checklist examples
 - compare against `main` if the editor starts showing raw syntax outside the active paragraph
 
