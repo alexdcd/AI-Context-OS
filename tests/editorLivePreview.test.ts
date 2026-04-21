@@ -1,11 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { EditorState } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
   shouldHideMarkdownNode,
   shouldRenderReplacePreviewWidget,
 } from "../src/components/editor/editorLivePreview.ts";
+
+function collectNodeNames(doc: string) {
+  const state = EditorState.create({
+    doc,
+    extensions: [markdown({ base: markdownLanguage })],
+  });
+  const names = new Set<string>();
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      names.add(node.name);
+    },
+  });
+
+  return names;
+}
 
 test("hidden markdown syntax uses a mark decoration instead of a replace decoration", () => {
   assert.equal((hiddenSyntaxMark as { isReplace?: boolean }).isReplace, undefined);
@@ -30,6 +49,30 @@ test("always-hidden markdown markers stay hidden even on the active line", () =>
 test("inline syntax markers are only hidden when the line is inactive", () => {
   assert.equal(shouldHideMarkdownNode("StrongEmphasisMark", false), true);
   assert.equal(shouldHideMarkdownNode("StrongEmphasisMark", true), false);
+});
+
+test("live preview hiding covers the marker node names emitted by CodeMirror markdown", () => {
+  const names = collectNodeNames([
+    "# Heading",
+    "",
+    "This is **bold** and *italic* with [a link](https://example.com).",
+    "- [ ] task",
+    "> quote",
+  ].join("\n"));
+
+  assert.equal(names.has("HeaderMark"), true);
+  assert.equal(names.has("EmphasisMark"), true);
+  assert.equal(names.has("LinkMark"), true);
+  assert.equal(names.has("ListMark"), true);
+  assert.equal(names.has("TaskMarker"), true);
+  assert.equal(names.has("QuoteMark"), true);
+
+  assert.equal(shouldHideMarkdownNode("HeaderMark", false), true);
+  assert.equal(shouldHideMarkdownNode("EmphasisMark", false), true);
+  assert.equal(shouldHideMarkdownNode("LinkMark", false), true);
+  assert.equal(shouldHideMarkdownNode("ListMark", false), true);
+  assert.equal(shouldHideMarkdownNode("TaskMarker", false), true);
+  assert.equal(shouldHideMarkdownNode("QuoteMark", false), true);
 });
 
 test("replace-based preview widgets stay disabled while the editor is editable", () => {

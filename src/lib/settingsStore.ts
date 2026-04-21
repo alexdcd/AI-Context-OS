@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useEffect } from "react";
 import { applyCustomThemeCss, clearCustomTheme, loadCustomThemeById } from "./themeLoader";
+import { migrateSettingsStore } from "./settingsMigration";
 
 export type Theme = "dark" | "light" | "system";
 export type Language = "en" | "es";
@@ -76,6 +77,8 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: "obs-settings",
+      version: 1,
+      migrate: migrateSettingsStore,
     }
   )
 );

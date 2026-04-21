@@ -51,6 +51,8 @@ The settings toggle owns the raw-vs-preview contract:
 
 `ChatPanel` intentionally passes `showSyntax={true}` with `editable={false}` while live preview is being stabilized. Keep chat in that conservative mode unless its read-only preview behavior is explicitly reviewed.
 
+`settingsStore` version 1 deliberately migrates legacy persisted `showMarkdownSyntax` values back to `false`. This gives users the restored live-preview baseline after the period where the global presentation switch made raw syntax visible regardless of the setting. After that migration, explicit user changes are preserved.
+
 ## Safer implementation strategy
 
 Prefer changes that do not alter the core live preview hiding logic:
