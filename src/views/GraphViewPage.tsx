@@ -69,11 +69,11 @@ const COMMUNITY_PALETTE = [
 ];
 
 const EDGE_COLORS: Record<string, string> = {
-  related: "#475569",
-  requires: "#6366f1",
-  optional: "#78716c",
-  wikilink: "#059669",
-  tag: "#7c3aed",
+  related: "#64748b",
+  requires: "#818cf8",
+  optional: "#a1a1aa",
+  wikilink: "#34d399",
+  tag: "#a78bfa",
 };
 
 function communityColor(community: number | null): string {
@@ -85,8 +85,11 @@ function cardWidth(degree: number): number {
   return 160 + Math.min(degree * 10, 80);
 }
 
-function cosmosRadius(degree: number): number {
-  return Math.max(12, Math.min(12 + Math.log(degree + 1) * 8, 34));
+/** Radius driven by importance (primary) + degree (secondary) */
+function cosmosRadius(importance: number, degree: number): number {
+  const base = 10 + importance * 14;
+  const degreeBonus = Math.log(degree + 1) * 4;
+  return Math.max(10, Math.min(base + degreeBonus, 36));
 }
 
 // ---------------------------------------------------------------------------
@@ -236,44 +239,8 @@ const CardsNode = memo(function CardsNode({ data }: { data: NodeData }) {
 });
 
 // ---------------------------------------------------------------------------
-// Star SVG for structural nodes (system_role = rule | skill)
-// ---------------------------------------------------------------------------
-
-function StarShape({ size, color, borderColor, borderWidth }: {
-  size: number;
-  color: string;
-  borderColor: string;
-  borderWidth: number;
-}) {
-  const spikes = 8;
-  const outerR = size / 2;
-  const innerR = outerR * 0.55;
-  const cx = outerR;
-  const cy = outerR;
-
-  const points: string[] = [];
-  for (let i = 0; i < spikes * 2; i++) {
-    const r = i % 2 === 0 ? outerR : innerR;
-    const angle = (i * Math.PI) / spikes - Math.PI / 2;
-    points.push(`${cx + Math.cos(angle) * r},${cy + Math.sin(angle) * r}`);
-  }
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="graph-cosmos-star">
-      <polygon
-        points={points.join(" ")}
-        fill={color}
-        stroke={borderColor}
-        strokeWidth={borderWidth}
-        strokeLinejoin="round"
-      />
-      <circle cx={cx} cy={cy} r={innerR * 0.4} fill="rgba(0,0,0,0.3)" />
-    </svg>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Cosmos node — reads hover state from context (no re-render cascade)
+// Size driven by importance; high-importance nodes get a luminous ring
 // ---------------------------------------------------------------------------
 
 const CosmosNode = memo(function CosmosNode({ data }: { data: NodeData }) {
@@ -290,17 +257,18 @@ const CosmosNode = memo(function CosmosNode({ data }: { data: NodeData }) {
   const isNeighbor = firstDegree.has(gn.id) && !isFocus;
   const isBg = hasHover && !isFocus && !isNeighbor;
 
-  const isStar = !!gn.system_role;
-  const r = cosmosRadius(gn.degree);
-  const starBonus = isStar ? 4 : 0;
-  const diam = (r + starBonus) * 2;
+  const isHighImportance = gn.importance >= 0.7;
+  const r = cosmosRadius(gn.importance, gn.degree);
+  const diam = r * 2;
 
+  const borderWidth = isFocus ? 2.5 : isNeighbor ? 1.5 : isHighImportance ? 1.5 : 0.8;
   const borderColor = isFocus
     ? "rgba(255,255,255,0.85)"
     : isNeighbor
       ? "rgba(255,255,255,0.35)"
-      : "rgba(255,255,255,0.06)";
-  const borderWidth = isFocus ? 2 : isNeighbor ? 1.5 : 0.8;
+      : isHighImportance
+        ? `${color}90`
+        : "rgba(255,255,255,0.06)";
 
   const shadow = isGod
     ? `0 0 0 2px #ef4444, 0 0 18px ${color}70`
@@ -308,7 +276,9 @@ const CosmosNode = memo(function CosmosNode({ data }: { data: NodeData }) {
       ? `0 0 20px ${color}80, 0 0 6px ${color}`
       : isNeighbor
         ? `0 0 12px ${color}50`
-        : `0 0 4px ${color}25`;
+        : isHighImportance
+          ? `0 0 10px ${color}40, 0 0 3px ${color}30`
+          : `0 0 4px ${color}20`;
 
   return (
     <div
@@ -320,29 +290,25 @@ const CosmosNode = memo(function CosmosNode({ data }: { data: NodeData }) {
         zIndex: isFocus ? 20 : isNeighbor ? 10 : 1,
       }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
-      <div className="flex justify-center" style={{ filter: `drop-shadow(${shadow.split(",").pop()?.trim() ?? "none"})` }}>
-        {isStar ? (
-          <StarShape
-            size={diam}
-            color={color}
-            borderColor={borderColor}
-            borderWidth={borderWidth}
-          />
-        ) : (
-          <div
-            className="graph-cosmos-circle"
-            style={{
-              width: diam,
-              height: diam,
-              backgroundColor: color,
-              border: `${borderWidth}px solid ${borderColor}`,
-              boxShadow: shadow,
-            }}
-          />
-        )}
+      {/* Both handles at the center of the circle so edges radiate to/from the node center */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-transparent !border-0"
+        style={{ top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 1, height: 1 }}
+      />
+      <div className="flex justify-center">
+        <div
+          className="graph-cosmos-circle"
+          style={{
+            width: diam,
+            height: diam,
+            backgroundColor: color,
+            border: `${borderWidth}px solid ${borderColor}`,
+            boxShadow: shadow,
+          }}
+        />
       </div>
-      {/* Label: hidden for background nodes */}
       {!isBg && (
         <div
           className="graph-cosmos-label"
@@ -362,7 +328,12 @@ const CosmosNode = memo(function CosmosNode({ data }: { data: NodeData }) {
           )}
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-transparent !border-0"
+        style={{ top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 1, height: 1 }}
+      />
     </div>
   );
 });
@@ -566,7 +537,7 @@ export function GraphViewPage() {
 
     const newNodes: FlowNode[] = filteredData.nodes.map((node) => {
       const isCards = viewMode === "cards";
-      const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 70);
+      const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.importance, node.degree) * 2 + 70);
       return {
         id: node.id,
         type: viewMode,

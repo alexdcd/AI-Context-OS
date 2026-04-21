@@ -235,15 +235,6 @@ textarea {
   transition: font-size 0.28s ease, color 0.28s ease, opacity 0.28s ease;
 }
 
-.graph-cosmos-star {
-  transition: filter 0.28s ease;
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.15));
-}
-
-.graph-cosmos-star polygon {
-  transition: stroke 0.28s ease, fill 0.28s ease;
-}
-
 .graph-cosmos-label-pill {
   display: inline-block;
   background: rgba(0, 0, 0, 0.5);
