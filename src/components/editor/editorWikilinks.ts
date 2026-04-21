@@ -17,8 +17,11 @@ import {
 import type { MemoryOntology } from "../../lib/types";
 import {
   getActivePreviewLineNumbers,
-  shouldRefreshActivePreviewLines,
 } from "./editorPreviewState";
+import {
+  isMouseSelecting,
+  shouldRefreshSensitivePreviewDecorations,
+} from "./editorMouseSelectingField";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
@@ -334,12 +337,16 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
+        if (isMouseSelecting(update.state)) {
+          return;
+        }
+
         if (update.docChanged || update.viewportChanged) {
           this.decorations = this.buildDecorations(update.view);
           return;
         }
 
-        if (shouldRefreshActivePreviewLines(update, options.revealSyntaxOnActiveLine)) {
+        if (shouldRefreshSensitivePreviewDecorations(update, options.revealSyntaxOnActiveLine)) {
           this.decorations = this.buildDecorations(update.view);
         }
       }

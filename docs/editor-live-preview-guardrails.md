@@ -23,10 +23,33 @@ That change was too invasive and caused `.md` pages to show raw Markdown syntax 
 When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 
 - treat `createLivePreviewPlugin()` as sensitive core rendering logic
+- keep structural decorations and live-preview hiding behind separate switches
 - preserve the existing marker-hiding flow used in `main`
 - avoid overlapping `Decoration.replace`, `Decoration.mark`, and `Decoration.widget` ranges on task lines unless the behavior is verified manually
+- keep inline marker hiding on `Decoration.mark`; do not replace source text inside editable live preview
 - validate on real `.md` pages, not only isolated checklist examples
 - compare against `main` if the editor starts showing raw syntax outside the active paragraph
+
+## Selection guard
+
+`mouseSelectingField` in `src/components/editor/editorMouseSelectingField.ts` tracks the native drag-selection cycle.
+
+- `mousedown` sets the field to `true`
+- `document` `mouseup` clears it in `requestAnimationFrame`, after native selection has settled
+- sensitive preview plugins must not rebuild decorations while the field is `true`
+- the clear effect is allowed to trigger one rebuild after mouseup
+
+Read this section before touching `drag -> mouseup` behavior. Do not remove or bypass `mouseSelectingField` as a simplification unless an equivalent automated and manual selection test replaces it.
+
+## Product wiring
+
+The settings toggle owns the raw-vs-preview contract:
+
+- `showSyntax={true}` means raw Markdown is visible everywhere
+- `showSyntax={false}` means live preview is active
+- `revealSyntaxOnActiveLine={!showMarkdownSyntax}` keeps syntax reveal aligned with preview mode in both L1 and L2 editors
+
+`ChatPanel` intentionally passes `showSyntax={true}` with `editable={false}` while live preview is being stabilized. Keep chat in that conservative mode unless its read-only preview behavior is explicitly reviewed.
 
 ## Safer implementation strategy
 

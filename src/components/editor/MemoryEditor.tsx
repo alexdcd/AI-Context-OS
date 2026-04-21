@@ -585,6 +585,7 @@ export function MemoryEditor() {
                 editable={!isProtected}
                 viewRef={editorViewRef}
                 showSyntax={showMarkdownSyntax}
+                revealSyntaxOnActiveLine={!showMarkdownSyntax}
                 wikilinkTargets={wikilinkTargets}
                 onOpenWikilink={handleOpenMemory}
                 onCreateWikilinkMemory={(draft) => void handleCreateWikilinkMemory("l2", draft)}
@@ -640,6 +641,7 @@ export function MemoryEditor() {
                         editable={!isProtected}
                         themeVariant="clean"
                         showSyntax={showMarkdownSyntax}
+                        revealSyntaxOnActiveLine={!showMarkdownSyntax}
                         wikilinkTargets={wikilinkTargets}
                         onOpenWikilink={handleOpenMemory}
                         onCreateWikilinkMemory={(draft) => void handleCreateWikilinkMemory("l1", draft)}

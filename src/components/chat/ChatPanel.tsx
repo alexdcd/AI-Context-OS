@@ -431,6 +431,7 @@ function MessageBubble({ turn }: { turn: ChatTurn }) {
               onChange={() => {}}
               editable={false}
               revealSyntaxOnActiveLine={false}
+              showSyntax={true}
             />
           </div>
         )}

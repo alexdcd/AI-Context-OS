@@ -23,11 +23,15 @@ import { useTranslation } from "react-i18next";
 import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
 import {
   getActivePreviewLineNumbers,
-  shouldRefreshActivePreviewLines,
 } from "./editorPreviewState";
 import {
   isTaskCheckboxHitOffset,
 } from "./editorMouseSelection";
+import {
+  createMouseSelectingExtension,
+  isMouseSelecting,
+  shouldRefreshSensitivePreviewDecorations,
+} from "./editorMouseSelectingField";
 import {
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
@@ -101,8 +105,12 @@ const editorThemePresets = {
   },
 } as const;
 
-function shouldUsePresentationDecorations() {
-  return false;
+function shouldUseStructuralDecorations() {
+  return true;
+}
+
+function shouldUseLivePreviewDecorations() {
+  return true;
 }
 
 function createEditorTheme(variant: keyof typeof editorThemePresets) {
@@ -410,7 +418,7 @@ function createStructuralDecorations(editable: boolean) {
       }
 
       buildDecorations(view: EditorView) {
-        if (!shouldUsePresentationDecorations()) {
+        if (!shouldUseStructuralDecorations()) {
           return new RangeSetBuilder<Decoration>().finish();
         }
 
@@ -753,6 +761,10 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
       }
 
       update(update: ViewUpdate) {
+        if (isMouseSelecting(update.state)) {
+          return;
+        }
+
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
 
         if (update.docChanged || update.viewportChanged || treeChanged) {
@@ -760,7 +772,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
           return;
         }
 
-        if (shouldRefreshActivePreviewLines(update, revealSyntaxOnActiveLine)) {
+        if (shouldRefreshSensitivePreviewDecorations(update, revealSyntaxOnActiveLine)) {
           this.decorations = this.buildDecorations(update.view);
         }
       }
@@ -768,7 +780,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
       buildDecorations(view: EditorView) {
         const builder = new RangeSetBuilder<Decoration>();
         const state = view.state;
-        if (!shouldUsePresentationDecorations()) {
+        if (!shouldUseLivePreviewDecorations()) {
           return builder.finish();
         }
 
@@ -1051,6 +1063,7 @@ export function HybridMarkdownEditor({
     () => [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
+      createMouseSelectingExtension(),
       createEditorTheme(themeVariant),
       createStructuralDecorations(editable),
       ...(showSyntax ? [] : [createLivePreviewPlugin(editable, revealSyntaxOnActiveLine)]),
