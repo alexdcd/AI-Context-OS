@@ -31,6 +31,7 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - regular/ordered list markers keep the raw source marker visible with subtle styling, while inline syntax inside list text still uses live preview; wrapped list lines were the first place where hidden marker geometry caused click/drag hit-testing regressions
 - task checkbox decoration is intentionally kept separate from that fallback because it has behaved well so far
 - editable line decorations must not add margins, fake heights, or generated text before source content; use paint-only styles such as color, background, and inset box-shadows for blockquote/code/table chrome
+- fenced code `CodeInfo` is only safe to hide when the block has real `CodeText`; if a user writes text on the opening fence line, CodeMirror classifies that text as `CodeInfo`, and hiding it makes the block look empty
 - validate on real `.md` pages, not only isolated checklist examples
 - compare against `main` if the editor starts showing raw syntax outside the active paragraph
 
@@ -44,6 +45,27 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - the clear effect is allowed to trigger one rebuild after mouseup
 
 Read this section before touching `drag -> mouseup` behavior. Do not remove or bypass `mouseSelectingField` as a simplification unless an equivalent automated and manual selection test replaces it.
+
+## Reference Implementation Notes
+
+`blueberrycongee/codemirror-live-markdown` was used as a reference, not as a dependency.
+
+Ideas adopted from that repo:
+
+- use a dedicated `mouseSelectingField` so sensitive decoration plugins skip rebuilds during native drag selection
+- keep live-preview syntax hiding as `Decoration.mark`
+- use one decision path for whether source syntax should be shown or previewed
+- treat block markers (`HeaderMark`, `ListMark`, `QuoteMark`) differently from inline markers
+- avoid generated editor widgets/replacements inside editable text while stabilizing selection
+
+Intentional differences in this app:
+
+- regular and ordered list source markers remain visible with subtle accent styling because wrapped list lines were the most fragile selection surface
+- task checkbox decoration remains in place because it has stayed stable during manual testing
+- rich `Decoration.replace` widgets remain disabled for editable preview via `shouldRenderReplacePreviewWidget(editable, lineIsActive)`
+- code block, table, quote, and horizontal-rule chrome must be paint-only on editable lines; do not add margins, fake heights, generated labels, or line-level text that is not present in the document
+
+If this is upstreamed or shared publicly, the most useful lesson is: in CodeMirror editable live preview, preserving browser hit-testing is more important than matching every read-mode visual. Paint around source text; do not move or replace it.
 
 ## Product wiring
 

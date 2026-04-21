@@ -38,6 +38,7 @@ import {
   shouldRenderReplacePreviewWidget,
   shouldHideMarkdownNode,
   getVisibleListMarkerDecoration,
+  shouldKeepCodeInfoVisible,
 } from "./editorLivePreview";
 import {
   createWikilinkExtensions,
@@ -269,9 +270,12 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-line.cm-codeblock": {
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
       backgroundColor: "color-mix(in srgb, var(--bg-2) 92%, transparent)",
-      color: "var(--text-0)",
+      color: "var(--text-0) !important",
       boxShadow:
         "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
+    },
+    ".cm-line.cm-codeblock span:not(.cm-hidden-syntax)": {
+      color: "inherit !important",
     },
     ".cm-line.cm-codeblock-start": {
       borderTopLeftRadius: "14px",
@@ -770,6 +774,8 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 
               if (visibleListMarkerDecoration) {
                 decos.push({ from: node.from, to: node.to, deco: visibleListMarkerDecoration });
+              } else if (shouldKeepCodeInfoVisible(node.name, node.node)) {
+                return;
               } else if (shouldHideMarkdownNode(node.name, lineIsActive)) {
                 decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
               } else if (

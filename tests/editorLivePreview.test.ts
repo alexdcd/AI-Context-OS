@@ -8,6 +8,7 @@ import {
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
   listSourceMarkerMark,
+  shouldKeepCodeInfoVisible,
   shouldKeepListMarkerVisible,
   shouldHideMarkdownNode,
   shouldRenderReplacePreviewWidget,
@@ -89,6 +90,15 @@ test("list source markers stay visible while inline list syntax can still previe
   assert.equal(shouldKeepListMarkerVisible("TaskMarker", taskMarker), false);
   assert.equal(shouldKeepListMarkerVisible("EmphasisMark", emphasisMark), false);
   assert.equal(shouldHideMarkdownNode("EmphasisMark", false), true);
+});
+
+test("code info stays visible when a fenced block has no code text body", () => {
+  const singleLineCodeInfo = findNode("```code block\n```", "CodeInfo");
+  const languageCodeInfo = findNode("```txt\ncode block\n```", "CodeInfo");
+
+  assert.equal(shouldKeepCodeInfoVisible("CodeInfo", singleLineCodeInfo), true);
+  assert.equal(shouldKeepCodeInfoVisible("CodeInfo", languageCodeInfo), false);
+  assert.equal(shouldHideMarkdownNode("CodeInfo", false), true);
 });
 
 test("live preview hiding covers the marker node names emitted by CodeMirror markdown", () => {

@@ -98,3 +98,20 @@ export function getVisibleListMarkerDecoration(
 
   return listSourceMarkerMark;
 }
+
+export function shouldKeepCodeInfoVisible(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any } | null },
+) {
+  if (nodeName !== "CodeInfo" || node.parent?.name !== "FencedCode") {
+    return false;
+  }
+
+  for (let child = node.parent.firstChild; child; child = child.nextSibling) {
+    if (child.name === "CodeText" && child.to > child.from) {
+      return false;
+    }
+  }
+
+  return true;
+}
