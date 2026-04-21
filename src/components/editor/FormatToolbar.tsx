@@ -21,7 +21,12 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
+import {
+  applyLinePrefixToggle,
+  insertFencedCodeBlock,
+  insertMarkdownLink,
+  normalizeInlineRange,
+} from "./editorCommands";
 
 interface Props {
   viewRef: React.MutableRefObject<EditorView | null>;
@@ -205,7 +210,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
         label: t("memoryEditor.toolbar.codeBlock"),
         keywords: ["snippet", "fenced", "code block", "bloque"],
         icon: <Code className="h-3.5 w-3.5" />,
-        run: (view) => insertBlock(view, "```\n\n```", 4),
+        run: (view) => insertFencedCodeBlock(view),
       },
       {
         key: "hr",

@@ -144,3 +144,44 @@ export function insertMarkdownLink(view: EditorView, textPlaceholder: string) {
   });
   view.focus();
 }
+
+export function getFencedCodeBlockInsertion(
+  doc: Text,
+  from: number,
+  to: number,
+  selectedText: string,
+) {
+  const startLine = doc.lineAt(from);
+  const endLine = doc.lineAt(to);
+  const prefix = from === startLine.from ? "" : "\n";
+  const suffix = to === endLine.to ? "" : "\n";
+  const body = selectedText.replace(/^\n+|\n+$/g, "");
+  const insert = `${prefix}\`\`\`\n${body}\n\`\`\`${suffix}`;
+  const bodyFrom = from + prefix.length + 4;
+  const bodyTo = bodyFrom + body.length;
+
+  return { insert, bodyFrom, bodyTo };
+}
+
+export function insertFencedCodeBlock(view: EditorView) {
+  const { state } = view;
+  const range = state.selection.main;
+  const selected = state.sliceDoc(range.from, range.to);
+  const { insert, bodyFrom, bodyTo } = getFencedCodeBlockInsertion(
+    state.doc,
+    range.from,
+    range.to,
+    selected,
+  );
+  const selection = bodyFrom === bodyTo
+    ? EditorSelection.cursor(bodyFrom)
+    : EditorSelection.range(bodyFrom, bodyTo);
+
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert },
+    selection,
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  view.focus();
+}
