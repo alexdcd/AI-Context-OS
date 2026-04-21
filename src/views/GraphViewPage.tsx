@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useCallback, useMemo, useRef, useState, memo } from "react";
 import {
   ReactFlow,
   Background,
@@ -6,6 +6,7 @@ import {
   MiniMap,
   Handle,
   Position,
+  MarkerType,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -40,23 +41,39 @@ import {
 } from "../lib/types";
 
 // ---------------------------------------------------------------------------
+// Hover context — avoids rebuilding all nodes on hover change
+// ---------------------------------------------------------------------------
+
+interface HoverCtx {
+  hoveredId: string | null;
+  firstDegree: Set<string>;
+  secondDegree: Set<string>;
+}
+
+const HoverContext = createContext<HoverCtx>({
+  hoveredId: null,
+  firstDegree: new Set(),
+  secondDegree: new Set(),
+});
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 type ViewMode = "cards" | "cosmos";
 
 const COMMUNITY_PALETTE = [
-  "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#0ea5e9", "#22c55e", "#f43f5e", "#a16207", "#0891b2",
-  "#7c3aed", "#059669",
+  "#818cf8", "#34d399", "#fbbf24", "#f87171", "#a78bfa",
+  "#38bdf8", "#4ade80", "#fb7185", "#d97706", "#22d3ee",
+  "#8b5cf6", "#10b981",
 ];
 
 const EDGE_COLORS: Record<string, string> = {
-  related: "#8a95a6",
-  requires: "#9aa8c0",
-  optional: "#9c9382",
-  wikilink: "#6d9e6d",
-  tag: "#7a6d9e",
+  related: "#475569",
+  requires: "#6366f1",
+  optional: "#78716c",
+  wikilink: "#059669",
+  tag: "#7c3aed",
 };
 
 function communityColor(community: number | null): string {
@@ -64,14 +81,12 @@ function communityColor(community: number | null): string {
   return COMMUNITY_PALETTE[community % COMMUNITY_PALETTE.length];
 }
 
-// Cards mode: width scales with degree
 function cardWidth(degree: number): number {
   return 160 + Math.min(degree * 10, 80);
 }
 
-// Cosmos mode: radius scales with degree (min 14, max 38)
 function cosmosRadius(degree: number): number {
-  return Math.max(14, Math.min(14 + degree * 5, 38));
+  return Math.max(12, Math.min(12 + Math.log(degree + 1) * 8, 34));
 }
 
 // ---------------------------------------------------------------------------
@@ -88,10 +103,6 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
   weight: number;
 }
 
-// ---------------------------------------------------------------------------
-// Create a d3-force simulation (stays alive for interactive dragging)
-// ---------------------------------------------------------------------------
-
 function createSimulation(
   gnodes: GNode[],
   gedges: GraphEdge[],
@@ -99,8 +110,8 @@ function createSimulation(
 ): { simulation: d3.Simulation<SimNode, SimLink>; simNodes: SimNode[] } {
   const simNodes: SimNode[] = gnodes.map((n, i) => ({
     id: n.id,
-    x: Math.cos(2 * Math.PI * i / gnodes.length) * 150,
-    y: Math.sin(2 * Math.PI * i / gnodes.length) * 150,
+    x: Math.cos(2 * Math.PI * i / gnodes.length) * 200 + (Math.random() - 0.5) * 40,
+    y: Math.sin(2 * Math.PI * i / gnodes.length) * 200 + (Math.random() - 0.5) * 40,
   }));
 
   const nodeSet = new Set(gnodes.map((n) => n.id));
@@ -108,26 +119,24 @@ function createSimulation(
     .filter((e) => nodeSet.has(e.source) && nodeSet.has(e.target))
     .map((e) => ({ source: e.source, target: e.target, weight: e.weight ?? 0.5 }));
 
-  const linkDist = mode === "cosmos" ? 90 : 150;
-  const charge = mode === "cosmos" ? -220 : -380;
-  const collide = mode === "cosmos" ? 52 : 95;
+  const linkDist = mode === "cosmos" ? 110 : 160;
+  const charge = mode === "cosmos" ? -280 : -400;
+  const collide = mode === "cosmos" ? 40 : 90;
 
   const simulation = d3.forceSimulation<SimNode, SimLink>(simNodes)
-    .force("link", d3.forceLink<SimNode, SimLink>(simLinks).id((d) => d.id).distance(linkDist).strength((l) => 0.25 + 0.35 * l.weight))
-    .force("charge", d3.forceManyBody().strength(charge))
-    .force("center", d3.forceCenter(0, 0))
+    .force("link", d3.forceLink<SimNode, SimLink>(simLinks).id((d) => d.id).distance(linkDist).strength((l) => 0.2 + 0.3 * l.weight))
+    .force("charge", d3.forceManyBody().strength(charge).distanceMax(500))
+    .force("center", d3.forceCenter(0, 0).strength(0.05))
     .force("collide", d3.forceCollide(collide))
-    .alphaDecay(0.02)
-    .velocityDecay(0.3);
+    .alphaDecay(0.018)
+    .velocityDecay(0.35);
 
-  // Run initial layout to convergence
-  simulation.stop().tick(300);
-
+  simulation.stop().tick(350);
   return { simulation, simNodes };
 }
 
 // ---------------------------------------------------------------------------
-// Shared node data interface
+// Node data (stable — does NOT contain hover state)
 // ---------------------------------------------------------------------------
 
 interface NodeData extends Record<string, unknown> {
@@ -135,7 +144,6 @@ interface NodeData extends Record<string, unknown> {
   colorByCommunity: boolean;
   godMode: boolean;
   godIds: Set<string>;
-  highlighted: boolean;
 }
 
 interface FlowNode {
@@ -151,35 +159,52 @@ interface FlowEdge {
   source: string;
   target: string;
   label?: string;
-  style?: { stroke?: string; strokeWidth?: number; strokeDasharray?: string };
-  labelStyle?: { fill?: string; fontSize?: number };
+  type?: string;
+  style?: Record<string, unknown>;
+  labelStyle?: Record<string, unknown>;
   animated?: boolean;
+  markerEnd?: { type: MarkerType; color?: string; width?: number; height?: number };
 }
 
 // ---------------------------------------------------------------------------
-// Cards node — detailed rectangle with metadata
+// Cards node
 // ---------------------------------------------------------------------------
 
-function CardsNode({ data }: { data: NodeData }) {
+const CardsNode = memo(function CardsNode({ data }: { data: NodeData }) {
   const { node: gn, colorByCommunity, godMode, godIds } = data;
   const { t } = useTranslation();
-  const [hovered, setHovered] = useState(false);
+  const { hoveredId, firstDegree } = useContext(HoverContext);
 
   const isGod = godMode && godIds.has(gn.id);
   const color = isGod ? "#ef4444"
     : colorByCommunity ? communityColor(gn.community)
     : (MEMORY_ONTOLOGY_COLORS[gn.ontology] ?? "#64748b");
 
+  const hasHover = !!hoveredId;
+  const isFocus = hoveredId === gn.id;
+  const isNeighbor = firstDegree.has(gn.id) && !isFocus;
+  const isBg = hasHover && !isFocus && !isNeighbor;
+
   return (
     <div
-      style={{ width: cardWidth(gn.degree), opacity: Math.max(0.4, gn.decay_score), position: "relative" }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="graph-node-card"
+      style={{
+        width: cardWidth(gn.degree),
+        opacity: isBg ? 0.18 : hasHover && !isFocus ? 0.85 : Math.max(0.5, gn.decay_score),
+        zIndex: isFocus ? 20 : isNeighbor ? 10 : 1,
+      }}
     >
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       <div
-        className="rounded border border-[var(--border)] bg-[color:var(--bg-1)] px-2.5 py-2"
-        style={isGod ? { borderColor: "#ef4444", boxShadow: "0 0 0 1px #ef444440" } : {}}
+        className="rounded-lg border bg-[color:var(--bg-1)] px-2.5 py-2"
+        style={{
+          borderColor: isFocus ? color : isNeighbor ? `${color}60` : "var(--border)",
+          boxShadow: isGod
+            ? `0 0 0 2px #ef4444, 0 0 16px #ef444440`
+            : isFocus
+              ? `0 0 0 1.5px ${color}, 0 0 20px ${color}35`
+              : "none",
+        }}
       >
         <div className="flex items-center gap-1.5">
           <span
@@ -206,106 +231,186 @@ function CardsNode({ data }: { data: NodeData }) {
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
-
-      {hovered && gn.preview && (
-        <HoverTooltip node={gn} />
-      )}
     </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Star SVG for structural nodes (system_role = rule | skill)
+// ---------------------------------------------------------------------------
+
+function StarShape({ size, color, borderColor, borderWidth }: {
+  size: number;
+  color: string;
+  borderColor: string;
+  borderWidth: number;
+}) {
+  const spikes = 8;
+  const outerR = size / 2;
+  const innerR = outerR * 0.55;
+  const cx = outerR;
+  const cy = outerR;
+
+  const points: string[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = (i * Math.PI) / spikes - Math.PI / 2;
+    points.push(`${cx + Math.cos(angle) * r},${cy + Math.sin(angle) * r}`);
+  }
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="graph-cosmos-star">
+      <polygon
+        points={points.join(" ")}
+        fill={color}
+        stroke={borderColor}
+        strokeWidth={borderWidth}
+        strokeLinejoin="round"
+      />
+      <circle cx={cx} cy={cy} r={innerR * 0.4} fill="rgba(0,0,0,0.3)" />
+    </svg>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Cosmos node — minimal circle + label (Obsidian-style)
+// Cosmos node — reads hover state from context (no re-render cascade)
 // ---------------------------------------------------------------------------
 
-function CosmosNode({ data }: { data: NodeData }) {
-  const { node: gn, colorByCommunity, godMode, godIds, highlighted } = data;
-  const [hovered, setHovered] = useState(false);
+const CosmosNode = memo(function CosmosNode({ data }: { data: NodeData }) {
+  const { node: gn, colorByCommunity, godMode, godIds } = data;
+  const { hoveredId, firstDegree } = useContext(HoverContext);
 
   const isGod = godMode && godIds.has(gn.id);
   const color = isGod ? "#ef4444"
     : colorByCommunity ? communityColor(gn.community)
     : (MEMORY_ONTOLOGY_COLORS[gn.ontology] ?? "#64748b");
 
-  const active = hovered || highlighted;
+  const hasHover = !!hoveredId;
+  const isFocus = hoveredId === gn.id;
+  const isNeighbor = firstDegree.has(gn.id) && !isFocus;
+  const isBg = hasHover && !isFocus && !isNeighbor;
+
+  const isStar = !!gn.system_role;
   const r = cosmosRadius(gn.degree);
-  const diam = r * 2;
+  const starBonus = isStar ? 4 : 0;
+  const diam = (r + starBonus) * 2;
+
+  const borderColor = isFocus
+    ? "rgba(255,255,255,0.85)"
+    : isNeighbor
+      ? "rgba(255,255,255,0.35)"
+      : "rgba(255,255,255,0.06)";
+  const borderWidth = isFocus ? 2 : isNeighbor ? 1.5 : 0.8;
+
+  const shadow = isGod
+    ? `0 0 0 2px #ef4444, 0 0 18px ${color}70`
+    : isFocus
+      ? `0 0 20px ${color}80, 0 0 6px ${color}`
+      : isNeighbor
+        ? `0 0 12px ${color}50`
+        : `0 0 4px ${color}25`;
 
   return (
     <div
+      className="graph-node-cosmos"
       style={{
-        width: diam + 80,
-        opacity: Math.max(0.35, gn.decay_score),
-        position: "relative",
-        transition: "transform 0.2s ease, opacity 0.2s ease",
-        transform: active ? "scale(1.12)" : "scale(1)",
-        zIndex: active ? 10 : 1,
+        width: diam + 70,
+        opacity: isBg ? 0.15 : hasHover && !isFocus && !isNeighbor ? 0.4 : Math.max(0.45, gn.decay_score),
+        transform: isFocus ? "scale(1.2)" : isNeighbor ? "scale(1.06)" : "scale(1)",
+        zIndex: isFocus ? 20 : isNeighbor ? 10 : 1,
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
-      {/* Circle */}
-      <div className="flex justify-center">
+      <div className="flex justify-center" style={{ filter: `drop-shadow(${shadow.split(",").pop()?.trim() ?? "none"})` }}>
+        {isStar ? (
+          <StarShape
+            size={diam}
+            color={color}
+            borderColor={borderColor}
+            borderWidth={borderWidth}
+          />
+        ) : (
+          <div
+            className="graph-cosmos-circle"
+            style={{
+              width: diam,
+              height: diam,
+              backgroundColor: color,
+              border: `${borderWidth}px solid ${borderColor}`,
+              boxShadow: shadow,
+            }}
+          />
+        )}
+      </div>
+      {/* Label: hidden for background nodes */}
+      {!isBg && (
         <div
-          className="rounded-full"
+          className="graph-cosmos-label"
           style={{
-            width: diam,
-            height: diam,
-            backgroundColor: color,
-            opacity: active ? 1 : 0.85,
-            boxShadow: isGod
-              ? `0 0 0 2px #ef4444, 0 0 12px ${color}60`
-              : active
-                ? `0 0 14px ${color}90, 0 0 4px ${color}`
-                : `0 0 8px ${color}50`,
-            transition: "box-shadow 0.25s ease, opacity 0.25s ease",
+            fontSize: isFocus ? 12 : Math.max(9, Math.min(10 + gn.degree * 0.5, 11)),
+            fontWeight: isFocus ? 600 : isNeighbor ? 500 : 400,
+            maxWidth: diam + 70,
+            color: isFocus ? "var(--text-0)" : isNeighbor ? "var(--text-1)" : "var(--text-2)",
           }}
-        />
-      </div>
-      {/* Label below circle — expands when highlighted */}
-      <div
-        className="mt-1 text-center font-medium leading-tight"
-        style={{
-          fontSize: active ? 13 : Math.max(9, Math.min(10 + gn.degree, 12)),
-          maxWidth: diam + 80,
-          overflow: active ? "visible" : "hidden",
-          display: "-webkit-box",
-          WebkitLineClamp: active ? 4 : 2,
-          WebkitBoxOrient: "vertical",
-          color: active ? "var(--text-0)" : "var(--text-1)",
-          textShadow: active ? "0 1px 6px rgba(0,0,0,0.9)" : "0 1px 3px rgba(0,0,0,0.8)",
-          transition: "font-size 0.2s ease, color 0.2s ease",
-        }}
-      >
-        {gn.label || gn.id}
-      </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
-
-      {hovered && gn.preview && (
-        <HoverTooltip node={gn} />
+        >
+          {isFocus ? (
+            <span className="graph-cosmos-label-pill">
+              {gn.label || gn.id}
+            </span>
+          ) : (
+            gn.label || gn.id
+          )}
+        </div>
       )}
+      <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-2 !h-2" />
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
-// Shared hover tooltip
+// Floating hover preview panel
 // ---------------------------------------------------------------------------
 
-function HoverTooltip({ node: gn }: { node: GNode }) {
+function HoverPreviewPanel({ node, visible }: { node: GNode | null; visible: boolean }) {
   const { t } = useTranslation();
+  if (!node) return null;
+
+  const color = MEMORY_ONTOLOGY_COLORS[node.ontology] ?? "#64748b";
+
   return (
     <div
-      className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-60 -translate-x-1/2 rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-3 py-2 shadow-lg"
+      className="pointer-events-none absolute right-3 top-3 z-50 w-64 rounded-xl border border-[var(--border)] shadow-2xl"
+      style={{
+        backgroundColor: "rgba(var(--bg-1-rgb, 15,15,20), 0.88)",
+        backdropFilter: "blur(12px)",
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0) scale(1)" : "translateY(6px) scale(0.97)",
+        transition: "opacity 0.2s ease, transform 0.2s ease",
+      }}
     >
-      <p className="text-[11px] font-medium text-[color:var(--text-0)]">{gn.label}</p>
-      <p className="mt-1 text-[10px] leading-relaxed text-[color:var(--text-2)]">
-        {gn.preview}{gn.preview.length >= 160 ? "…" : ""}
-      </p>
-      <div className="mt-1.5 flex items-center gap-2 text-[9px] text-[color:var(--text-2)]">
-        <span>{t(`ontologies.${gn.ontology}`)}</span>
-        {gn.degree > 0 && <span>{t("graph.links", { count: gn.degree })}</span>}
+      <div className="p-3">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+          <span className="truncate text-xs font-semibold text-[color:var(--text-0)]">{node.label || node.id}</span>
+        </div>
+        {node.preview && (
+          <p className="mt-2 text-[10px] leading-relaxed text-[color:var(--text-2)]">
+            {node.preview.slice(0, 200)}{node.preview.length > 200 ? "…" : ""}
+          </p>
+        )}
+        <div className="mt-2 flex items-center gap-2">
+          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: `${color}20`, color }}>
+            {t(`ontologies.${node.ontology}`)}
+          </span>
+          {node.degree > 0 && (
+            <span className="rounded-full bg-[color:var(--bg-2)] px-1.5 py-0.5 text-[9px] text-[color:var(--text-2)]">
+              {node.degree} links
+            </span>
+          )}
+          <span className="ml-auto text-[9px] text-[color:var(--text-2)]">
+            ⚡ {node.importance.toFixed(1)}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -317,18 +422,18 @@ const nodeTypes = {
 };
 
 // ---------------------------------------------------------------------------
-// View mode switcher button group
+// View mode toggle
 // ---------------------------------------------------------------------------
 
 function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
   const { t } = useTranslation();
   return (
-    <div className="flex rounded border border-[var(--border)] overflow-hidden">
+    <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
       <button
         type="button"
         onClick={() => onChange("cards")}
         className={clsx(
-          "flex items-center gap-1 px-2 py-1 text-[10px] transition-colors",
+          "flex items-center gap-1 px-2.5 py-1 text-[10px] transition-all",
           mode === "cards"
             ? "bg-[color:var(--accent)] text-white"
             : "bg-[color:var(--bg-2)] text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
@@ -342,7 +447,7 @@ function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: View
         type="button"
         onClick={() => onChange("cosmos")}
         className={clsx(
-          "flex items-center gap-1 px-2 py-1 text-[10px] transition-colors border-l border-[var(--border)]",
+          "flex items-center gap-1 px-2.5 py-1 text-[10px] transition-all border-l border-[var(--border)]",
           mode === "cosmos"
             ? "bg-[color:var(--accent)] text-white"
             : "bg-[color:var(--bg-2)] text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
@@ -386,6 +491,8 @@ export function GraphViewPage() {
   const simNodeMapRef = useRef<Map<string, SimNode>>(new Map());
   const draggedNodeIdRef = useRef<string | null>(null);
   const frameRef = useRef<number | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hoverPreviewNode, setHoverPreviewNode] = useState<GNode | null>(null);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
@@ -414,9 +521,7 @@ export function GraphViewPage() {
   useEffect(() => {
     if (!graphData || !selectedNode) return;
     const nextSelectedNode = graphData.nodes.find((n) => n.id === selectedNode.id) ?? null;
-    if (nextSelectedNode !== selectedNode) {
-      setSelectedNode(nextSelectedNode);
-    }
+    if (nextSelectedNode !== selectedNode) setSelectedNode(nextSelectedNode);
   }, [graphData, selectedNode]);
 
   const backlinksMap = useMemo(() => {
@@ -434,57 +539,104 @@ export function GraphViewPage() {
     return map;
   }, [graphData]);
 
-  // Compute which node IDs are neighbors of the hovered node
-  const highlightedIds = useMemo<Set<string>>(() => {
-    if (!hoveredNodeId) return new Set();
-    const ids = new Set<string>([hoveredNodeId]);
+  // ---------- Hover emphasis sets (for context + edge styling) ----------
+  const hoverCtx = useMemo<HoverCtx>(() => {
+    const first = new Set<string>();
+    const second = new Set<string>();
+    if (!hoveredNodeId) return { hoveredId: null, firstDegree: first, secondDegree: second };
+    first.add(hoveredNodeId);
     for (const e of filteredData.edges) {
-      if (e.source === hoveredNodeId) ids.add(e.target);
-      if (e.target === hoveredNodeId) ids.add(e.source);
+      if (e.source === hoveredNodeId) first.add(e.target);
+      if (e.target === hoveredNodeId) first.add(e.source);
     }
-    return ids;
+    for (const neighborId of first) {
+      if (neighborId === hoveredNodeId) continue;
+      for (const e of filteredData.edges) {
+        const otherId = e.source === neighborId ? e.target : e.target === neighborId ? e.source : null;
+        if (otherId && !first.has(otherId)) second.add(otherId);
+      }
+    }
+    return { hoveredId: hoveredNodeId, firstDegree: first, secondDegree: second };
   }, [hoveredNodeId, filteredData.edges]);
 
-  // Build flow nodes/edges from simulation positions
+  // ---------- Build flow data (only on layout/filter/color changes, NOT hover) ----------
   const buildFlowData = useCallback((simNodes: SimNode[]) => {
     const positions: Record<string, { x: number; y: number }> = {};
     for (const n of simNodes) positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
 
     const newNodes: FlowNode[] = filteredData.nodes.map((node) => {
       const isCards = viewMode === "cards";
-      const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 80);
+      const w = isCards ? cardWidth(node.degree) : (cosmosRadius(node.degree) * 2 + 70);
       return {
         id: node.id,
         type: viewMode,
         position: positions[node.id] ?? { x: 0, y: 0 },
         style: { width: w },
-        data: { node, colorByCommunity, godMode, godIds, highlighted: highlightedIds.has(node.id) },
+        data: { node, colorByCommunity, godMode, godIds },
       };
     });
 
-    const newEdges: FlowEdge[] = filteredData.edges.map((edge, i) => {
-      const isHighlighted = highlightedIds.has(edge.source) && highlightedIds.has(edge.target);
+    return newNodes;
+  }, [filteredData, viewMode, colorByCommunity, godMode, godIds]);
+
+  // ---------- Build edges (separate, rebuilt on hover for emphasis) ----------
+  const buildEdges = useCallback((): FlowEdge[] => {
+    const hasHover = !!hoveredNodeId;
+    const { firstDegree } = hoverCtx;
+
+    return filteredData.edges.map((edge, i) => {
+      const srcConnected = firstDegree.has(edge.source);
+      const tgtConnected = firstDegree.has(edge.target);
+      const bothConnected = srcConnected && tgtConnected;
+      const oneConnected = srcConnected || tgtConnected;
+
+      let strokeColor: string;
+      let strokeWidth: number;
+      let opacity: number;
+
+      if (hasHover) {
+        if (bothConnected) {
+          strokeColor = EDGE_COLORS[edge.edge_type] ?? "#94a3b8";
+          strokeWidth = Math.max(1.5, (edge.weight ?? 0.5) * 2.5);
+          opacity = 0.85;
+        } else if (oneConnected) {
+          strokeColor = EDGE_COLORS[edge.edge_type] ?? "#475569";
+          strokeWidth = Math.max(0.8, (edge.weight ?? 0.5) * 1.5);
+          opacity = 0.25;
+        } else {
+          strokeColor = "#334155";
+          strokeWidth = 0.5;
+          opacity = 0.06;
+        }
+      } else {
+        strokeColor = EDGE_COLORS[edge.edge_type] ?? "#475569";
+        strokeWidth = viewMode === "cosmos"
+          ? Math.max(0.6, (edge.weight ?? 0.5) * 1.5)
+          : Math.max(0.8, (edge.weight ?? 0.5) * 2);
+        opacity = 0.4;
+      }
+
       return {
         id: `e-${edge.source}-${edge.target}-${i}`,
         source: edge.source,
         target: edge.target,
-        label: edge.edge_type !== "tag" ? edge.edge_type : undefined,
-        animated: edge.edge_type === "requires" || isHighlighted,
+        type: "straight",
         style: {
-          stroke: isHighlighted ? "#fff" : (EDGE_COLORS[edge.edge_type] ?? "#6b7280"),
-          strokeWidth: isHighlighted
-            ? Math.max(1.5, (edge.weight ?? 0.5) * 3)
-            : viewMode === "cosmos"
-              ? Math.max(0.5, (edge.weight ?? 0.5) * 2)
-              : Math.max(0.8, (edge.weight ?? 0.5) * 2.5),
-          strokeDasharray: edge.edge_type === "tag" && !isHighlighted ? "4 3" : undefined,
+          stroke: strokeColor,
+          strokeWidth,
+          opacity,
+          transition: "stroke 0.25s ease, stroke-width 0.25s ease, opacity 0.25s ease",
+          strokeDasharray: edge.edge_type === "tag" && !bothConnected ? "3 4" : undefined,
         },
-        labelStyle: { fill: isHighlighted ? "#fff" : "#8b9cb4", fontSize: isHighlighted ? 10 : 9 },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: strokeColor,
+          width: bothConnected && hasHover ? 14 : 10,
+          height: bothConnected && hasHover ? 14 : 10,
+        },
       };
     });
-
-    return { newNodes, newEdges };
-  }, [filteredData, viewMode, colorByCommunity, godMode, godIds, highlightedIds]);
+  }, [filteredData.edges, hoveredNodeId, hoverCtx, viewMode]);
 
   // Create simulation and run initial layout
   useEffect(() => {
@@ -509,9 +661,9 @@ export function GraphViewPage() {
     simNodesRef.current = simNodes;
     simNodeMapRef.current = new Map(simNodes.map((node) => [node.id, node]));
 
-    const { newNodes, newEdges } = buildFlowData(simNodes);
+    const newNodes = buildFlowData(simNodes);
     setNodes(newNodes);
-    setEdges(newEdges);
+    setEdges(buildEdges());
 
     simulation.on("tick", () => {
       if (frameRef.current !== null) return;
@@ -530,12 +682,7 @@ export function GraphViewPage() {
             if (flowNode.id === draggedNodeId) return flowNode;
             const nextPosition = positions.get(flowNode.id);
             if (!nextPosition) return flowNode;
-            if (
-              flowNode.position.x === nextPosition.x
-              && flowNode.position.y === nextPosition.y
-            ) {
-              return flowNode;
-            }
+            if (flowNode.position.x === nextPosition.x && flowNode.position.y === nextPosition.y) return flowNode;
             return { ...flowNode, position: nextPosition };
           }),
         );
@@ -555,62 +702,67 @@ export function GraphViewPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredData, layoutSeed, viewMode]);
 
-  // Update node data (highlight, colors) without recomputing layout
+  // Update node data (colors only, NOT hover) without recomputing layout
   useEffect(() => {
     if (simNodesRef.current.length === 0) return;
-    const { newNodes, newEdges } = buildFlowData(simNodesRef.current);
+    const newNodes = buildFlowData(simNodesRef.current);
     setNodes(newNodes);
-    setEdges(newEdges);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightedIds, colorByCommunity, godMode, godIds]);
+  }, [colorByCommunity, godMode, godIds]);
 
-  // Fit view after layout completes or when flowInstance becomes available
+  // Update edges on hover change (lightweight — only edge objects, not nodes)
+  useEffect(() => {
+    if (filteredData.edges.length === 0) return;
+    setEdges(buildEdges());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredNodeId]);
+
+  // Fit view after layout
   useEffect(() => {
     if (flowInstance && nodes.length > 0 && !layouting) {
-      requestAnimationFrame(() => flowInstance.fitView({ padding: 0.15, duration: 400 }));
+      requestAnimationFrame(() => flowInstance.fitView({ padding: 0.15, duration: 500 }));
     }
   }, [flowInstance, nodes.length, layouting]);
 
-  // --- Interactive drag: pin dragged node, reheat simulation, update positions ---
+  // --- Drag ---
   const onNodeDragStart: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const sim = simulationRef.current;
     if (!sim) return;
     draggedNodeIdRef.current = node.id;
     const simNode = simNodeMapRef.current.get(node.id);
-    if (simNode) {
-      simNode.fx = node.position.x;
-      simNode.fy = node.position.y;
-    }
+    if (simNode) { simNode.fx = node.position.x; simNode.fy = node.position.y; }
     sim.alphaTarget(0.3).restart();
   }, []);
 
   const onNodeDrag: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const simNode = simNodeMapRef.current.get(node.id);
-    if (simNode) {
-      simNode.fx = node.position.x;
-      simNode.fy = node.position.y;
-    }
+    if (simNode) { simNode.fx = node.position.x; simNode.fy = node.position.y; }
   }, []);
 
   const onNodeDragStop: OnNodeDrag<FlowNode> = useCallback((_event, node) => {
     const sim = simulationRef.current;
     if (!sim) return;
     const simNode = simNodeMapRef.current.get(node.id);
-    if (simNode) {
-      simNode.fx = null;
-      simNode.fy = null;
-    }
+    if (simNode) { simNode.fx = null; simNode.fy = null; }
     draggedNodeIdRef.current = null;
     sim.alphaTarget(0);
   }, []);
 
-  // --- Hover highlighting ---
+  // --- Hover ---
   const onNodeMouseEnter = useCallback((_event: React.MouseEvent, node: FlowNode) => {
     setHoveredNodeId(node.id);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverPreviewNode(node.data.node);
+    }, 150);
   }, []);
 
   const onNodeMouseLeave = useCallback(() => {
     setHoveredNodeId(null);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverPreviewNode(null);
+    }, 250);
   }, []);
 
   const onConnect = useCallback(
@@ -623,6 +775,7 @@ export function GraphViewPage() {
             source: connection.source!,
             target: connection.target!,
             label: edgeMode,
+            type: "straight",
             style: { stroke: EDGE_COLORS[edgeMode], strokeWidth: 1.5 },
             labelStyle: { fill: "#8b9cb4", fontSize: 9 },
           },
@@ -669,182 +822,188 @@ export function GraphViewPage() {
   }, []);
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
-        <ViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
+    <HoverContext.Provider value={hoverCtx}>
+      <div className="relative flex h-full min-h-0 flex-col">
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
+          <ViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
 
-        <span className="text-[11px] text-[color:var(--text-2)]">
-          {t("graph.nodesEdges", { nodes: filteredData.nodes.length, edges: filteredData.edges.length })}
-        </span>
+          <span className="text-[11px] text-[color:var(--text-2)]">
+            {t("graph.nodesEdges", { nodes: filteredData.nodes.length, edges: filteredData.edges.length })}
+          </span>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <select
-            value={ontologyFilter}
-            onChange={(e) => setOntologyFilter(e.target.value as MemoryOntology | "all")}
-            className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
-          >
-            <option value="all">{t("graph.filterAll")}</option>
-            {(["source", "entity", "concept", "synthesis", "unknown"] as MemoryOntology[]).map((o) => (
-              <option key={o} value={o}>{t(`ontologies.${o}`)}</option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-1">
-            <label className="text-[10px] text-[color:var(--text-2)]">{t("graph.importanceLabel")}</label>
-            <input
-              type="range" min="0" max="1" step="0.1"
-              value={minImportance}
-              onChange={(e) => setMinImportance(parseFloat(e.target.value))}
-              className="h-1 w-16 accent-[color:var(--accent)]"
-            />
-            <span className="w-5 text-right font-mono text-[10px] text-[color:var(--text-2)]">
-              {minImportance.toFixed(1)}
-            </span>
-          </div>
-
-          <select
-            value={edgeMode}
-            onChange={(e) => setEdgeMode(e.target.value as "related" | "requires" | "optional")}
-            className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
-          >
-            <option value="related">{t("graph.edgeRelated")}</option>
-            <option value="requires">{t("graph.edgeRequires")}</option>
-            <option value="optional">{t("graph.edgeOptional")}</option>
-          </select>
-
-          <button
-            type="button"
-            onClick={() => setGodMode((p) => !p)}
-            className={clsx(
-              "flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors",
-              godMode ? "bg-red-500/15 text-red-400" : "text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
-            )}
-            title={t("graph.highlightGodNodes")}
-          >
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {godMode && godIds.size > 0 && <span>{godIds.size}</span>}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setColorByCommunity((p) => !p)}
-            className={clsx(
-              "rounded p-1 transition-colors",
-              colorByCommunity
-                ? "bg-[color:var(--accent)]/10 text-[color:var(--accent)]"
-                : "text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
-            )}
-            title={colorByCommunity ? t("graph.colorByOntology") : t("graph.colorByCommunity")}
-          >
-            <Layers className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setLayoutSeed((p) => p + 1)}
-            className="rounded p-1 text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
-            title={t("graph.relayout")}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowInspector((p) => !p)}
-            className="rounded p-1 text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
-            title={showInspector ? t("graph.hideInspector") : t("graph.showInspector")}
-          >
-            {showInspector ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1">
-        {/* Canvas */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[color:var(--bg-0)]">
-          {nodes.length > 0 ? (
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onNodeClick={onNodeClick}
-              onNodeDoubleClick={onNodeDoubleClick}
-              onNodeDragStart={onNodeDragStart}
-              onNodeDrag={onNodeDrag}
-              onNodeDragStop={onNodeDragStop}
-              onNodeMouseEnter={onNodeMouseEnter}
-              onNodeMouseLeave={onNodeMouseLeave}
-              onInit={setFlowInstance}
-              nodeTypes={nodeTypes}
-              fitView
-              proOptions={{ hideAttribution: true }}
+          <div className="ml-auto flex items-center gap-1.5">
+            <select
+              value={ontologyFilter}
+              onChange={(e) => setOntologyFilter(e.target.value as MemoryOntology | "all")}
+              className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
             >
-              {viewMode === "cosmos" ? (
-                <Background color="rgba(255,255,255,0.025)" gap={32} size={1} />
-              ) : (
-                <Background color="rgba(255,255,255,0.03)" gap={24} />
-              )}
-              <Controls />
-              <MiniMap
-                nodeColor={(n) => {
-                  const nd = (n.data as NodeData | undefined)?.node;
-                  if (!nd) return "rgba(255,255,255,0.15)";
-                  return colorByCommunity
-                    ? communityColor(nd.community)
-                    : (MEMORY_ONTOLOGY_COLORS[nd.ontology] ?? "#64748b");
-                }}
-                style={{
-                  backgroundColor: "var(--bg-1)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "6px",
-                }}
+              <option value="all">{t("graph.filterAll")}</option>
+              {(["source", "entity", "concept", "synthesis", "unknown"] as MemoryOntology[]).map((o) => (
+                <option key={o} value={o}>{t(`ontologies.${o}`)}</option>
+              ))}
+            </select>
+
+            <div className="flex items-center gap-1">
+              <label className="text-[10px] text-[color:var(--text-2)]">{t("graph.importanceLabel")}</label>
+              <input
+                type="range" min="0" max="1" step="0.1"
+                value={minImportance}
+                onChange={(e) => setMinImportance(parseFloat(e.target.value))}
+                className="h-1 w-16 accent-[color:var(--accent)]"
               />
-            </ReactFlow>
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center text-[color:var(--text-2)]">
-              <Network className="mb-3 h-8 w-8" />
-              <p className="text-xs">{t("graph.noNodes")}</p>
             </div>
-          )}
-        </div>
 
-        {/* Inspector */}
-        <aside
-          className={clsx(
-            "obs-inspector min-h-0 transition-all",
-            showInspector ? "w-[280px] opacity-100" : "pointer-events-none w-0 opacity-0",
-          )}
-        >
-          <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[color:var(--bg-1)]">
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {selectedNode ? (
-                <InspectorPanel
-                  node={selectedNode}
-                  backlinks={backlinksMap.get(selectedNode.id) ?? []}
-                  graphNodes={graphData?.nodes ?? []}
-                  colorByCommunity={colorByCommunity}
-                  onOpenNode={(id) => void onNodeDoubleClick(null, { id })}
-                  onSelectNode={(id) => setSelectedNode(graphData?.nodes.find((n) => n.id === id) ?? null)}
-                />
-              ) : (
-                <p className="text-xs text-[color:var(--text-2)]">
-                  {t("graph.clickToInspect")}
-                </p>
+            <select
+              value={edgeMode}
+              onChange={(e) => setEdgeMode(e.target.value as "related" | "requires" | "optional")}
+              className="rounded border border-[var(--border)] bg-[color:var(--bg-2)] px-2 py-1 text-[11px] text-[color:var(--text-1)]"
+            >
+              <option value="related">{t("graph.edgeRelated")}</option>
+              <option value="requires">{t("graph.edgeRequires")}</option>
+              <option value="optional">{t("graph.edgeOptional")}</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setGodMode((p) => !p)}
+              className={clsx(
+                "flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors",
+                godMode ? "bg-red-500/15 text-red-400" : "text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
               )}
-            </div>
-          </div>
-        </aside>
-      </div>
+              title={t("graph.highlightGodNodes")}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {godMode && godIds.size > 0 && <span>{godIds.size}</span>}
+            </button>
 
-      {layouting && (
-        <div className="pointer-events-none absolute right-8 top-16 rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1 text-xs text-[color:var(--text-1)]">
-          {t("graph.calculatingLayout")}
+            <button
+              type="button"
+              onClick={() => setColorByCommunity((p) => !p)}
+              className={clsx(
+                "rounded p-1 transition-colors",
+                colorByCommunity
+                  ? "bg-[color:var(--accent)]/10 text-[color:var(--accent)]"
+                  : "text-[color:var(--text-2)] hover:text-[color:var(--text-1)]",
+              )}
+              title={colorByCommunity ? t("graph.colorByOntology") : t("graph.colorByCommunity")}
+            >
+              <Layers className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLayoutSeed((p) => p + 1)}
+              className="rounded p-1 text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
+              title={t("graph.relayout")}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowInspector((p) => !p)}
+              className="rounded p-1 text-[color:var(--text-2)] hover:text-[color:var(--text-1)]"
+              title={showInspector ? t("graph.hideInspector") : t("graph.showInspector")}
+            >
+              {showInspector ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+            </button>
+          </div>
         </div>
-      )}
-    </div>
+
+        <div className="relative flex min-h-0 flex-1">
+          {/* Canvas */}
+          <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[color:var(--bg-0)]">
+            {nodes.length > 0 ? (
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                onNodeDoubleClick={onNodeDoubleClick}
+                onNodeDragStart={onNodeDragStart}
+                onNodeDrag={onNodeDrag}
+                onNodeDragStop={onNodeDragStop}
+                onNodeMouseEnter={onNodeMouseEnter}
+                onNodeMouseLeave={onNodeMouseLeave}
+                onInit={setFlowInstance}
+                nodeTypes={nodeTypes}
+                fitView
+                proOptions={{ hideAttribution: true }}
+                defaultEdgeOptions={{ type: "straight" }}
+              >
+                {viewMode === "cosmos" ? (
+                  <Background color="rgba(255,255,255,0.02)" gap={40} size={0.8} />
+                ) : (
+                  <Background color="rgba(255,255,255,0.025)" gap={24} />
+                )}
+                <Controls showInteractive={false} position="bottom-left" />
+                <MiniMap
+                  nodeColor={(n) => {
+                    const nd = (n.data as NodeData | undefined)?.node;
+                    if (!nd) return "rgba(255,255,255,0.15)";
+                    return colorByCommunity
+                      ? communityColor(nd.community)
+                      : (MEMORY_ONTOLOGY_COLORS[nd.ontology] ?? "#64748b");
+                  }}
+                  style={{
+                    backgroundColor: "var(--bg-1)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                  }}
+                  maskColor="rgba(0,0,0,0.6)"
+                />
+              </ReactFlow>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center text-[color:var(--text-2)]">
+                <Network className="mb-3 h-8 w-8" />
+                <p className="text-xs">{t("graph.noNodes")}</p>
+              </div>
+            )}
+
+            <HoverPreviewPanel
+              node={hoverPreviewNode}
+              visible={!!hoverPreviewNode && !!hoveredNodeId}
+            />
+          </div>
+
+          {/* Inspector */}
+          <aside
+            className={clsx(
+              "obs-inspector min-h-0 transition-all",
+              showInspector ? "w-[280px] opacity-100" : "pointer-events-none w-0 opacity-0",
+            )}
+          >
+            <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[color:var(--bg-1)]">
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                {selectedNode ? (
+                  <InspectorPanel
+                    node={selectedNode}
+                    backlinks={backlinksMap.get(selectedNode.id) ?? []}
+                    graphNodes={graphData?.nodes ?? []}
+                    colorByCommunity={colorByCommunity}
+                    onOpenNode={(id) => void onNodeDoubleClick(null, { id })}
+                    onSelectNode={(id) => setSelectedNode(graphData?.nodes.find((n) => n.id === id) ?? null)}
+                  />
+                ) : (
+                  <p className="text-xs text-[color:var(--text-2)]">
+                    {t("graph.clickToInspect")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {layouting && (
+          <div className="pointer-events-none absolute right-8 top-16 rounded-md border border-[var(--border)] bg-[color:var(--bg-2)] px-2.5 py-1 text-xs text-[color:var(--text-1)]">
+            {t("graph.calculatingLayout")}
+          </div>
+        )}
+      </div>
+    </HoverContext.Provider>
   );
 }
 
