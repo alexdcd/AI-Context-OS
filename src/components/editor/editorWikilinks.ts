@@ -19,7 +19,6 @@ import {
   getActivePreviewLineNumbers,
   shouldRefreshActivePreviewLines,
 } from "./editorPreviewState";
-import { hiddenSyntaxMark } from "./editorLivePreview";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
@@ -58,7 +57,6 @@ type WikilinkMatchResult =
 
 interface WikilinkEditorOptions {
   targets: WikilinkTarget[];
-  editable: boolean;
   revealSyntaxOnActiveLine: boolean;
   onOpenMemory?: (id: string) => void;
   onCreateMemory?: (draft: WikilinkDraftMemory) => void | Promise<void>;
@@ -366,18 +364,7 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
 
             const inner = match[1].trim();
             const resolution = resolveWikilinkText(inner, options.targets);
-            const innerFrom = matchFrom + 2;
-            const innerTo = matchTo - 2;
-
-            if (options.editable) {
-              builder.add(matchFrom, matchTo, getWikilinkPreviewDecoration(inner, resolution));
-            } else {
-              builder.add(matchFrom, innerFrom, hiddenSyntaxMark);
-              if (innerTo > innerFrom) {
-                builder.add(innerFrom, innerTo, getWikilinkPreviewDecoration(inner, resolution));
-              }
-              builder.add(innerTo, matchTo, hiddenSyntaxMark);
-            }
+            builder.add(matchFrom, matchTo, getWikilinkPreviewDecoration(inner, resolution));
           }
         }
 

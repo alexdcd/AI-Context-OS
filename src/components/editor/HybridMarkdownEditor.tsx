@@ -67,6 +67,7 @@ const EMPTY_WIKILINK_TARGETS: WikilinkTarget[] = [];
 const EDITOR_BASIC_SETUP = {
   lineNumbers: false,
   foldGutter: false,
+  drawSelection: false,
   dropCursor: false,
   allowMultipleSelections: true,
   indentOnInput: false,
@@ -99,6 +100,10 @@ const editorThemePresets = {
     headingBorderSoft: "1px solid color-mix(in srgb, var(--border) 78%, transparent)",
   },
 } as const;
+
+function shouldUsePresentationDecorations() {
+  return false;
+}
 
 function createEditorTheme(variant: keyof typeof editorThemePresets) {
   const preset = editorThemePresets[variant];
@@ -405,7 +410,7 @@ function createStructuralDecorations(editable: boolean) {
       }
 
       buildDecorations(view: EditorView) {
-        if (editable) {
+        if (!shouldUsePresentationDecorations()) {
           return new RangeSetBuilder<Decoration>().finish();
         }
 
@@ -763,7 +768,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
       buildDecorations(view: EditorView) {
         const builder = new RangeSetBuilder<Decoration>();
         const state = view.state;
-        if (editable) {
+        if (!shouldUsePresentationDecorations()) {
           return builder.finish();
         }
 
@@ -1053,7 +1058,6 @@ export function HybridMarkdownEditor({
         ? []
         : createWikilinkExtensions({
             targets: stableWikilinkTargets,
-            editable,
             revealSyntaxOnActiveLine,
             onOpenMemory: onOpenWikilink,
             onCreateMemory: onCreateWikilinkMemory,
