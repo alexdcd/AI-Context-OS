@@ -6,13 +6,14 @@ import {
   MiniMap,
   Handle,
   Position,
-  MarkerType,
   useNodesState,
   useEdgesState,
+  useInternalNode,
   addEdge,
   type Connection,
   type ReactFlowInstance,
   type OnNodeDrag,
+  type EdgeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import * as d3 from "d3-force";
@@ -166,7 +167,6 @@ interface FlowEdge {
   style?: Record<string, unknown>;
   labelStyle?: Record<string, unknown>;
   animated?: boolean;
-  markerEnd?: { type: MarkerType; color?: string; width?: number; height?: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -387,9 +387,89 @@ function HoverPreviewPanel({ node, visible }: { node: GNode | null; visible: boo
   );
 }
 
+// ---------------------------------------------------------------------------
+// Custom edge — straight line center-to-center with arrowhead at circle border
+// ---------------------------------------------------------------------------
+
+function CenterEdge({ id, source, target, style }: EdgeProps) {
+  const sourceNode = useInternalNode(source);
+  const targetNode = useInternalNode(target);
+
+  if (!sourceNode || !targetNode) return null;
+
+  const sw = sourceNode.measured?.width ?? 0;
+  const sh = sourceNode.measured?.height ?? 0;
+  const tw = targetNode.measured?.width ?? 0;
+  const th = targetNode.measured?.height ?? 0;
+
+  // Center positions in flow coordinates
+  const sx = sourceNode.internals.positionAbsolute.x + sw / 2;
+  const sy = sourceNode.internals.positionAbsolute.y + sh / 2;
+  const tx = targetNode.internals.positionAbsolute.x + tw / 2;
+  const ty = targetNode.internals.positionAbsolute.y + th / 2;
+
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return null;
+
+  // Unit vector from source to target
+  const ux = dx / dist;
+  const uy = dy / dist;
+
+  // Estimate circle radii (circle is centered in the node div, roughly half the smaller dimension)
+  const sourceR = Math.min(sw, sh) / 2;
+  const targetR = Math.min(tw, th) / 2;
+
+  // Shorten line: start at source circle border, end at target circle border
+  const x1 = sx + ux * sourceR;
+  const y1 = sy + uy * sourceR;
+  const arrowLen = 7;
+  const x2 = tx - ux * (targetR + arrowLen);
+  const y2 = ty - uy * (targetR + arrowLen);
+
+  // Arrowhead tip at target border
+  const ax = tx - ux * targetR;
+  const ay = ty - uy * targetR;
+  const arrowHalfW = 3.5;
+  const perpX = -uy * arrowHalfW;
+  const perpY = ux * arrowHalfW;
+
+  const arrowPath = `M${ax},${ay} L${ax - ux * arrowLen + perpX},${ay - uy * arrowLen + perpY} L${ax - ux * arrowLen - perpX},${ay - uy * arrowLen - perpY} Z`;
+
+  const edgeStyle = (style ?? {}) as Record<string, unknown>;
+  const stroke = (edgeStyle.stroke as string) ?? "#475569";
+  const strokeWidth = (edgeStyle.strokeWidth as number) ?? 1;
+  const opacity = (edgeStyle.opacity as number) ?? 0.4;
+  const dashArray = (edgeStyle.strokeDasharray as string) ?? undefined;
+
+  return (
+    <g className="react-flow__edge-path" style={{ transition: "opacity 0.25s ease" }}>
+      <line
+        x1={x1} y1={y1} x2={x2} y2={y2}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        opacity={opacity}
+        strokeDasharray={dashArray}
+        style={{ transition: "stroke 0.25s ease, stroke-width 0.25s ease, opacity 0.25s ease" }}
+      />
+      <path
+        d={arrowPath}
+        fill={stroke}
+        opacity={opacity}
+        style={{ transition: "fill 0.25s ease, opacity 0.25s ease" }}
+      />
+    </g>
+  );
+}
+
 const nodeTypes = {
   cards: CardsNode,
   cosmos: CosmosNode,
+};
+
+const edgeTypes = {
+  center: CenterEdge,
 };
 
 // ---------------------------------------------------------------------------
@@ -591,19 +671,13 @@ export function GraphViewPage() {
         id: `e-${edge.source}-${edge.target}-${i}`,
         source: edge.source,
         target: edge.target,
-        type: "straight",
+        type: viewMode === "cosmos" ? "center" : "straight",
         style: {
           stroke: strokeColor,
           strokeWidth,
           opacity,
           transition: "stroke 0.25s ease, stroke-width 0.25s ease, opacity 0.25s ease",
           strokeDasharray: edge.edge_type === "tag" && !bothConnected ? "3 4" : undefined,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: strokeColor,
-          width: bothConnected && hasHover ? 14 : 10,
-          height: bothConnected && hasHover ? 14 : 10,
         },
       };
     });
@@ -901,6 +975,7 @@ export function GraphViewPage() {
                 onNodeMouseLeave={onNodeMouseLeave}
                 onInit={setFlowInstance}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 fitView
                 proOptions={{ hideAttribution: true }}
                 defaultEdgeOptions={{ type: "straight" }}
