@@ -39,6 +39,46 @@ test("toggle mark removes wrappers included in the selection", () => {
   ]);
 });
 
+test("toggle mark wraps selected italic text", () => {
+  const doc = Text.of(["texto"]);
+  const result = getToggleMarkChange(doc, 0, 5, "*");
+
+  assert.deepEqual(result.changes, [
+    { from: 0, insert: "*" },
+    { from: 5, insert: "*" },
+  ]);
+});
+
+test("toggle mark removes selected italic wrappers", () => {
+  const doc = Text.of(["*texto*"]);
+  const result = getToggleMarkChange(doc, 0, 7, "*");
+
+  assert.deepEqual(result.changes, [
+    { from: 0, to: 1 },
+    { from: 6, to: 7 },
+  ]);
+});
+
+test("toggle mark handles inline code wrappers", () => {
+  const doc = Text.of(["`texto`"]);
+  const result = getToggleMarkChange(doc, 1, 6, "`");
+
+  assert.deepEqual(result.changes, [
+    { from: 0, to: 1 },
+    { from: 6, to: 7 },
+  ]);
+});
+
+test("toggle mark handles strikethrough wrappers", () => {
+  const doc = Text.of(["~~texto~~"]);
+  const result = getToggleMarkChange(doc, 2, 7, "~~");
+
+  assert.deepEqual(result.changes, [
+    { from: 0, to: 2 },
+    { from: 7, to: 9 },
+  ]);
+});
+
 test("fenced code block insertion wraps selected text", () => {
   const doc = Text.of(["texto"]);
   const result = getFencedCodeBlockInsertion(doc, 0, 5, "texto");

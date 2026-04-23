@@ -23,9 +23,9 @@ import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import {
   applyLinePrefixToggle,
+  getToggleMarkChange,
   insertFencedCodeBlock,
   insertMarkdownLink,
-  normalizeMarkdownInlineRange,
 } from "./editorCommands";
 
 interface Props {
@@ -36,14 +36,16 @@ interface Props {
 function wrapSelection(view: EditorView, mark: string, placeholder = "") {
   const { state } = view;
   const changes = state.changeByRange((range) => {
-    const normalized = normalizeMarkdownInlineRange(state.doc, range.from, range.to);
-    const text = state.sliceDoc(normalized.from, normalized.to) || placeholder;
-    const inserted = `${mark}${text}${mark}`;
+    if (!range.empty) {
+      return getToggleMarkChange(state.doc, range.from, range.to, mark);
+    }
+
+    const inserted = `${mark}${placeholder}${mark}`;
     return {
-      changes: [{ from: normalized.from, to: normalized.to, insert: inserted }],
+      changes: [{ from: range.from, to: range.to, insert: inserted }],
       range: EditorSelection.range(
-        normalized.from + mark.length,
-        normalized.from + mark.length + text.length,
+        range.from + mark.length,
+        range.from + mark.length + placeholder.length,
       ),
     };
   });
