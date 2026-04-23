@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Text } from "@codemirror/state";
 import {
   getFencedCodeBlockInsertion,
+  getToggleMarkChange,
   normalizeMarkdownInlineRange,
 } from "../src/components/editor/editorCommands.ts";
 
@@ -16,6 +17,26 @@ test("markdown inline range skips list prefix and trims item text spaces", () =>
   const doc = Text.of(["-  texto "]);
 
   assert.deepEqual(normalizeMarkdownInlineRange(doc, 0, 9), { from: 3, to: 8 });
+});
+
+test("toggle mark removes wrappers around selected bold text", () => {
+  const doc = Text.of(["**texto**"]);
+  const result = getToggleMarkChange(doc, 2, 7, "**");
+
+  assert.deepEqual(result.changes, [
+    { from: 0, to: 2 },
+    { from: 7, to: 9 },
+  ]);
+});
+
+test("toggle mark removes wrappers included in the selection", () => {
+  const doc = Text.of(["**texto**"]);
+  const result = getToggleMarkChange(doc, 0, 9, "**");
+
+  assert.deepEqual(result.changes, [
+    { from: 0, to: 2 },
+    { from: 7, to: 9 },
+  ]);
 });
 
 test("fenced code block insertion wraps selected text", () => {

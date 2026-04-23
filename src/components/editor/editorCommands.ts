@@ -102,6 +102,57 @@ export function normalizeMarkdownInlineRange(doc: Text, from: number, to: number
   return nextTo < nextFrom ? normalized : { from: nextFrom, to: nextTo };
 }
 
+export function getToggleMarkChange(doc: Text, from: number, to: number, mark: string) {
+  const normalized = normalizeMarkdownInlineRange(doc, from, to);
+
+  if (from === to) {
+    return {
+      changes: [{ from, insert: mark + mark }],
+      range: EditorSelection.range(from + mark.length, from + mark.length),
+    };
+  }
+
+  const selectedText = doc.sliceString(normalized.from, normalized.to);
+  const selectionIncludesMarks =
+    selectedText.startsWith(mark)
+    && selectedText.endsWith(mark)
+    && selectedText.length >= mark.length * 2;
+
+  if (selectionIncludesMarks) {
+    return {
+      changes: [
+        { from: normalized.from, to: normalized.from + mark.length },
+        { from: normalized.to - mark.length, to: normalized.to },
+      ],
+      range: EditorSelection.range(normalized.from, normalized.to - mark.length * 2),
+    };
+  }
+
+  const textIsWrapped =
+    normalized.from >= mark.length
+    && normalized.to <= doc.length - mark.length
+    && doc.sliceString(normalized.from - mark.length, normalized.from) === mark
+    && doc.sliceString(normalized.to, normalized.to + mark.length) === mark;
+
+  if (textIsWrapped) {
+    return {
+      changes: [
+        { from: normalized.from - mark.length, to: normalized.from },
+        { from: normalized.to, to: normalized.to + mark.length },
+      ],
+      range: EditorSelection.range(normalized.from - mark.length, normalized.to - mark.length),
+    };
+  }
+
+  return {
+    changes: [
+      { from: normalized.from, insert: mark },
+      { from: normalized.to, insert: mark },
+    ],
+    range: EditorSelection.range(normalized.from + mark.length, normalized.to + mark.length),
+  };
+}
+
 export function applyLinePrefixToggle(view: EditorView, prefix: string) {
   const { state } = view;
   const lineNumbers = new Set<number>();

@@ -43,7 +43,7 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - `mousedown` sets the field to `true`
 - `document` `mouseup` clears it in `requestAnimationFrame`, after native selection has settled
 - sensitive preview plugins must not rebuild decorations while the field is `true`
-- the clear effect is allowed to trigger one rebuild after mouseup
+- range selections clear immediately after mouseup; simple clicks clear after a short double-click window so a click still reveals syntax for editing, but not between the first and second click of native word selection
 
 Read this section before touching `drag -> mouseup` behavior. Do not remove or bypass `mouseSelectingField` as a simplification unless an equivalent automated and manual selection test replaces it.
 

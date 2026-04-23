@@ -18,10 +18,11 @@ import { useEffect, useMemo, useRef } from "react";
 import { tags as t } from "@lezer/highlight";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
+import { type StateCommand, EditorSelection, Prec, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
 import {
   applyLinePrefixToggle,
+  getToggleMarkChange,
   insertMarkdownLink,
   normalizeMarkdownInlineRange,
 } from "./editorCommands";
@@ -892,38 +893,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 function applyToggleMark(view: EditorView, mark: string) {
   const { state } = view;
   const changes = state.changeByRange((range) => {
-    const normalized = normalizeMarkdownInlineRange(state.doc, range.from, range.to);
-
-    if (range.empty) {
-      return {
-        changes: [{ from: range.from, insert: mark + mark }],
-        range: EditorSelection.range(range.from + mark.length, range.from + mark.length),
-      };
-    }
-
-    const alreadyWrapped =
-      normalized.from >= mark.length &&
-      normalized.to <= state.doc.length - mark.length &&
-      state.sliceDoc(normalized.from - mark.length, normalized.from) === mark &&
-      state.sliceDoc(normalized.to, normalized.to + mark.length) === mark;
-
-    if (alreadyWrapped) {
-      return {
-        changes: [
-          { from: normalized.from - mark.length, to: normalized.from },
-          { from: normalized.to, to: normalized.to + mark.length },
-        ],
-        range: EditorSelection.range(normalized.from - mark.length, normalized.to - mark.length),
-      };
-    }
-
-    return {
-      changes: [
-        { from: normalized.from, insert: mark },
-        { from: normalized.to, insert: mark },
-      ],
-      range: EditorSelection.range(normalized.from + mark.length, normalized.to + mark.length),
-    };
+    return getToggleMarkChange(state.doc, range.from, range.to, mark);
   });
 
   view.dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
@@ -1162,7 +1132,7 @@ export function HybridMarkdownEditor({
           })),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
-      keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
+      Prec.highest(keymap.of(createMarkdownKeymap(linkTextPlaceholder))),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       createDomHandlers(editable, onOpenWikilink),
     ],

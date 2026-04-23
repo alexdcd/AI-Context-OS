@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EditorSelection, EditorState, Transaction } from "@codemirror/state";
 import {
+  getMouseSelectingClearDelayMs,
   isMouseSelecting,
   mouseSelectingField,
   setMouseSelecting,
@@ -54,7 +55,7 @@ test("sensitive preview refreshes are frozen while mouse selection is active", (
   );
 });
 
-test("sensitive preview refreshes once after mouse selection finishes", () => {
+test("sensitive preview refreshes once after mouse range selection finishes", () => {
   const startState = EditorState.create({
     doc: "alpha\nbeta\n",
     selection: EditorSelection.range(0, 7),
@@ -79,4 +80,46 @@ test("sensitive preview refreshes once after mouse selection finishes", () => {
     ),
     true,
   );
+});
+
+test("sensitive preview refreshes after a delayed simple mouse click finish", () => {
+  const startState = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.cursor(0),
+    extensions: [mouseSelectingField],
+  }).update({
+    effects: setMouseSelecting.of(true),
+  }).state;
+
+  const transaction = startState.update({
+    selection: EditorSelection.cursor(7),
+    effects: setMouseSelecting.of(false),
+  });
+
+  assert.equal(
+    shouldRefreshSensitivePreviewDecorations(
+      {
+        selectionSet: true,
+        startState,
+        state: transaction.state,
+        transactions: [transaction],
+      },
+      true,
+    ),
+    true,
+  );
+});
+
+test("simple clicks delay the mouse-selecting clear but range selections do not", () => {
+  const cursorState = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.cursor(0),
+  });
+  const rangeState = EditorState.create({
+    doc: "alpha\nbeta\n",
+    selection: EditorSelection.range(0, 7),
+  });
+
+  assert.equal(getMouseSelectingClearDelayMs(cursorState) > 0, true);
+  assert.equal(getMouseSelectingClearDelayMs(rangeState), 0);
 });
