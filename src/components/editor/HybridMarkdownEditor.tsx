@@ -43,6 +43,7 @@ import {
   shouldHideMarkdownNode,
   getVisibleListMarkerDecoration,
   shouldKeepCodeInfoVisible,
+  shouldHideNamedLinkUrl,
 } from "./editorLivePreview";
 import {
   createWikilinkExtensions,
@@ -796,6 +797,8 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                 decos.push({ from: node.from, to: node.to, deco: visibleListMarkerDecoration });
               } else if (shouldKeepCodeInfoVisible(node.name, node.node)) {
                 return;
+              } else if (shouldHideNamedLinkUrl(node.name, node.node, lineIsActive)) {
+                decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
               } else if (shouldHideMarkdownNode(node.name, lineIsActive)) {
                 decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
               } else if (
@@ -812,6 +815,19 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                   to: node.to,
                   deco: Decoration.replace({ widget: new LinkIconWidget(urlText) }),
                 });
+              } else if (node.name === "URL" && node.node.parent?.name !== "Link") {
+                const urlText = state
+                  .sliceDoc(node.from, node.to)
+                  .replace(/^[(<]/, "")
+                  .replace(/[)>]$/, "");
+                const linkPreviewMark = Decoration.mark({
+                  class: "cm-link-preview",
+                  attributes: {
+                    "data-link-url": urlText,
+                    title: urlText,
+                  },
+                });
+                decos.push({ from: node.from, to: node.to, deco: linkPreviewMark });
               } else if (node.name === "Link") {
                 const firstChild = node.node.firstChild;
                 const lastChild = node.node.lastChild;
@@ -842,6 +858,18 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                       },
                     });
                     decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                  } else if (urlText) {
+                    decos.push({
+                      from: child?.from ?? node.from,
+                      to: child?.to ?? node.to,
+                      deco: Decoration.mark({
+                        class: "cm-link-preview",
+                        attributes: {
+                          "data-link-url": urlText,
+                          title: urlText,
+                        },
+                      }),
+                    });
                   }
                 }
               }

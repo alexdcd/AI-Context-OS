@@ -7,10 +7,12 @@ import {
   getVisibleListMarkerDecoration,
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
+  linkHasVisibleLabel,
   listSourceMarkerMark,
   shouldKeepCodeInfoVisible,
   shouldKeepListMarkerVisible,
   shouldHideMarkdownNode,
+  shouldHideNamedLinkUrl,
   shouldRenderReplacePreviewWidget,
 } from "../src/components/editor/editorLivePreview.ts";
 
@@ -35,7 +37,7 @@ function findNode(doc: string, nodeName: string) {
     doc,
     extensions: [markdown({ base: markdownLanguage })],
   });
-  let found: { parent: { name: string; parent: any } | null } | null = null;
+  let found: any = null;
 
   syntaxTree(state).iterate({
     enter(node) {
@@ -99,6 +101,19 @@ test("code info stays visible when a fenced block has no code text body", () => 
   assert.equal(shouldKeepCodeInfoVisible("CodeInfo", singleLineCodeInfo), true);
   assert.equal(shouldKeepCodeInfoVisible("CodeInfo", languageCodeInfo), false);
   assert.equal(shouldHideMarkdownNode("CodeInfo", false), true);
+});
+
+test("named markdown links hide the URL syntax only on inactive lines", () => {
+  const namedUrl = findNode("[MafiaIA](https://mafiaia.com/)", "URL");
+  const bareUrl = findNode("https://mafiaia.com/", "URL");
+  const emptyLabelUrl = findNode("[](https://mafiaia.com/)", "URL");
+
+  assert.equal(linkHasVisibleLabel(namedUrl.parent), true);
+  assert.equal(linkHasVisibleLabel(emptyLabelUrl.parent), false);
+  assert.equal(shouldHideNamedLinkUrl("URL", namedUrl, false), true);
+  assert.equal(shouldHideNamedLinkUrl("URL", namedUrl, true), false);
+  assert.equal(shouldHideNamedLinkUrl("URL", bareUrl, false), false);
+  assert.equal(shouldHideNamedLinkUrl("URL", emptyLabelUrl, false), false);
 });
 
 test("live preview hiding covers the marker node names emitted by CodeMirror markdown", () => {

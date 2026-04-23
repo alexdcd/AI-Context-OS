@@ -115,3 +115,30 @@ export function shouldKeepCodeInfoVisible(
 
   return true;
 }
+
+export function linkHasVisibleLabel(node: { firstChild?: any } | null) {
+  if (!node) return false;
+
+  const firstChild = node.firstChild;
+  if (!firstChild || firstChild.name !== "LinkMark") {
+    return false;
+  }
+
+  const closingLabelMark = firstChild.nextSibling;
+  if (!closingLabelMark || closingLabelMark.name !== "LinkMark") {
+    return false;
+  }
+
+  return closingLabelMark.from > firstChild.to;
+}
+
+export function shouldHideNamedLinkUrl(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any } | null },
+  lineIsActive: boolean,
+) {
+  return nodeName === "URL"
+    && !lineIsActive
+    && node.parent?.name === "Link"
+    && linkHasVisibleLabel(node.parent);
+}
