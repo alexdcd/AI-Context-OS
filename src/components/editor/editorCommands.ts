@@ -102,6 +102,59 @@ export function normalizeMarkdownInlineRange(doc: Text, from: number, to: number
   return nextTo < nextFrom ? normalized : { from: nextFrom, to: nextTo };
 }
 
+function getSimpleEnclosingMarkPair(doc: Text, from: number, to: number, mark: string) {
+  const line = doc.lineAt(from);
+  if (to > line.to) return null;
+
+  const markPositions: number[] = [];
+  for (let pos = line.from; pos <= line.to - mark.length; pos += 1) {
+    if (doc.sliceString(pos, pos + mark.length) === mark) {
+      markPositions.push(pos);
+      pos += mark.length - 1;
+    }
+  }
+
+  for (let index = 0; index < markPositions.length - 1; index += 2) {
+    const openFrom = markPositions[index];
+    const closeFrom = markPositions[index + 1];
+    if (openFrom + mark.length <= from && to <= closeFrom) {
+      return {
+        openFrom,
+        openTo: openFrom + mark.length,
+        closeFrom,
+        closeTo: closeFrom + mark.length,
+      };
+    }
+  }
+
+  return null;
+}
+
+function getSplitEnclosingBoldChange(doc: Text, from: number, to: number) {
+  const mark = "**";
+  const enclosing = getSimpleEnclosingMarkPair(doc, from, to, mark);
+  if (!enclosing) return null;
+
+  const left = doc.sliceString(enclosing.openTo, from);
+  const selected = doc.sliceString(from, to);
+  const right = doc.sliceString(to, enclosing.closeFrom);
+  const leftBody = left.replace(/[ \t]+$/, "");
+  const leftPlain = left.slice(leftBody.length);
+  const rightPlain = right.match(/^[ \t]+/)?.[0] ?? "";
+  const rightBody = right.slice(rightPlain.length);
+  const replacementBeforeSelection =
+    (leftBody ? `${mark}${leftBody}${mark}` : "") + leftPlain;
+  const replacementAfterSelection =
+    rightPlain + (rightBody ? `${mark}${rightBody}${mark}` : "");
+  const insert = `${replacementBeforeSelection}${selected}${replacementAfterSelection}`;
+  const nextFrom = enclosing.openFrom + replacementBeforeSelection.length;
+
+  return {
+    changes: [{ from: enclosing.openFrom, to: enclosing.closeTo, insert }],
+    range: EditorSelection.range(nextFrom, nextFrom + selected.length),
+  };
+}
+
 export function getToggleMarkChange(doc: Text, from: number, to: number, mark: string) {
   const normalized = normalizeMarkdownInlineRange(doc, from, to);
 
@@ -142,6 +195,17 @@ export function getToggleMarkChange(doc: Text, from: number, to: number, mark: s
       ],
       range: EditorSelection.range(normalized.from - mark.length, normalized.to - mark.length),
     };
+  }
+
+  if (mark === "**") {
+    const splitBoldChange = getSplitEnclosingBoldChange(
+      doc,
+      normalized.from,
+      normalized.to,
+    );
+    if (splitBoldChange) {
+      return splitBoldChange;
+    }
   }
 
   return {

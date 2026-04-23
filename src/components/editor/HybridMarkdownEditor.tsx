@@ -30,6 +30,7 @@ import {
   getActivePreviewLineNumbers,
 } from "./editorPreviewState";
 import {
+  getDocumentWordRangeAtPosition,
   isTaskCheckboxHitOffset,
 } from "./editorMouseSelection";
 import {
@@ -995,6 +996,32 @@ function selectionIsRange(state: EditorView["state"]) {
   return state.selection.ranges.some((range) => !range.empty);
 }
 
+function selectDocumentWordAtEvent(view: EditorView, event: MouseEvent) {
+  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+  if (pos === null) {
+    return false;
+  }
+
+  const wordRange = getDocumentWordRangeAtPosition(view.state, pos);
+  if (!wordRange) {
+    return false;
+  }
+
+  requestAnimationFrame(() => {
+    if (wordRange.to > view.state.doc.length) {
+      return;
+    }
+
+    view.dispatch({
+      selection: EditorSelection.range(wordRange.from, wordRange.to),
+      scrollIntoView: false,
+      userEvent: "select.pointer",
+    });
+  });
+
+  return true;
+}
+
 function createDomHandlers(editable: boolean, onOpenWikilink?: (id: string) => void) {
   return EditorView.domEventHandlers({
     click(event, view) {
@@ -1027,6 +1054,15 @@ function createDomHandlers(editable: boolean, onOpenWikilink?: (id: string) => v
         }
       }
 
+      return false;
+    },
+
+    dblclick(event, view) {
+      if (!editable || event.button !== 0) {
+        return false;
+      }
+
+      selectDocumentWordAtEvent(view, event);
       return false;
     },
 

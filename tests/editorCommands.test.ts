@@ -7,6 +7,16 @@ import {
   normalizeMarkdownInlineRange,
 } from "../src/components/editor/editorCommands.ts";
 
+function applyChanges(text: string, changes: any[]) {
+  return [...changes]
+    .sort((left, right) => right.from - left.from)
+    .reduce(
+      (next, change) =>
+        next.slice(0, change.from) + (change.insert ?? "") + next.slice(change.to ?? change.from),
+      text,
+    );
+}
+
 test("markdown inline range trims surrounding spaces before adding marks", () => {
   const doc = Text.of([" texto "]);
 
@@ -36,6 +46,45 @@ test("toggle mark removes wrappers included in the selection", () => {
   assert.deepEqual(result.changes, [
     { from: 0, to: 2 },
     { from: 7, to: 9 },
+  ]);
+});
+
+test("toggle bold splits an enclosing bold span for a middle selection", () => {
+  const text = "**uno dos tres cuatro**";
+  const doc = Text.of([text]);
+  const from = text.indexOf("dos");
+  const result = getToggleMarkChange(doc, from, from + "dos".length, "**");
+
+  assert.equal(applyChanges(text, result.changes), "**uno** dos **tres cuatro**");
+});
+
+test("toggle bold splits an enclosing bold span at the start", () => {
+  const text = "**uno dos tres**";
+  const doc = Text.of([text]);
+  const from = text.indexOf("uno");
+  const result = getToggleMarkChange(doc, from, from + "uno".length, "**");
+
+  assert.equal(applyChanges(text, result.changes), "uno **dos tres**");
+});
+
+test("toggle bold splits an enclosing bold span at the end", () => {
+  const text = "**uno dos tres**";
+  const doc = Text.of([text]);
+  const from = text.indexOf("tres");
+  const result = getToggleMarkChange(doc, from, from + "tres".length, "**");
+
+  assert.equal(applyChanges(text, result.changes), "**uno dos** tres");
+});
+
+test("toggle bold wraps plain text between separate bold spans", () => {
+  const text = "**uno** dos **tres**";
+  const doc = Text.of([text]);
+  const from = text.indexOf("dos");
+  const result = getToggleMarkChange(doc, from, from + "dos".length, "**");
+
+  assert.deepEqual(result.changes, [
+    { from, insert: "**" },
+    { from: from + "dos".length, insert: "**" },
   ]);
 });
 
