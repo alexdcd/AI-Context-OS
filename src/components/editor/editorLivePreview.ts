@@ -116,20 +116,27 @@ export function shouldKeepCodeInfoVisible(
   return true;
 }
 
-export function linkHasVisibleLabel(node: { firstChild?: any } | null) {
-  if (!node) return false;
+export function getMarkdownLinkLabelRange(
+  node: { firstChild?: any } | null,
+): { from: number; to: number } | null {
+  if (!node) return null;
 
   const firstChild = node.firstChild;
   if (!firstChild || firstChild.name !== "LinkMark") {
-    return false;
+    return null;
   }
 
-  const closingLabelMark = firstChild.nextSibling;
-  if (!closingLabelMark || closingLabelMark.name !== "LinkMark") {
-    return false;
+  for (let child = firstChild.nextSibling; child; child = child.nextSibling) {
+    if (child.name === "LinkMark") {
+      return child.from > firstChild.to ? { from: firstChild.to, to: child.from } : null;
+    }
   }
 
-  return closingLabelMark.from > firstChild.to;
+  return null;
+}
+
+export function linkHasVisibleLabel(node: { firstChild?: any } | null) {
+  return getMarkdownLinkLabelRange(node) !== null;
 }
 
 export function shouldHideNamedLinkUrl(

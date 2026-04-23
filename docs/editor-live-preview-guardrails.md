@@ -33,6 +33,7 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 - editable line decorations must not add margins, fake heights, or generated text before source content; use paint-only styles such as color, background, and inset box-shadows for blockquote/code/table chrome
 - fenced code `CodeInfo` is only safe to hide when the block has real `CodeText`; if a user writes text on the opening fence line, CodeMirror classifies that text as `CodeInfo`, and hiding it makes the block look empty
 - external links and wikilinks stay clickable through `Decoration.mark` attributes plus editor DOM handlers; do not bring back `Decoration.replace` link widgets in editable mode just to add an icon or click target
+- named links can have formatted labels, for example `[**label**](url)`; compute the label range by finding the closing `]`, not by assuming it is the immediate sibling after `[`
 - validate on real `.md` pages, not only isolated checklist examples
 - compare against `main` if the editor starts showing raw syntax outside the active paragraph
 
@@ -41,9 +42,12 @@ When modifying checklist UX in `src/components/editor/HybridMarkdownEditor.tsx`:
 `mouseSelectingField` in `src/components/editor/editorMouseSelectingField.ts` tracks the native drag-selection cycle.
 
 - `mousedown` sets the field to `true`
+- the tracker records the mouse event `detail` so double/triple-click selection can be treated differently from drag selection
 - `document` `mouseup` clears it in `requestAnimationFrame`, after native selection has settled
 - sensitive preview plugins must not rebuild decorations while the field is `true`
-- range selections clear immediately after mouseup; simple clicks clear after a short double-click window so a click still reveals syntax for editing, but not between the first and second click of native word selection
+- drag range selections clear immediately after mouseup
+- double/triple-click range selections keep a very short settle delay before clearing; this avoids repainting hidden inline syntax while the browser is still finalizing native word/paragraph selection
+- simple clicks clear after a short double-click window so a click still reveals syntax for editing, but not between the first and second click of native word selection
 
 Read this section before touching `drag -> mouseup` behavior. Do not remove or bypass `mouseSelectingField` as a simplification unless an equivalent automated and manual selection test replaces it.
 

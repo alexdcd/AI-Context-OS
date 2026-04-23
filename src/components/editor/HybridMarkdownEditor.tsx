@@ -45,6 +45,7 @@ import {
   getVisibleListMarkerDecoration,
   shouldKeepCodeInfoVisible,
   shouldHideNamedLinkUrl,
+  getMarkdownLinkLabelRange,
 } from "./editorLivePreview";
 import {
   createWikilinkExtensions,
@@ -845,12 +846,8 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                     }
                     child = child.nextSibling;
                   }
-                  const textFrom = firstChild.to;
-                  const textTo =
-                    firstChild.nextSibling?.name === "LinkMark"
-                      ? firstChild.nextSibling.from
-                      : lastChild.from;
-                  if (textTo > textFrom && urlText) {
+                  const labelRange = getMarkdownLinkLabelRange(node.node);
+                  if (labelRange && urlText) {
                     const linkPreviewMark = Decoration.mark({
                       class: "cm-link-preview",
                       attributes: {
@@ -858,7 +855,11 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                         title: urlText,
                       },
                     });
-                    decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                    decos.push({
+                      from: labelRange.from,
+                      to: labelRange.to,
+                      deco: linkPreviewMark,
+                    });
                   } else if (urlText) {
                     decos.push({
                       from: child?.from ?? node.from,

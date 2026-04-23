@@ -7,8 +7,10 @@ import {
 } from "./editorPreviewState.ts";
 
 const SIMPLE_CLICK_REVEAL_DELAY_MS = 160;
+const MULTI_CLICK_RANGE_SETTLE_DELAY_MS = 80;
 
 export const setMouseSelecting = StateEffect.define<boolean>();
+export const setMouseSelectionClickDetail = StateEffect.define<number>();
 
 export const mouseSelectingField = StateField.define<boolean>({
   create() {
@@ -24,8 +26,26 @@ export const mouseSelectingField = StateField.define<boolean>({
   },
 });
 
+export const mouseSelectionClickDetailField = StateField.define<number>({
+  create() {
+    return 0;
+  },
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(setMouseSelectionClickDetail)) {
+        return effect.value;
+      }
+    }
+    return value;
+  },
+});
+
 export function isMouseSelecting(state: EditorState) {
   return state.field(mouseSelectingField, false);
+}
+
+export function getMouseSelectionClickDetail(state: EditorState) {
+  return state.field(mouseSelectionClickDetailField, false) || 0;
 }
 
 export function didFinishMouseSelecting(update: Pick<PreviewSelectionUpdate, "transactions">) {
@@ -52,7 +72,11 @@ export function shouldRefreshSensitivePreviewDecorations(
 }
 
 export function getMouseSelectingClearDelayMs(state: EditorState) {
-  return selectionHasRange(state.selection) ? 0 : SIMPLE_CLICK_REVEAL_DELAY_MS;
+  if (!selectionHasRange(state.selection)) {
+    return SIMPLE_CLICK_REVEAL_DELAY_MS;
+  }
+
+  return getMouseSelectionClickDetail(state) >= 2 ? MULTI_CLICK_RANGE_SETTLE_DELAY_MS : 0;
 }
 
 const mouseSelectingTracker = ViewPlugin.fromClass(
@@ -79,9 +103,12 @@ const mouseSelectingTracker = ViewPlugin.fromClass(
 
       this.clearPendingMouseSelectingClear();
 
-      if (!isMouseSelecting(this.view.state)) {
-        this.view.dispatch({ effects: setMouseSelecting.of(true) });
-      }
+      this.view.dispatch({
+        effects: [
+          setMouseSelecting.of(true),
+          setMouseSelectionClickDetail.of(event.detail),
+        ],
+      });
 
       this.detachDocumentMouseup();
       this.documentMouseupHandler = () => {
@@ -92,7 +119,12 @@ const mouseSelectingTracker = ViewPlugin.fromClass(
             this.clearMouseSelectingTimer = setTimeout(() => {
               this.clearMouseSelectingTimer = null;
               if (isMouseSelecting(this.view.state)) {
-                this.view.dispatch({ effects: setMouseSelecting.of(false) });
+                this.view.dispatch({
+                  effects: [
+                    setMouseSelecting.of(false),
+                    setMouseSelectionClickDetail.of(0),
+                  ],
+                });
               }
             }, delay);
           }
@@ -122,5 +154,5 @@ const mouseSelectingTracker = ViewPlugin.fromClass(
 );
 
 export function createMouseSelectingExtension(): Extension {
-  return [mouseSelectingField, mouseSelectingTracker];
+  return [mouseSelectingField, mouseSelectionClickDetailField, mouseSelectingTracker];
 }

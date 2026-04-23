@@ -5,6 +5,7 @@ import { syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   getVisibleListMarkerDecoration,
+  getMarkdownLinkLabelRange,
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
   linkHasVisibleLabel,
@@ -49,6 +50,19 @@ function findNode(doc: string, nodeName: string) {
 
   assert.ok(found, `Expected ${nodeName} in test document`);
   return found;
+}
+
+function assertNamedLinkUrlHidden(doc: string) {
+  const url = findNode(doc, "URL");
+  const closingLabelMark = doc.indexOf("]");
+
+  assert.equal(linkHasVisibleLabel(url.parent), true);
+  assert.deepEqual(getMarkdownLinkLabelRange(url.parent), {
+    from: 1,
+    to: closingLabelMark,
+  });
+  assert.equal(shouldHideNamedLinkUrl("URL", url, false), true);
+  assert.equal(shouldHideNamedLinkUrl("URL", url, true), false);
 }
 
 test("hidden markdown syntax uses a mark decoration instead of a replace decoration", () => {
@@ -108,10 +122,13 @@ test("named markdown links hide the URL syntax only on inactive lines", () => {
   const bareUrl = findNode("https://mafiaia.com/", "URL");
   const emptyLabelUrl = findNode("[](https://mafiaia.com/)", "URL");
 
-  assert.equal(linkHasVisibleLabel(namedUrl.parent), true);
+  assertNamedLinkUrlHidden("[MafiaIA](https://mafiaia.com/)");
+  assertNamedLinkUrlHidden("[**MafiaIA**](https://mafiaia.com/)");
+  assertNamedLinkUrlHidden("[*MafiaIA*](https://mafiaia.com/)");
+  assertNamedLinkUrlHidden("[`MafiaIA`](https://mafiaia.com/)");
+
   assert.equal(linkHasVisibleLabel(emptyLabelUrl.parent), false);
-  assert.equal(shouldHideNamedLinkUrl("URL", namedUrl, false), true);
-  assert.equal(shouldHideNamedLinkUrl("URL", namedUrl, true), false);
+  assert.deepEqual(getMarkdownLinkLabelRange(namedUrl.parent), { from: 1, to: 8 });
   assert.equal(shouldHideNamedLinkUrl("URL", bareUrl, false), false);
   assert.equal(shouldHideNamedLinkUrl("URL", emptyLabelUrl, false), false);
 });
