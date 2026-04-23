@@ -86,6 +86,137 @@ export function normalizeInlineRange(doc: Text, from: number, to: number) {
   return nextTo < nextFrom ? { from, to } : { from: nextFrom, to: nextTo };
 }
 
+export function normalizeMarkdownInlineRange(doc: Text, from: number, to: number) {
+  const normalized = normalizeInlineRange(doc, from, to);
+  let nextFrom = normalized.from;
+  let nextTo = normalized.to;
+
+  while (nextFrom < nextTo && /[ \t]/.test(doc.sliceString(nextFrom, nextFrom + 1))) {
+    nextFrom += 1;
+  }
+
+  while (nextTo > nextFrom && /[ \t]/.test(doc.sliceString(nextTo - 1, nextTo))) {
+    nextTo -= 1;
+  }
+
+  return nextTo < nextFrom ? normalized : { from: nextFrom, to: nextTo };
+}
+
+function getSimpleEnclosingMarkPair(doc: Text, from: number, to: number, mark: string) {
+  const line = doc.lineAt(from);
+  if (to > line.to) return null;
+
+  const markPositions: number[] = [];
+  for (let pos = line.from; pos <= line.to - mark.length; pos += 1) {
+    if (doc.sliceString(pos, pos + mark.length) === mark) {
+      markPositions.push(pos);
+      pos += mark.length - 1;
+    }
+  }
+
+  for (let index = 0; index < markPositions.length - 1; index += 2) {
+    const openFrom = markPositions[index];
+    const closeFrom = markPositions[index + 1];
+    if (openFrom + mark.length <= from && to <= closeFrom) {
+      return {
+        openFrom,
+        openTo: openFrom + mark.length,
+        closeFrom,
+        closeTo: closeFrom + mark.length,
+      };
+    }
+  }
+
+  return null;
+}
+
+function getSplitEnclosingBoldChange(doc: Text, from: number, to: number) {
+  const mark = "**";
+  const enclosing = getSimpleEnclosingMarkPair(doc, from, to, mark);
+  if (!enclosing) return null;
+
+  const left = doc.sliceString(enclosing.openTo, from);
+  const selected = doc.sliceString(from, to);
+  const right = doc.sliceString(to, enclosing.closeFrom);
+  const leftBody = left.replace(/[ \t]+$/, "");
+  const leftPlain = left.slice(leftBody.length);
+  const rightPlain = right.match(/^[ \t]+/)?.[0] ?? "";
+  const rightBody = right.slice(rightPlain.length);
+  const replacementBeforeSelection =
+    (leftBody ? `${mark}${leftBody}${mark}` : "") + leftPlain;
+  const replacementAfterSelection =
+    rightPlain + (rightBody ? `${mark}${rightBody}${mark}` : "");
+  const insert = `${replacementBeforeSelection}${selected}${replacementAfterSelection}`;
+  const nextFrom = enclosing.openFrom + replacementBeforeSelection.length;
+
+  return {
+    changes: [{ from: enclosing.openFrom, to: enclosing.closeTo, insert }],
+    range: EditorSelection.range(nextFrom, nextFrom + selected.length),
+  };
+}
+
+export function getToggleMarkChange(doc: Text, from: number, to: number, mark: string) {
+  const normalized = normalizeMarkdownInlineRange(doc, from, to);
+
+  if (from === to) {
+    return {
+      changes: [{ from, insert: mark + mark }],
+      range: EditorSelection.range(from + mark.length, from + mark.length),
+    };
+  }
+
+  const selectedText = doc.sliceString(normalized.from, normalized.to);
+  const selectionIncludesMarks =
+    selectedText.startsWith(mark)
+    && selectedText.endsWith(mark)
+    && selectedText.length >= mark.length * 2;
+
+  if (selectionIncludesMarks) {
+    return {
+      changes: [
+        { from: normalized.from, to: normalized.from + mark.length },
+        { from: normalized.to - mark.length, to: normalized.to },
+      ],
+      range: EditorSelection.range(normalized.from, normalized.to - mark.length * 2),
+    };
+  }
+
+  const textIsWrapped =
+    normalized.from >= mark.length
+    && normalized.to <= doc.length - mark.length
+    && doc.sliceString(normalized.from - mark.length, normalized.from) === mark
+    && doc.sliceString(normalized.to, normalized.to + mark.length) === mark;
+
+  if (textIsWrapped) {
+    return {
+      changes: [
+        { from: normalized.from - mark.length, to: normalized.from },
+        { from: normalized.to, to: normalized.to + mark.length },
+      ],
+      range: EditorSelection.range(normalized.from - mark.length, normalized.to - mark.length),
+    };
+  }
+
+  if (mark === "**") {
+    const splitBoldChange = getSplitEnclosingBoldChange(
+      doc,
+      normalized.from,
+      normalized.to,
+    );
+    if (splitBoldChange) {
+      return splitBoldChange;
+    }
+  }
+
+  return {
+    changes: [
+      { from: normalized.from, insert: mark },
+      { from: normalized.to, insert: mark },
+    ],
+    range: EditorSelection.range(normalized.from + mark.length, normalized.to + mark.length),
+  };
+}
+
 export function applyLinePrefixToggle(view: EditorView, prefix: string) {
   const { state } = view;
   const lineNumbers = new Set<number>();
@@ -139,6 +270,47 @@ export function insertMarkdownLink(view: EditorView, textPlaceholder: string) {
   view.dispatch({
     changes: { from: range.from, to: range.to, insert },
     selection: EditorSelection.range(range.from + selected.length + 3, range.from + selected.length + 6),
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  view.focus();
+}
+
+export function getFencedCodeBlockInsertion(
+  doc: Text,
+  from: number,
+  to: number,
+  selectedText: string,
+) {
+  const startLine = doc.lineAt(from);
+  const endLine = doc.lineAt(to);
+  const prefix = from === startLine.from ? "" : "\n";
+  const suffix = to === endLine.to ? "" : "\n";
+  const body = selectedText.replace(/^\n+|\n+$/g, "");
+  const insert = `${prefix}\`\`\`\n${body}\n\`\`\`${suffix}`;
+  const bodyFrom = from + prefix.length + 4;
+  const bodyTo = bodyFrom + body.length;
+
+  return { insert, bodyFrom, bodyTo };
+}
+
+export function insertFencedCodeBlock(view: EditorView) {
+  const { state } = view;
+  const range = state.selection.main;
+  const selected = state.sliceDoc(range.from, range.to);
+  const { insert, bodyFrom, bodyTo } = getFencedCodeBlockInsertion(
+    state.doc,
+    range.from,
+    range.to,
+    selected,
+  );
+  const selection = bodyFrom === bodyTo
+    ? EditorSelection.cursor(bodyFrom)
+    : EditorSelection.range(bodyFrom, bodyTo);
+
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert },
+    selection,
     scrollIntoView: true,
     userEvent: "input",
   });

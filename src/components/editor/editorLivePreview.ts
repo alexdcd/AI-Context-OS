@@ -19,9 +19,13 @@ export const ACTIVE_LINE_HIDDEN_MARKERS = [
 ] as const;
 
 export const hiddenSyntaxMark = Decoration.mark({ class: "cm-hidden-syntax" });
+export const listSourceMarkerMark = Decoration.mark({ class: "cm-list-source-marker" });
 
 export const hiddenSyntaxStyle = {
   color: "transparent !important",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important",
+  fontSize: "1px !important",
+  letterSpacing: "-1ch !important",
 } as const;
 
 /**
@@ -46,4 +50,102 @@ export function shouldHideMarkdownNode(nodeName: string, lineIsActive: boolean) 
   return ACTIVE_LINE_HIDDEN_MARKERS.includes(
     nodeName as (typeof ACTIVE_LINE_HIDDEN_MARKERS)[number],
   );
+}
+
+export function isInsideMarkdownListItem(node: { parent: { name: string; parent: any } | null }) {
+  let current = node.parent;
+  while (current) {
+    if (current.name === "ListItem") {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function listItemHasTask(node: { parent: { name: string; firstChild?: any; parent: any } | null }) {
+  let current = node.parent;
+  while (current && current.name !== "ListItem") {
+    current = current.parent;
+  }
+  if (!current) return false;
+
+  for (let child = current.firstChild; child; child = child.nextSibling) {
+    if (child.name === "Task") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function shouldKeepListMarkerVisible(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any; parent: any } | null },
+) {
+  return nodeName === "ListMark"
+    && isInsideMarkdownListItem(node)
+    && !listItemHasTask(node);
+}
+
+export function getVisibleListMarkerDecoration(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any; parent: any } | null },
+) {
+  if (!shouldKeepListMarkerVisible(nodeName, node)) {
+    return null;
+  }
+
+  return listSourceMarkerMark;
+}
+
+export function shouldKeepCodeInfoVisible(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any } | null },
+) {
+  if (nodeName !== "CodeInfo" || node.parent?.name !== "FencedCode") {
+    return false;
+  }
+
+  for (let child = node.parent.firstChild; child; child = child.nextSibling) {
+    if (child.name === "CodeText" && child.to > child.from) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function getMarkdownLinkLabelRange(
+  node: { firstChild?: any } | null,
+): { from: number; to: number } | null {
+  if (!node) return null;
+
+  const firstChild = node.firstChild;
+  if (!firstChild || firstChild.name !== "LinkMark") {
+    return null;
+  }
+
+  for (let child = firstChild.nextSibling; child; child = child.nextSibling) {
+    if (child.name === "LinkMark") {
+      return child.from > firstChild.to ? { from: firstChild.to, to: child.from } : null;
+    }
+  }
+
+  return null;
+}
+
+export function linkHasVisibleLabel(node: { firstChild?: any } | null) {
+  return getMarkdownLinkLabelRange(node) !== null;
+}
+
+export function shouldHideNamedLinkUrl(
+  nodeName: string,
+  node: { parent: { name: string; firstChild?: any } | null },
+  lineIsActive: boolean,
+) {
+  return nodeName === "URL"
+    && !lineIsActive
+    && node.parent?.name === "Link"
+    && linkHasVisibleLabel(node.parent);
 }

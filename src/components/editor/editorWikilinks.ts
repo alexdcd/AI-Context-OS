@@ -17,8 +17,11 @@ import {
 import type { MemoryOntology } from "../../lib/types";
 import {
   getActivePreviewLineNumbers,
-  shouldRefreshActivePreviewLines,
 } from "./editorPreviewState";
+import {
+  isMouseSelecting,
+  shouldRefreshSensitivePreviewDecorations,
+} from "./editorMouseSelectingField";
 
 const WIKILINK_RE = /\[\[([^\[\]\n]+?)\]\]/g;
 const MAX_EMPTY_QUERY_SUGGESTIONS = 12;
@@ -217,6 +220,9 @@ export function nextUniqueMemoryId(text: string, targets: ReadonlyArray<Wikilink
 
 function getWikilinkPreviewDecoration(innerText: string, resolution: WikilinkMatchResult) {
   let title: string;
+  const attributes: Record<string, string> = {
+    "data-wikilink-state": resolution.kind,
+  };
 
   switch (resolution.kind) {
     case "exact_id":
@@ -226,6 +232,7 @@ function getWikilinkPreviewDecoration(innerText: string, resolution: WikilinkMat
       title = [target.l0 || target.id, target.id, target.ontology, target.folderCategory]
         .filter(Boolean)
         .join(" · ");
+      attributes["data-wikilink-target"] = target.id;
       break;
     }
     case "ambiguous":
@@ -239,7 +246,7 @@ function getWikilinkPreviewDecoration(innerText: string, resolution: WikilinkMat
   return Decoration.mark({
     class: "cm-wikilink-chip",
     attributes: {
-      "data-wikilink-state": resolution.kind,
+      ...attributes,
       title,
     },
   });
@@ -247,15 +254,19 @@ function getWikilinkPreviewDecoration(innerText: string, resolution: WikilinkMat
 
 const wikilinkEditorTheme = EditorView.baseTheme({
   ".cm-wikilink-chip": {
+    padding: "0.05em 0.32em",
     borderRadius: "999px",
     backgroundColor: "transparent",
     cursor: "text",
     transition: "background-color 140ms ease, color 140ms ease",
+    boxDecorationBreak: "clone",
+    WebkitBoxDecorationBreak: "clone",
   },
   ".cm-wikilink-chip[data-wikilink-state='exact_id'], .cm-wikilink-chip[data-wikilink-state='exact_l0'], .cm-wikilink-chip[data-wikilink-state='fuzzy_l0']":
     {
       color: "var(--accent)",
       backgroundColor: "color-mix(in srgb, var(--accent-muted) 72%, transparent)",
+      cursor: "pointer",
     },
   ".cm-wikilink-chip[data-wikilink-state='ambiguous']": {
     color: "var(--warning)",
@@ -334,12 +345,16 @@ function createWikilinkPreviewPlugin(options: WikilinkEditorOptions) {
       }
 
       update(update: ViewUpdate) {
+        if (isMouseSelecting(update.state)) {
+          return;
+        }
+
         if (update.docChanged || update.viewportChanged) {
           this.decorations = this.buildDecorations(update.view);
           return;
         }
 
-        if (shouldRefreshActivePreviewLines(update, options.revealSyntaxOnActiveLine)) {
+        if (shouldRefreshSensitivePreviewDecorations(update, options.revealSyntaxOnActiveLine)) {
           this.decorations = this.buildDecorations(update.view);
         }
       }

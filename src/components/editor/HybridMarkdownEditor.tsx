@@ -18,21 +18,35 @@ import { useEffect, useMemo, useRef } from "react";
 import { tags as t } from "@lezer/highlight";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { type StateCommand, EditorSelection, RangeSetBuilder } from "@codemirror/state";
+import { type StateCommand, EditorSelection, Prec, RangeSetBuilder } from "@codemirror/state";
 import { useTranslation } from "react-i18next";
-import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
+import {
+  applyLinePrefixToggle,
+  getToggleMarkChange,
+  insertMarkdownLink,
+  normalizeMarkdownInlineRange,
+} from "./editorCommands";
 import {
   getActivePreviewLineNumbers,
-  shouldRefreshActivePreviewLines,
 } from "./editorPreviewState";
 import {
+  getDocumentWordRangeAtPosition,
   isTaskCheckboxHitOffset,
 } from "./editorMouseSelection";
+import {
+  createMouseSelectingExtension,
+  isMouseSelecting,
+  shouldRefreshSensitivePreviewDecorations,
+} from "./editorMouseSelectingField";
 import {
   hiddenSyntaxMark,
   hiddenSyntaxStyle,
   shouldRenderReplacePreviewWidget,
   shouldHideMarkdownNode,
+  getVisibleListMarkerDecoration,
+  shouldKeepCodeInfoVisible,
+  shouldHideNamedLinkUrl,
+  getMarkdownLinkLabelRange,
 } from "./editorLivePreview";
 import {
   createWikilinkExtensions,
@@ -101,8 +115,12 @@ const editorThemePresets = {
   },
 } as const;
 
-function shouldUsePresentationDecorations() {
-  return false;
+function shouldUseStructuralDecorations() {
+  return true;
+}
+
+function shouldUseLivePreviewDecorations() {
+  return true;
 }
 
 function createEditorTheme(variant: keyof typeof editorThemePresets) {
@@ -144,6 +162,31 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     ".cm-hidden-syntax": {
       ...hiddenSyntaxStyle,
     },
+    ".cm-hidden-syntax *": {
+      ...hiddenSyntaxStyle,
+    },
+    ".cm-list-source-marker": {
+      color: "var(--accent) !important",
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      fontWeight: "700",
+    },
+    ".cm-link-preview": {
+      color: "var(--accent)",
+      textDecoration: "underline",
+      textDecorationThickness: "0.08em",
+      textUnderlineOffset: "0.18em",
+      cursor: "pointer",
+    },
+    ".cm-link-preview::after": {
+      content: '"↗"',
+      display: "inline-block",
+      marginLeft: "0.16em",
+      fontSize: "0.72em",
+      lineHeight: "1",
+      verticalAlign: "text-top",
+      color: "color-mix(in srgb, var(--accent) 76%, var(--text-2))",
+      pointerEvents: "none",
+    },
     ".cm-cursor": {
       borderLeftColor: "var(--text-0)",
     },
@@ -154,7 +197,7 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       letterSpacing: "-0.025em",
       paddingTop: "0.75em",
       paddingBottom: "0.32em",
-      borderBottom: preset.headingBorderStrong,
+      boxShadow: `inset 0 -${preset.headingBorderStrong.startsWith("2px") ? "2px" : "1px"} 0 color-mix(in srgb, var(--accent) 16%, var(--border))`,
     },
     ".cm-line.cm-h2": {
       fontSize: preset.heading2Size,
@@ -163,7 +206,7 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       color: preset.heading2Color,
       paddingTop: "0.65em",
       paddingBottom: "0.22em",
-      borderBottom: preset.headingBorderSoft,
+      boxShadow: "inset 0 -1px 0 color-mix(in srgb, var(--accent) 12%, var(--border))",
     },
     ".cm-line.cm-h3": {
       fontSize: "1.24em",
@@ -188,54 +231,33 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
       letterSpacing: "0.04em",
     },
     ".cm-line.cm-blockquote": {
-      marginLeft: "0.1rem",
-      paddingLeft: "0.95rem",
-      borderLeft: "3px solid color-mix(in srgb, var(--accent) 28%, var(--border))",
       color: "var(--text-1)",
       backgroundColor: "color-mix(in srgb, var(--accent-muted) 55%, transparent)",
+      boxShadow: "inset 3px 0 0 color-mix(in srgb, var(--accent) 28%, var(--border))",
     },
     ".cm-line.cm-bullet-item": {
       position: "relative",
-      paddingLeft: "1.15rem",
     },
     ".cm-line.cm-list-depth-1": {
       marginLeft: "0",
     },
     ".cm-line.cm-list-depth-2": {
-      marginLeft: "1rem",
+      marginLeft: "0",
     },
     ".cm-line.cm-list-depth-3": {
-      marginLeft: "2rem",
+      marginLeft: "0",
     },
     ".cm-line.cm-list-depth-4": {
-      marginLeft: "3rem",
+      marginLeft: "0",
     },
     ".cm-line.cm-bullet-item::before": {
-      content: '""',
-      position: "absolute",
-      left: "0.2rem",
-      top: "0.9em",
-      width: "0.36rem",
-      height: "0.36rem",
-      borderRadius: "999px",
-      backgroundColor: "color-mix(in srgb, var(--text-1) 88%, transparent)",
-      transform: "translateY(-50%)",
+      content: "none",
     },
     ".cm-line.cm-ordered-item": {
       position: "relative",
-      paddingLeft: "2rem",
     },
     ".cm-line.cm-ordered-item::before": {
-      content: "attr(data-list-index) '.'",
-      position: "absolute",
-      left: "0",
-      top: "0.12rem",
-      width: "1.5rem",
-      color: "var(--text-2)",
-      fontSize: "0.88em",
-      fontWeight: "700",
-      textAlign: "right",
-      fontVariantNumeric: "tabular-nums",
+      content: "none",
     },
     ".cm-line.cm-task-item": {
       position: "relative",
@@ -272,81 +294,63 @@ function createEditorTheme(variant: keyof typeof editorThemePresets) {
     },
     ".cm-line.cm-codeblock": {
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
-      fontSize: "0.92em",
       backgroundColor: "color-mix(in srgb, var(--bg-2) 92%, transparent)",
-      color: "var(--text-0)",
-      paddingLeft: "0.95rem",
-      paddingRight: "0.95rem",
+      color: "var(--text-0) !important",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
+    },
+    ".cm-line.cm-codeblock span:not(.cm-hidden-syntax)": {
+      color: "inherit !important",
     },
     ".cm-line.cm-codeblock-start": {
-      marginTop: "0.7rem",
-      paddingTop: "0.55rem",
       borderTopLeftRadius: "14px",
       borderTopRightRadius: "14px",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       color: "var(--text-2)",
-      fontSize: "0.76em",
-      letterSpacing: "0.06em",
-      textTransform: "uppercase",
+      boxShadow:
+        "inset 1px 1px 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-codeblock-start::before": {
-      content: "attr(data-code-language)",
+      content: "none",
     },
     ".cm-line.cm-codeblock-body": {
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-codeblock-end": {
-      paddingBottom: "0.55rem",
       borderBottomLeftRadius: "14px",
       borderBottomRightRadius: "14px",
-      borderBottom: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       color: "var(--text-2)",
-      fontSize: "0.76em",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-hr": {
-      height: "0",
-      paddingTop: "1rem",
-      marginTop: "0.4rem",
-      marginBottom: "1.1rem",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 88%, transparent)",
+      color: "transparent",
+      boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--border) 88%, transparent)",
     },
     ".cm-line.cm-table-header, .cm-line.cm-table-row": {
-      paddingLeft: "0.75rem",
-      paddingRight: "0.75rem",
       backgroundColor: "color-mix(in srgb, var(--bg-2) 78%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
-      fontSize: "0.92em",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-table-header": {
-      marginTop: "0.7rem",
-      paddingTop: "0.55rem",
-      paddingBottom: "0.45rem",
       fontWeight: "700",
       borderTopLeftRadius: "12px",
       borderTopRightRadius: "12px",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      boxShadow:
+        "inset 1px 1px 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-table-separator": {
-      height: "0",
-      paddingTop: "0",
-      marginBottom: "0",
-      borderTop: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderLeft: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
-      borderRight: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
+      color: "transparent",
       backgroundColor: "color-mix(in srgb, var(--bg-2) 78%, transparent)",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset 0 1px 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
     ".cm-line.cm-table-row:last-of-type": {
-      borderBottom: "1px solid color-mix(in srgb, var(--border) 84%, transparent)",
       borderBottomLeftRadius: "12px",
       borderBottomRightRadius: "12px",
-      paddingBottom: "0.55rem",
+      boxShadow:
+        "inset 1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset -1px 0 0 color-mix(in srgb, var(--border) 84%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--border) 84%, transparent)",
     },
   });
 }
@@ -410,7 +414,7 @@ function createStructuralDecorations(editable: boolean) {
       }
 
       buildDecorations(view: EditorView) {
-        if (!shouldUsePresentationDecorations()) {
+        if (!shouldUseStructuralDecorations()) {
           return new RangeSetBuilder<Decoration>().finish();
         }
 
@@ -753,6 +757,10 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
       }
 
       update(update: ViewUpdate) {
+        if (isMouseSelecting(update.state)) {
+          return;
+        }
+
         const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
 
         if (update.docChanged || update.viewportChanged || treeChanged) {
@@ -760,7 +768,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
           return;
         }
 
-        if (shouldRefreshActivePreviewLines(update, revealSyntaxOnActiveLine)) {
+        if (shouldRefreshSensitivePreviewDecorations(update, revealSyntaxOnActiveLine)) {
           this.decorations = this.buildDecorations(update.view);
         }
       }
@@ -768,13 +776,12 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
       buildDecorations(view: EditorView) {
         const builder = new RangeSetBuilder<Decoration>();
         const state = view.state;
-        if (!shouldUsePresentationDecorations()) {
+        if (!shouldUseLivePreviewDecorations()) {
           return builder.finish();
         }
 
         const activeLines = new Set(getActivePreviewLineNumbers(state, revealSyntaxOnActiveLine));
 
-        const linkPreviewMark = Decoration.mark({ class: "cm-link-preview" });
         const decos: { from: number; to: number; deco: Decoration }[] = [];
 
         for (const { from, to } of view.visibleRanges) {
@@ -784,8 +791,18 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
             enter(node) {
               const line = state.doc.lineAt(node.from).number;
               const lineIsActive = activeLines.has(line);
+              const visibleListMarkerDecoration = getVisibleListMarkerDecoration(
+                node.name,
+                node.node,
+              );
 
-              if (shouldHideMarkdownNode(node.name, lineIsActive)) {
+              if (visibleListMarkerDecoration) {
+                decos.push({ from: node.from, to: node.to, deco: visibleListMarkerDecoration });
+              } else if (shouldKeepCodeInfoVisible(node.name, node.node)) {
+                return;
+              } else if (shouldHideNamedLinkUrl(node.name, node.node, lineIsActive)) {
+                decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
+              } else if (shouldHideMarkdownNode(node.name, lineIsActive)) {
                 decos.push({ from: node.from, to: node.to, deco: hiddenSyntaxMark });
               } else if (
                 shouldRenderReplacePreviewWidget(editable, lineIsActive)
@@ -801,17 +818,61 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
                   to: node.to,
                   deco: Decoration.replace({ widget: new LinkIconWidget(urlText) }),
                 });
+              } else if (node.name === "URL" && node.node.parent?.name !== "Link") {
+                const urlText = state
+                  .sliceDoc(node.from, node.to)
+                  .replace(/^[(<]/, "")
+                  .replace(/[)>]$/, "");
+                const linkPreviewMark = Decoration.mark({
+                  class: "cm-link-preview",
+                  attributes: {
+                    "data-link-url": urlText,
+                    title: urlText,
+                  },
+                });
+                decos.push({ from: node.from, to: node.to, deco: linkPreviewMark });
               } else if (node.name === "Link") {
                 const firstChild = node.node.firstChild;
                 const lastChild = node.node.lastChild;
                 if (firstChild && lastChild) {
-                  const textFrom = firstChild.to;
-                  const textTo =
-                    firstChild.nextSibling?.name === "LinkMark"
-                      ? firstChild.nextSibling.from
-                      : lastChild.from;
-                  if (textTo > textFrom) {
-                    decos.push({ from: textFrom, to: textTo, deco: linkPreviewMark });
+                  let urlText = "";
+                  let child = node.node.firstChild;
+                  while (child) {
+                    if (child.name === "URL") {
+                      urlText = state
+                        .sliceDoc(child.from, child.to)
+                        .replace(/^[(<]/, "")
+                        .replace(/[)>]$/, "");
+                      break;
+                    }
+                    child = child.nextSibling;
+                  }
+                  const labelRange = getMarkdownLinkLabelRange(node.node);
+                  if (labelRange && urlText) {
+                    const linkPreviewMark = Decoration.mark({
+                      class: "cm-link-preview",
+                      attributes: {
+                        "data-link-url": urlText,
+                        title: urlText,
+                      },
+                    });
+                    decos.push({
+                      from: labelRange.from,
+                      to: labelRange.to,
+                      deco: linkPreviewMark,
+                    });
+                  } else if (urlText) {
+                    decos.push({
+                      from: child?.from ?? node.from,
+                      to: child?.to ?? node.to,
+                      deco: Decoration.mark({
+                        class: "cm-link-preview",
+                        attributes: {
+                          "data-link-url": urlText,
+                          title: urlText,
+                        },
+                      }),
+                    });
                   }
                 }
               }
@@ -834,38 +895,7 @@ function createLivePreviewPlugin(editable: boolean, revealSyntaxOnActiveLine: bo
 function applyToggleMark(view: EditorView, mark: string) {
   const { state } = view;
   const changes = state.changeByRange((range) => {
-    const normalized = normalizeInlineRange(state.doc, range.from, range.to);
-
-    if (range.empty) {
-      return {
-        changes: [{ from: range.from, insert: mark + mark }],
-        range: EditorSelection.range(range.from + mark.length, range.from + mark.length),
-      };
-    }
-
-    const alreadyWrapped =
-      normalized.from >= mark.length &&
-      normalized.to <= state.doc.length - mark.length &&
-      state.sliceDoc(normalized.from - mark.length, normalized.from) === mark &&
-      state.sliceDoc(normalized.to, normalized.to + mark.length) === mark;
-
-    if (alreadyWrapped) {
-      return {
-        changes: [
-          { from: normalized.from - mark.length, to: normalized.from },
-          { from: normalized.to, to: normalized.to + mark.length },
-        ],
-        range: EditorSelection.range(normalized.from - mark.length, normalized.to - mark.length),
-      };
-    }
-
-    return {
-      changes: [
-        { from: normalized.from, insert: mark },
-        { from: normalized.to, insert: mark },
-      ],
-      range: EditorSelection.range(normalized.from + mark.length, normalized.to + mark.length),
-    };
+    return getToggleMarkChange(state.doc, range.from, range.to, mark);
   });
 
   view.dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
@@ -914,7 +944,7 @@ function wrapWith(mark: string): StateCommand {
 
     const changes = state.changeByRange((range) => {
       if (range.empty) return { range };
-      const normalized = normalizeInlineRange(state.doc, range.from, range.to);
+      const normalized = normalizeMarkdownInlineRange(state.doc, range.from, range.to);
       return {
         changes: [
           { from: normalized.from, insert: mark },
@@ -962,8 +992,80 @@ const turndownService = new TurndownService({
   strongDelimiter: "**",
 });
 
-function createDomHandlers(editable: boolean) {
+function selectionIsRange(state: EditorView["state"]) {
+  return state.selection.ranges.some((range) => !range.empty);
+}
+
+function selectDocumentWordAtEvent(view: EditorView, event: MouseEvent) {
+  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+  if (pos === null) {
+    return false;
+  }
+
+  const wordRange = getDocumentWordRangeAtPosition(view.state, pos);
+  if (!wordRange) {
+    return false;
+  }
+
+  requestAnimationFrame(() => {
+    if (wordRange.to > view.state.doc.length) {
+      return;
+    }
+
+    view.dispatch({
+      selection: EditorSelection.range(wordRange.from, wordRange.to),
+      scrollIntoView: false,
+      userEvent: "select.pointer",
+    });
+  });
+
+  return true;
+}
+
+function createDomHandlers(editable: boolean, onOpenWikilink?: (id: string) => void) {
   return EditorView.domEventHandlers({
+    click(event, view) {
+      if (event.button !== 0 || event.detail !== 1 || selectionIsRange(view.state)) {
+        return false;
+      }
+
+      const target = getEventTargetElement(event.target);
+      if (!target) return false;
+
+      const wikilinkElement = target.closest(".cm-wikilink-chip[data-wikilink-target]");
+      if (wikilinkElement instanceof HTMLElement) {
+        const targetId = wikilinkElement.dataset.wikilinkTarget;
+        if (targetId && onOpenWikilink) {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenWikilink(targetId);
+          return true;
+        }
+      }
+
+      const linkElement = target.closest(".cm-link-preview[data-link-url]");
+      if (linkElement instanceof HTMLElement) {
+        const url = linkElement.dataset.linkUrl;
+        if (url) {
+          event.preventDefault();
+          event.stopPropagation();
+          open(url).catch(console.error);
+          return true;
+        }
+      }
+
+      return false;
+    },
+
+    dblclick(event, view) {
+      if (!editable || event.button !== 0) {
+        return false;
+      }
+
+      selectDocumentWordAtEvent(view, event);
+      return false;
+    },
+
     mousedown(event, view) {
       if (!editable || event.button !== 0) return false;
       if (event.detail >= 2) return false;
@@ -1051,6 +1153,7 @@ export function HybridMarkdownEditor({
     () => [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
+      createMouseSelectingExtension(),
       createEditorTheme(themeVariant),
       createStructuralDecorations(editable),
       ...(showSyntax ? [] : [createLivePreviewPlugin(editable, revealSyntaxOnActiveLine)]),
@@ -1066,9 +1169,9 @@ export function HybridMarkdownEditor({
           })),
       syntaxHighlighting(markdownHighlightStyle),
       history(),
-      keymap.of(createMarkdownKeymap(linkTextPlaceholder)),
+      Prec.highest(keymap.of(createMarkdownKeymap(linkTextPlaceholder))),
       keymap.of([...defaultKeymap, ...historyKeymap]),
-      createDomHandlers(editable),
+      createDomHandlers(editable, onOpenWikilink),
     ],
     [
       themeVariant,

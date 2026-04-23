@@ -21,7 +21,12 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import { applyLinePrefixToggle, insertMarkdownLink, normalizeInlineRange } from "./editorCommands";
+import {
+  applyLinePrefixToggle,
+  getToggleMarkChange,
+  insertFencedCodeBlock,
+  insertMarkdownLink,
+} from "./editorCommands";
 
 interface Props {
   viewRef: React.MutableRefObject<EditorView | null>;
@@ -31,14 +36,16 @@ interface Props {
 function wrapSelection(view: EditorView, mark: string, placeholder = "") {
   const { state } = view;
   const changes = state.changeByRange((range) => {
-    const normalized = normalizeInlineRange(state.doc, range.from, range.to);
-    const text = state.sliceDoc(normalized.from, normalized.to) || placeholder;
-    const inserted = `${mark}${text}${mark}`;
+    if (!range.empty) {
+      return getToggleMarkChange(state.doc, range.from, range.to, mark);
+    }
+
+    const inserted = `${mark}${placeholder}${mark}`;
     return {
-      changes: [{ from: normalized.from, to: normalized.to, insert: inserted }],
+      changes: [{ from: range.from, to: range.to, insert: inserted }],
       range: EditorSelection.range(
-        normalized.from + mark.length,
-        normalized.from + mark.length + text.length,
+        range.from + mark.length,
+        range.from + mark.length + placeholder.length,
       ),
     };
   });
@@ -205,7 +212,7 @@ export function FormatToolbar({ viewRef, disabled = false }: Props) {
         label: t("memoryEditor.toolbar.codeBlock"),
         keywords: ["snippet", "fenced", "code block", "bloque"],
         icon: <Code className="h-3.5 w-3.5" />,
-        run: (view) => insertBlock(view, "```\n\n```", 4),
+        run: (view) => insertFencedCodeBlock(view),
       },
       {
         key: "hr",
