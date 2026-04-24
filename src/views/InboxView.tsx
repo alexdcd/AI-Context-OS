@@ -288,23 +288,33 @@ export function InboxView() {
     const unsubs: Array<() => void> = [];
 
     void (async () => {
-      const [u1, u2] = await Promise.all([
-        listen("inbox-changed", () => void loadInboxState()),
-        listen("proposals-changed", () => void loadInboxState()),
-      ]);
-      if (cancelled) {
-        u1();
-        u2();
-        return;
+      try {
+        const u1 = await listen("inbox-changed", () => void loadInboxState());
+        if (cancelled) {
+          u1();
+          return;
+        }
+        unsubs.push(u1);
+
+        const u2 = await listen("proposals-changed", () => void loadInboxState());
+        if (cancelled) {
+          u2();
+          return;
+        }
+        unsubs.push(u2);
+      } catch (error) {
+        unsubs.forEach((u) => u());
+        if (!cancelled) {
+          setError(String(error));
+        }
       }
-      unsubs.push(u1, u2);
     })();
 
     return () => {
       cancelled = true;
       unsubs.forEach((u) => u());
     };
-  }, [loadInboxState]);
+  }, [loadInboxState, setError]);
 
   const proposalMap = useMemo(() => buildProposalMap(proposals), [proposals]);
 
@@ -339,8 +349,13 @@ export function InboxView() {
     setDraftL1(selectedItem.l1_content);
     setDraftL2(selectedItem.l2_content);
     setDraftTags(selectedItem.tags.join(", "));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItem?.id, selectedItem?.content_hash]);
+  }, [
+    selectedItem?.id,
+    selectedItem?.title,
+    selectedItem?.l1_content,
+    selectedItem?.l2_content,
+    selectedItem?.tags,
+  ]);
 
   useEffect(() => {
     if (!selectedProposal) {
