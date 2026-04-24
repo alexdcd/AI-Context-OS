@@ -1797,6 +1797,194 @@ async fn fetch_models_for_config(
     }
 }
 
+fn build_inbox_enrichment(
+    root: &Path,
+    item: &InboxItem,
+    memory_corpus: &[MemoryCorpusEntry],
+    inbox_duplicates: Vec<InboxDuplicateCandidate>,
+) -> InboxEnrichment {
+    let mut enrichment = InboxEnrichment {
+        duplicate_candidates: inbox_duplicates,
+        ..InboxEnrichment::default()
+    };
+
+    if memory_corpus.is_empty() {
+        enrichment.destination_candidates = infer_destination_candidates(root, &[]);
+        enrichment.inferred_destination = enrichment
+            .destination_candidates
+            .first()
+            .map(|candidate| candidate.path.clone());
+        enrichment.context_prompt = build_enrichment_context_prompt(
+            item,
+            &enrichment.related_memory_candidates,
+            &enrichment.duplicate_candidates,
+            &enrichment.destination_candidates,
+            memory_corpus,
+        );
+        return enrichment;
+    }
+
+    let query = item_query_text(item);
+    let documents: Vec<&str> = memory_corpus
+        .iter()
+        .map(|entry| entry.document.as_str())
+        .collect();
+    let bm25_corpus = Bm25Corpus::from_documents(&documents);
+    let memory_metas: Vec<MemoryMeta> = memory_corpus.iter().map(|entry| entry.meta.clone()).collect();
+    let wikilink_targets = detect_item_wikilink_targets(item, &memory_metas);
+    let source_url = item.source_url.clone().unwrap_or_default();
+    let tag_query = combine_query_parts(&[item.tags.join(" "), query.clone()]);
+
+    let raw_bm25_scores: Vec<f64> = memory_corpus
+        .iter()
+        .map(|entry| {
+            if bm25_corpus.total_docs == 0 {
+                0.0
+            } else {
+                bm25_score(
+                    &query,
+                    &entry.document,
+                    bm25_corpus.avg_doc_len.max(1.0),
+                    bm25_corpus.total_docs,
+                    &bm25_corpus.doc_freq,
+                )
+            }
+        })
+        .collect();
+    let max_bm25 = raw_bm25_scores
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+
+    let mut related_candidates = Vec::new();
+    let mut duplicate_candidates = enrichment.duplicate_candidates.clone();
+    let mut seen_duplicate_keys = HashSet::new();
+
+    for (index, entry) in memory_corpus.iter().enumerate() {
+        let normalized_bm25 = if max_bm25 > 0.0 {
+            raw_bm25_scores[index] / max_bm25
+        } else {
+            0.0
+        };
+        let tag_overlap = tag_match_score(&tag_query, &entry.meta.tags);
+        let l0_keyword = l0_keyword_score(&query, &entry.meta.l0);
+        let wikilink = if wikilink_targets.contains(&entry.meta.id) {
+            1.0
+        } else {
+            0.0
+        };
+        let source_url_score = if !source_url.is_empty()
+            && entry.source_urls.iter().any(|candidate| candidate == &source_url)
+        {
+            1.0
+        } else {
+            0.0
+        };
+
+        let mut final_score = normalized_bm25 * 0.45
+            + tag_overlap * 0.20
+            + l0_keyword * 0.15
+            + wikilink * 0.10
+            + source_url_score * 0.10;
+        if wikilink > 0.0 {
+            final_score = final_score.max(0.82);
+        }
+        if source_url_score > 0.0 {
+            final_score = final_score.max(0.98);
+            let key = format!("memory_source_url:{}", entry.meta.id);
+            if seen_duplicate_keys.insert(key) {
+                duplicate_candidates.push(InboxDuplicateCandidate {
+                    kind: "memory_source_url".to_string(),
+                    target_id: entry.meta.id.clone(),
+                    target_title: entry.meta.l0.clone(),
+                    file_path: Some(entry.path.clone()),
+                    confidence: 0.98,
+                    rationale: format!(
+                        "Matches the same source URL already captured by memory '{}'.",
+                        entry.meta.l0
+                    ),
+                });
+            }
+        }
+
+        let mut reasons = Vec::new();
+        if normalized_bm25 >= 0.35 {
+            reasons.push(format!("Strong lexical match (BM25 {:.2}).", normalized_bm25));
+        }
+        if tag_overlap >= 0.25 {
+            reasons.push(format!("Tag overlap {:.2}.", tag_overlap));
+        }
+        if l0_keyword >= 0.25 {
+            reasons.push(format!("L0 keyword overlap {:.2}.", l0_keyword));
+        }
+        if wikilink > 0.0 {
+            reasons.push("Explicit wikilink from the inbox content.".to_string());
+        }
+        if source_url_score > 0.0 {
+            reasons.push("Exact source URL match.".to_string());
+        }
+
+        if final_score >= 0.18 || wikilink > 0.0 || source_url_score > 0.0 {
+            related_candidates.push(InboxRelatedMemoryCandidate {
+                memory_id: entry.meta.id.clone(),
+                l0: entry.meta.l0.clone(),
+                ontology: entry.meta.ontology.clone(),
+                file_path: entry.path.clone(),
+                folder_category: entry.meta.folder_category.clone(),
+                protected: entry.meta.protected,
+                score: InboxRecommendationScore {
+                    bm25: normalized_bm25,
+                    tag_overlap,
+                    l0_keyword,
+                    wikilink,
+                    source_url: source_url_score,
+                },
+                final_score,
+                reasons,
+            });
+        }
+    }
+
+    related_candidates.sort_by(|left, right| right.final_score.total_cmp(&left.final_score));
+    related_candidates.truncate(8);
+
+    duplicate_candidates.sort_by(|left, right| right.confidence.total_cmp(&left.confidence));
+    enrichment.duplicate_candidates = duplicate_candidates;
+    enrichment.related_memory_candidates = related_candidates;
+    enrichment.destination_candidates =
+        infer_destination_candidates(root, &enrichment.related_memory_candidates);
+    enrichment.inferred_destination = enrichment
+        .destination_candidates
+        .first()
+        .map(|candidate| candidate.path.clone());
+    enrichment.context_memory_ids = enrichment
+        .related_memory_candidates
+        .iter()
+        .take(5)
+        .map(|candidate| candidate.memory_id.clone())
+        .collect();
+
+    if let Some(target) = enrichment.related_memory_candidates.iter().find(|candidate| {
+        !candidate.protected
+            && (candidate.score.source_url >= 0.99
+                || candidate.score.wikilink >= 0.99
+                || candidate.final_score >= 0.72)
+    }) {
+        enrichment.suggested_target_memory_id = Some(target.memory_id.clone());
+        enrichment.suggested_target_memory_path = Some(target.file_path.clone());
+    }
+
+    enrichment.context_prompt = build_enrichment_context_prompt(
+        item,
+        &enrichment.related_memory_candidates,
+        &enrichment.duplicate_candidates,
+        &enrichment.destination_candidates,
+        memory_corpus,
+    );
+
+    enrichment
+}
+
 fn heuristic_proposal(item: &InboxItem) -> IngestProposal {
     let now = Utc::now();
     let (action, ontology, rationale, l0, l1, l2, confidence) = match item.kind {
@@ -1866,12 +2054,18 @@ fn heuristic_proposal(item: &InboxItem) -> IngestProposal {
         created: now,
         modified: now,
         destination: None,
+        target_memory_id: None,
+        target_memory_path: None,
         ontology,
         l0,
         l1_content: l1,
         l2_content: l2,
         tags: item.tags.clone(),
         derived_from: vec![item.id.clone()],
+        context_memory_ids: Vec::new(),
+        related_memory_candidates: Vec::new(),
+        duplicate_candidates: Vec::new(),
+        destination_candidates: Vec::new(),
         inference_provider: None,
         inference_preset: None,
         origin: "heuristic".to_string(),
@@ -1894,12 +2088,18 @@ fn duplicate_proposal(item: &InboxItem, duplicate_of: &InboxItem) -> IngestPropo
         created: now,
         modified: now,
         destination: None,
+        target_memory_id: None,
+        target_memory_path: None,
         ontology: None,
         l0: Some(item.title.clone()),
         l1_content: Some(item.summary.clone()),
         l2_content: Some(item.l2_content.clone()),
         tags: item.tags.clone(),
         derived_from: vec![item.id.clone(), duplicate_of.id.clone()],
+        context_memory_ids: Vec::new(),
+        related_memory_candidates: Vec::new(),
+        duplicate_candidates: Vec::new(),
+        destination_candidates: Vec::new(),
         inference_provider: None,
         inference_preset: None,
         origin: "heuristic".to_string(),
