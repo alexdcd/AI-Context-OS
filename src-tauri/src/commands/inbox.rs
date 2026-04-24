@@ -774,7 +774,7 @@ fn apply_inferred_enrichment(
             proposal.target_memory_id = Some(fallback_id.clone());
             proposal.target_memory_path = enrichment.suggested_target_memory_path.clone();
             proposal.rationale = format!(
-                "{} Fallbacked to the strongest vetted related memory.",
+                "{} Fell back to the strongest vetted related memory.",
                 proposal.rationale
             );
         } else {
@@ -817,6 +817,29 @@ fn inbox_frontmatter_to_item(
         .clone()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| preview_text(if l1.trim().is_empty() { &l2 } else { &l1 }));
+    let kind = frontmatter.kind.unwrap_or(InboxItemKind::Text);
+    let source_url = frontmatter.source_url.clone();
+    let original_file = frontmatter.original_file.clone();
+    let mime = frontmatter.mime.clone();
+    let tags = frontmatter.tags.clone();
+    let derived_from = frontmatter.derived_from.clone();
+    let attachments = frontmatter.attachments.clone();
+    let content_hash = if is_legacy_content_hash(frontmatter.content_hash.as_deref()) {
+        compute_item_content_hash(
+            &kind,
+            &title,
+            &l1,
+            &l2,
+            source_url.as_deref(),
+            &attachments,
+            frontmatter.content_hash.as_deref(),
+        )
+    } else {
+        frontmatter
+            .content_hash
+            .clone()
+            .unwrap_or_else(|| compute_item_content_hash(&kind, &title, &l1, &l2, source_url.as_deref(), &attachments, None))
+    };
 
     InboxItem {
         id: if frontmatter.id.trim().is_empty() {
@@ -824,15 +847,13 @@ fn inbox_frontmatter_to_item(
         } else {
             frontmatter.id
         },
-        kind: frontmatter.kind.unwrap_or(InboxItemKind::Text),
+        kind,
         status: frontmatter.status.unwrap_or(InboxItemStatus::New),
         capture_state: frontmatter
             .capture_state
             .unwrap_or_else(|| "raw".to_string()),
         proposal_state: frontmatter.proposal_state.unwrap_or(ProposalState::Pending),
-        content_hash: frontmatter
-            .content_hash
-            .unwrap_or_else(|| hash_str(&(title.clone() + &body))),
+        content_hash,
         created: frontmatter.created.unwrap_or_else(Utc::now),
         modified: frontmatter.modified.unwrap_or_else(Utc::now),
         path: path.to_string_lossy().to_string(),
@@ -840,14 +861,14 @@ fn inbox_frontmatter_to_item(
         summary,
         l1_content: l1,
         l2_content: l2,
-        source_url: frontmatter.source_url,
-        original_file: frontmatter.original_file,
-        mime: frontmatter.mime,
-        tags: frontmatter.tags,
-        derived_from: frontmatter.derived_from,
+        source_url,
+        original_file,
+        mime,
+        tags,
+        derived_from,
         needs_extraction: frontmatter.needs_extraction,
         needs_inference: frontmatter.needs_inference,
-        attachments: frontmatter.attachments,
+        attachments,
     }
 }
 
@@ -919,7 +940,15 @@ fn parse_inbox_markdown(path: &Path) -> Result<InboxItem, String> {
         status: InboxItemStatus::New,
         capture_state: "raw".to_string(),
         proposal_state: ProposalState::Pending,
-        content_hash: hash_str(&body),
+        content_hash: compute_item_content_hash(
+            &InboxItemKind::Text,
+            &title,
+            &body,
+            "",
+            None,
+            &[],
+            None,
+        ),
         created: Utc::now(),
         modified: Utc::now(),
         path: path.to_string_lossy().to_string(),
@@ -1493,24 +1522,48 @@ pub(super) fn build_openai_messages(request: &ChatCompletionRequest) -> Vec<Valu
 ///   1. `user` turn — from `request.context_prompt`, injected as loaded vault
 ///      context so the model treats it as background knowledge (if any)
 ///   2. All `request.messages` in order, normalized to `user`/`assistant`
+///
+/// When the first history turn is also `user`, merge the context into that
+/// first user message so Anthropic does not receive two consecutive user turns.
 pub(super) fn build_anthropic_messages(request: &ChatCompletionRequest) -> Vec<Value> {
-    let mut messages: Vec<Value> = Vec::new();
+    let mut normalized_turns: Vec<(String, String)> = request
+        .messages
+        .iter()
+        .map(|message| {
+            (
+                if message.role == "assistant" {
+                    "assistant".to_string()
+                } else {
+                    "user".to_string()
+                },
+                message.content.clone(),
+            )
+        })
+        .collect();
 
-    if let Some(ctx) = &request.context_prompt {
-        messages.push(json!({
-            "role": "user",
-            "content": [{ "type": "text", "text": ctx }]
-        }));
+    if let Some(ctx) = request
+        .context_prompt
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        match normalized_turns.first_mut() {
+            Some((role, content)) if role == "user" => {
+                *content = format!("{}\n\n{}", ctx, content);
+            }
+            _ => normalized_turns.insert(0, ("user".to_string(), ctx.to_string())),
+        }
     }
 
-    messages.extend(request.messages.iter().map(|message| {
+    normalized_turns
+        .into_iter()
+        .map(|(role, text)| {
         json!({
-            "role": if message.role == "assistant" { "assistant" } else { "user" },
-            "content": [{ "type": "text", "text": message.content }]
+                "role": role,
+                "content": [{ "type": "text", "text": text }]
         })
-    }));
-
-    messages
+        })
+        .collect()
 }
 
 async fn openai_compatible_chat(
@@ -1903,7 +1956,11 @@ fn build_inbox_enrichment(
         .collect();
     let wikilink_targets = detect_item_wikilink_targets(item, &memory_metas);
     let source_url = item.source_url.clone().unwrap_or_default();
-    let tag_query = combine_query_parts(&[item.tags.join(" "), query.clone()]);
+    let tag_match_query = if item.tags.is_empty() {
+        query.clone()
+    } else {
+        item.tags.join(" ")
+    };
 
     let raw_bm25_scores: Vec<f64> = memory_corpus
         .iter()
@@ -1933,7 +1990,7 @@ fn build_inbox_enrichment(
         } else {
             0.0
         };
-        let tag_overlap = tag_match_score(&tag_query, &entry.meta.tags);
+        let tag_overlap = tag_match_score(&tag_match_query, &entry.meta.tags);
         let l0_keyword = l0_keyword_score(&query, &entry.meta.l0);
         let wikilink = if wikilink_targets.contains(&entry.meta.id) {
             1.0
@@ -2381,7 +2438,7 @@ pub fn create_inbox_text(
         status: InboxItemStatus::New,
         capture_state: "raw".to_string(),
         proposal_state: ProposalState::Pending,
-        content_hash: hash_str(&l1),
+        content_hash: compute_item_content_hash(&InboxItemKind::Text, &title, &l1, "", None, &[], None),
         created: now,
         modified: now,
         path: path.to_string_lossy().to_string(),
@@ -2454,7 +2511,15 @@ pub async fn create_inbox_link(
         status: InboxItemStatus::Normalized,
         capture_state: "fetched".to_string(),
         proposal_state: ProposalState::Pending,
-        content_hash: hash_str(url.as_str()),
+        content_hash: compute_item_content_hash(
+            &InboxItemKind::Link,
+            &title,
+            &l1,
+            &format!("Source URL: {}", url),
+            Some(url.as_str()),
+            &[],
+            None,
+        ),
         created: now,
         modified: now,
         path: path.to_string_lossy().to_string(),
@@ -2630,7 +2695,15 @@ pub fn update_inbox_item(
         &item.l1_content
     });
     item.modified = Utc::now();
-    item.content_hash = hash_str(&(item.title.clone() + &item.l1_content + &item.l2_content));
+    item.content_hash = compute_item_content_hash(
+        &item.kind,
+        &item.title,
+        &item.l1_content,
+        &item.l2_content,
+        item.source_url.as_deref(),
+        &item.attachments,
+        Some(&item.content_hash),
+    );
     write_inbox_item(&item)?;
     update_manifest_from_disk(&root)?;
     state.mark_recent_write(Path::new(&item.path));
@@ -2673,10 +2746,19 @@ pub fn normalize_inbox_batch(
 ) -> Result<Vec<InboxItem>, String> {
     let mut out = Vec::new();
     let root = state.get_root();
+    let mut items = load_inbox_items(&root)?;
+    let positions: HashMap<String, usize> = items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (item.id.clone(), index))
+        .collect();
     for id in ids {
-        let mut item = load_inbox_items(&root)?
-            .into_iter()
-            .find(|item| item.id == id)
+        let position = positions
+            .get(&id)
+            .copied()
+            .ok_or_else(|| format!("Inbox item not found: {}", id))?;
+        let item = items
+            .get_mut(position)
             .ok_or_else(|| format!("Inbox item not found: {}", id))?;
         item.status = InboxItemStatus::Normalized;
         item.capture_state = "normalized".to_string();
@@ -2689,9 +2771,9 @@ pub fn normalize_inbox_batch(
             });
         }
         write_inbox_item(&item)?;
-        out.push(item);
+        out.push(item.clone());
     }
-    update_manifest_from_disk(&root)?;
+    persist_manifest(&root, &items)?;
     let _ = app.emit("inbox-changed", ());
     Ok(out)
 }
