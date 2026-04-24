@@ -1104,27 +1104,29 @@ export function InboxView() {
                   </div>
                 )}
                 {itemEditorTab === "l1" && (
-                  <div className="h-full min-h-0 overflow-hidden p-4">
-                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
+                  <div className="h-full min-h-0 overflow-y-auto p-4">
+                    <div className="flex min-h-full flex-col rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
                       <EditorCard
                         title="L1 summary"
                         content={draftL1}
                         onChange={setDraftL1}
                         placeholder="Short structured summary of the inbox item"
                         chrome={false}
+                        fillHeight={false}
                       />
                     </div>
                   </div>
                 )}
                 {itemEditorTab === "l2" && (
-                  <div className="h-full min-h-0 overflow-hidden p-4">
-                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
+                  <div className="h-full min-h-0 overflow-y-auto p-4">
+                    <div className="flex min-h-full flex-col rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
                       <EditorCard
                         title="L2 details"
                         content={draftL2}
                         onChange={setDraftL2}
                         placeholder="Longer notes, raw content, citations, or extracted detail"
                         chrome={false}
+                        fillHeight={false}
                       />
                     </div>
                   </div>
