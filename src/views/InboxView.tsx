@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import { clsx } from "clsx";
 import {
   Bot,
@@ -12,9 +13,10 @@ import {
   Save,
   Sparkles,
   Trash2,
+  Upload,
   Wand2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HybridMarkdownEditor } from "../components/editor/HybridMarkdownEditor";
 import { useAppStore } from "../lib/store";
 import {
@@ -22,6 +24,7 @@ import {
   createInboxLink,
   createInboxText,
   generateIngestProposals,
+  importInboxFiles,
   listInboxItems,
   listIngestProposals,
   normalizeInboxItem,
@@ -36,6 +39,8 @@ type LayoutMode = "stack" | "split" | "wide";
 type StackPanel = "queue" | "item" | "recommendation";
 type DetailPanel = "item" | "recommendation";
 type ItemEditorTab = "details" | "l1" | "l2";
+
+const MARKDOWN_EXTENSIONS = new Set(["md", "markdown"]);
 
 function actionLabel(action: IngestProposal["action"]) {
   switch (action) {
@@ -59,6 +64,63 @@ function parseTagInput(raw: string): string[] {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function isMarkdownPath(path: string) {
+  const extension = path.split(".").pop()?.toLowerCase() ?? "";
+  return MARKDOWN_EXTENSIONS.has(extension);
+}
+
+function collectMarkdownImportPaths(paths: string[]) {
+  const accepted: string[] = [];
+  const seen = new Set<string>();
+  let rejected = 0;
+
+  for (const candidate of paths) {
+    const normalized = candidate.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    if (isMarkdownPath(normalized)) {
+      accepted.push(normalized);
+    } else {
+      rejected += 1;
+    }
+  }
+
+  return { accepted, rejected };
+}
+
+function fileUriToPath(raw: string): string | null {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "file:") return null;
+    let decoded = decodeURIComponent(url.pathname);
+    if (/^\/[A-Za-z]:/.test(decoded)) {
+      decoded = decoded.slice(1);
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function extractDroppedFilePaths(dataTransfer: DataTransfer) {
+  const directPaths = Array.from(dataTransfer.files)
+    .map((file) => (file as File & { path?: string }).path ?? "")
+    .filter(Boolean);
+
+  const uriList = dataTransfer.getData("text/uri-list");
+  const uriPaths = uriList
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => fileUriToPath(line))
+    .filter((value): value is string => Boolean(value));
+
+  const textPlainPath = fileUriToPath(dataTransfer.getData("text/plain"));
+  const allCandidates = textPlainPath ? [...directPaths, ...uriPaths, textPlainPath] : [...directPaths, ...uriPaths];
+
+  return Array.from(new Set(allCandidates));
 }
 
 function useInboxLayoutMode() {
@@ -156,6 +218,9 @@ export function InboxView() {
   const [stackPanel, setStackPanel] = useState<StackPanel>("queue");
   const [detailPanel, setDetailPanel] = useState<DetailPanel>("item");
   const [itemEditorTab, setItemEditorTab] = useState<ItemEditorTab>("details");
+  const [isDropActive, setIsDropActive] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const dragDepthRef = useRef(0);
 
   const [draftTitle, setDraftTitle] = useState("");
   const [draftL1, setDraftL1] = useState("");
@@ -472,6 +537,96 @@ export function InboxView() {
     }
   }, [focusItemPanel, linkNotes, linkTitle, linkUrl, loadInboxState, setError]);
 
+  const importMarkdownPaths = useCallback(
+    async (pathsToImport: string[], origin: "drop" | "picker") => {
+      const { accepted, rejected } = collectMarkdownImportPaths(pathsToImport);
+
+      if (accepted.length === 0) {
+        if (origin === "drop") {
+          setImportFeedback(
+            pathsToImport.length === 0
+              ? "This drop source does not expose a filesystem path. Use Import Markdown instead."
+              : "For now Inbox drag-and-drop only accepts Markdown (.md) files.",
+          );
+        } else if (pathsToImport.length > 0) {
+          setImportFeedback("For now Inbox import only accepts Markdown (.md) files.");
+        }
+        return;
+      }
+
+      setBusyAction("import-files");
+      try {
+        const created = await importInboxFiles(accepted);
+        await loadInboxState();
+        setSelectedItemId(created[0]?.id ?? null);
+        focusItemPanel();
+        if (rejected > 0) {
+          setImportFeedback(`Imported ${accepted.length} Markdown file(s). Ignored ${rejected} unsupported file(s).`);
+        } else {
+          setImportFeedback(`Imported ${accepted.length} Markdown file(s) into Inbox.`);
+        }
+      } catch (error) {
+        setError(String(error));
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [focusItemPanel, loadInboxState, setError],
+  );
+
+  const handleOpenMarkdownImport = useCallback(async () => {
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: true,
+        filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+      });
+      const selectedPaths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+      if (selectedPaths.length === 0) return;
+      await importMarkdownPaths(selectedPaths, "picker");
+    } catch (error) {
+      setError(String(error));
+    }
+  }, [importMarkdownPaths, setError]);
+
+  const clearDropState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setIsDropActive(false);
+  }, []);
+
+  const handleDropZoneDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDropActive(true);
+  }, []);
+
+  const handleDropZoneDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    if (!isDropActive) setIsDropActive(true);
+  }, [isDropActive]);
+
+  const handleDropZoneDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDropActive(false);
+    }
+  }, []);
+
+  const handleDropZoneDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const droppedPaths = extractDroppedFilePaths(event.dataTransfer);
+      clearDropState();
+      void importMarkdownPaths(droppedPaths, "drop");
+    },
+    [clearDropState, importMarkdownPaths],
+  );
+
   const counts = useMemo(() => {
     const review = items.filter((item) => queueBucket(item, proposalMap.get(item.id) ?? null) === "review").length;
     const pending = items.filter((item) => queueBucket(item, proposalMap.get(item.id) ?? null) === "pending").length;
@@ -496,6 +651,21 @@ export function InboxView() {
             <span className="inline-flex items-center gap-1.5">
               <FilePlus2 className="h-3.5 w-3.5" />
               Quick note
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleOpenMarkdownImport()}
+            disabled={busyAction === "import-files"}
+            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              {busyAction === "import-files" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              Import Markdown
             </span>
           </button>
           <button
@@ -572,6 +742,45 @@ export function InboxView() {
             </button>
           </div>
         )}
+
+        <div
+          onDragEnter={handleDropZoneDragEnter}
+          onDragOver={handleDropZoneDragOver}
+          onDragLeave={handleDropZoneDragLeave}
+          onDrop={handleDropZoneDrop}
+          className={clsx(
+            "mt-3 rounded-xl border border-dashed p-3 transition-colors",
+            isDropActive
+              ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]/40"
+              : "border-[var(--border)] bg-[color:var(--bg-0)]",
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-lg bg-[color:var(--bg-2)] p-2 text-[color:var(--accent)]">
+              <Upload className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-[color:var(--text-0)]">
+                {isDropActive ? "Release to import Markdown" : "Drag Markdown files into Inbox"}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-[color:var(--text-2)]">
+                Start with `.md` files. PDF and other text formats can plug into this flow once we add
+                conversion to Markdown.
+              </div>
+              {importFeedback && (
+                <div className="mt-2 text-xs text-[color:var(--accent)]">{importFeedback}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleOpenMarkdownImport()}
+              disabled={busyAction === "import-files"}
+              className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50"
+            >
+              Choose files
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
