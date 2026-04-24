@@ -2915,7 +2915,7 @@ fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path)
 }
 
 fn resolve_target_memory_path(
-    root: &Path,
+    _root: &Path,
     state: &AppState,
     proposal: &IngestProposal,
 ) -> Result<PathBuf, String> {
@@ -3391,10 +3391,12 @@ pub async fn delete_ollama_model(model_name: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    use std::fs;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use axum::{
         extract::{Path as AxumPath, State as AxumState},
@@ -3456,6 +3458,69 @@ mod tests {
             base_url: Some(format!("{}/v1", base_url.trim_end_matches('/'))),
             api_key: None,
             capabilities: vec![InferenceCapability::Chat],
+        }
+    }
+
+    fn test_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("aicos-inbox-tests-{}-{}", name, nanos));
+        fs::create_dir_all(&root).expect("create temp root");
+        root
+    }
+
+    fn sample_item() -> InboxItem {
+        InboxItem {
+            id: "item-1".to_string(),
+            kind: InboxItemKind::Text,
+            status: InboxItemStatus::Normalized,
+            capture_state: "normalized".to_string(),
+            proposal_state: ProposalState::Pending,
+            content_hash: "hash-1".to_string(),
+            created: Utc::now(),
+            modified: Utc::now(),
+            path: "/tmp/inbox/item-1.md".to_string(),
+            title: "Alpha insight".to_string(),
+            summary: "Short alpha summary".to_string(),
+            l1_content: "Notes about [[alpha-note]] and the same project.".to_string(),
+            l2_content: "More detail about alpha execution.".to_string(),
+            source_url: None,
+            original_file: None,
+            mime: Some("text/markdown".to_string()),
+            tags: vec!["alpha".to_string(), "project".to_string()],
+            derived_from: Vec::new(),
+            needs_extraction: false,
+            needs_inference: false,
+            attachments: Vec::new(),
+        }
+    }
+
+    fn sample_memory_meta(id: &str, l0: &str) -> MemoryMeta {
+        MemoryMeta {
+            id: id.to_string(),
+            ontology: MemoryOntology::Concept,
+            l0: l0.to_string(),
+            importance: 0.5,
+            decay_rate: 0.998,
+            last_access: Utc::now(),
+            access_count: 0,
+            confidence: 0.9,
+            tags: vec!["alpha".to_string()],
+            related: Vec::new(),
+            created: Utc::now(),
+            modified: Utc::now(),
+            version: 1,
+            triggers: Vec::new(),
+            requires: Vec::new(),
+            optional: Vec::new(),
+            output_format: None,
+            status: None,
+            protected: false,
+            derived_from: Vec::new(),
+            folder_category: Some("notes".to_string()),
+            system_role: None,
         }
     }
 
@@ -3580,5 +3645,68 @@ mod tests {
             messages[1].get("role").and_then(|v| v.as_str()),
             Some("assistant")
         );
+    }
+
+    #[test]
+    fn build_inbox_enrichment_surfaces_related_memory_and_destination() {
+        let root = test_root("enrichment");
+        let notes_dir = root.join("notes");
+        fs::create_dir_all(&notes_dir).expect("create notes dir");
+
+        let entry = MemoryCorpusEntry {
+            meta: sample_memory_meta("alpha-note", "Alpha note"),
+            path: notes_dir
+                .join("alpha-note.md")
+                .to_string_lossy()
+                .to_string(),
+            document: "Alpha note\n\nShort alpha summary\n\nproject alpha".to_string(),
+            preview: "Short alpha summary".to_string(),
+            source_urls: Vec::new(),
+        };
+
+        let enrichment = build_inbox_enrichment(&root, &sample_item(), &[entry], Vec::new());
+
+        assert_eq!(enrichment.related_memory_candidates.len(), 1);
+        assert_eq!(
+            enrichment.related_memory_candidates[0].memory_id,
+            "alpha-note".to_string()
+        );
+        assert_eq!(enrichment.related_memory_candidates[0].score.wikilink, 1.0);
+        assert_eq!(
+            enrichment.suggested_target_memory_id,
+            Some("alpha-note".to_string())
+        );
+        assert_eq!(
+            enrichment.inferred_destination,
+            Some(notes_dir.to_string_lossy().to_string())
+        );
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn heuristic_enrichment_upgrades_to_update_memory_for_strong_match() {
+        let root = test_root("heuristic");
+        let notes_dir = root.join("notes");
+        fs::create_dir_all(&notes_dir).expect("create notes dir");
+        let item = sample_item();
+        let entry = MemoryCorpusEntry {
+            meta: sample_memory_meta("alpha-note", "Alpha note"),
+            path: notes_dir
+                .join("alpha-note.md")
+                .to_string_lossy()
+                .to_string(),
+            document: "Alpha note\n\nShort alpha summary\n\nproject alpha".to_string(),
+            preview: "Short alpha summary".to_string(),
+            source_urls: Vec::new(),
+        };
+        let enrichment = build_inbox_enrichment(&root, &item, &[entry], Vec::new());
+
+        let proposal = apply_heuristic_enrichment(heuristic_proposal(&item), &item, &enrichment);
+
+        assert_eq!(proposal.action, ProposalAction::UpdateMemory);
+        assert_eq!(proposal.target_memory_id, Some("alpha-note".to_string()));
+
+        fs::remove_dir_all(&root).ok();
     }
 }
