@@ -126,16 +126,16 @@ function extractDroppedFilePaths(dataTransfer: DataTransfer) {
 function useInboxLayoutMode() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
     if (typeof window === "undefined") return "wide";
-    if (window.innerWidth >= 1536) return "wide";
-    if (window.innerWidth >= 1024) return "split";
+    if (window.innerWidth >= 1760) return "wide";
+    if (window.innerWidth >= 1280) return "split";
     return "stack";
   });
 
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 1536) {
+      if (window.innerWidth >= 1760) {
         setLayoutMode("wide");
-      } else if (window.innerWidth >= 1024) {
+      } else if (window.innerWidth >= 1280) {
         setLayoutMode("split");
       } else {
         setLayoutMode("stack");
@@ -642,7 +642,7 @@ export function InboxView() {
             type="button"
             onClick={() => setCaptureMode((current) => (current === "note" ? null : "note"))}
             className={clsx(
-              "rounded-md px-3 py-1.5 text-xs font-medium",
+              "rounded-md px-3 py-1.5 text-xs font-medium max-sm:flex-1 max-sm:justify-center",
               captureMode === "note"
                 ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
                 : "border border-[var(--border)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
@@ -657,7 +657,7 @@ export function InboxView() {
             type="button"
             onClick={() => void handleOpenMarkdownImport()}
             disabled={busyAction === "import-files"}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50"
+            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50 max-sm:flex-1"
           >
             <span className="inline-flex items-center gap-1.5">
               {busyAction === "import-files" ? (
@@ -672,7 +672,7 @@ export function InboxView() {
             type="button"
             onClick={() => setCaptureMode((current) => (current === "link" ? null : "link"))}
             className={clsx(
-              "rounded-md px-3 py-1.5 text-xs font-medium",
+              "rounded-md px-3 py-1.5 text-xs font-medium max-sm:flex-1 max-sm:justify-center",
               captureMode === "link"
                 ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
                 : "border border-[var(--border)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
@@ -784,14 +784,14 @@ export function InboxView() {
       </div>
 
       <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
-        <div className="flex gap-1 overflow-x-auto pb-1">
+        <div className="flex flex-wrap gap-1">
           {(["review", "pending", "resolved", "all"] as QueueFilter[]).map((bucket) => (
             <button
               key={bucket}
               type="button"
               onClick={() => setFilter(bucket)}
               className={clsx(
-                "whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px] font-medium",
+                "rounded-md px-2.5 py-1.5 text-[11px] font-medium",
                 filter === bucket
                   ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
                   : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]",
@@ -895,12 +895,12 @@ export function InboxView() {
                   <span>{bucketLabel(currentBucket)}</span>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                 <button
                   type="button"
                   onClick={() => void saveSelectedItem()}
                   disabled={!draftIsDirty || busyAction === "save-item"}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50"
+                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "save-item" ? (
@@ -915,7 +915,7 @@ export function InboxView() {
                   type="button"
                   onClick={() => void handleNormalizeSelected()}
                   disabled={busyAction === "normalize-item"}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50"
+                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "normalize-item" ? (
@@ -932,7 +932,7 @@ export function InboxView() {
                     void handleAnalyzeItem(selectedProposal?.state === "pending" ? "replace" : "generate")
                   }
                   disabled={busyAction === "generate-proposal" || busyAction === "replace-proposal"}
-                  className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                  className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "generate-proposal" || busyAction === "replace-proposal" ? (
@@ -1114,7 +1114,7 @@ export function InboxView() {
                   type="button"
                   onClick={() => void handleApplyProposal()}
                   disabled={busyAction === "apply-proposal"}
-                  className="rounded-md bg-[color:var(--success)]/15 px-3 py-1.5 text-xs font-medium text-[color:var(--success)] disabled:opacity-60"
+                  className="rounded-md bg-[color:var(--success)]/15 px-3 py-1.5 text-xs font-medium text-[color:var(--success)] disabled:opacity-60 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "apply-proposal" ? (
@@ -1129,7 +1129,7 @@ export function InboxView() {
                   type="button"
                   onClick={() => void handleRejectProposal()}
                   disabled={busyAction === "reject-proposal"}
-                  className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] disabled:opacity-60"
+                  className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] disabled:opacity-60 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "reject-proposal" ? (
@@ -1197,11 +1197,11 @@ export function InboxView() {
               Review new content, inspect the AI recommendation, and decide what becomes canonical knowledge.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <button
               type="button"
               onClick={() => void loadInboxState()}
-              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]"
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] max-sm:flex-1"
             >
               <span className="inline-flex items-center gap-1.5">
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -1212,7 +1212,7 @@ export function InboxView() {
               type="button"
               onClick={() => void handleAnalyzeVisible()}
               disabled={busyAction === "generate-visible"}
-              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 max-sm:flex-1"
             >
               <span className="inline-flex items-center gap-1.5">
                 {busyAction === "generate-visible" ? (
@@ -1244,19 +1244,19 @@ export function InboxView() {
       <div className="min-h-0 flex-1 overflow-hidden">
         {layoutMode === "wide" && (
           <div className="flex h-full min-h-0 flex-row">
-            <aside className="flex w-[320px] shrink-0 border-r border-[var(--border)]">
+            <aside className="flex w-[clamp(300px,26vw,360px)] shrink-0 border-r border-[var(--border)]">
               {queuePanel}
             </aside>
             <section className="min-h-0 min-w-0 flex-1 border-r border-[var(--border)]">
               {itemPanel}
             </section>
-            <aside className="flex w-[380px] shrink-0">{recommendationPanel}</aside>
+            <aside className="flex w-[clamp(320px,30vw,420px)] shrink-0">{recommendationPanel}</aside>
           </div>
         )}
 
         {layoutMode === "split" && (
           <div className="flex h-full min-h-0 flex-row">
-            <aside className="flex w-[320px] shrink-0 border-r border-[var(--border)]">
+            <aside className="flex w-[clamp(280px,32vw,340px)] shrink-0 border-r border-[var(--border)]">
               {queuePanel}
             </aside>
             <section className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -1299,14 +1299,14 @@ function SegmentedControl({
   options: { value: string; label: string }[];
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto pb-1">
+    <div className="flex flex-wrap gap-1">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           onClick={() => onChange(option.value)}
           className={clsx(
-            "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium",
+            "rounded-md px-3 py-1.5 text-xs font-medium",
             value === option.value
               ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
               : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]",
