@@ -1523,6 +1523,7 @@ function EditorCard({
   placeholder,
   bordered = false,
   chrome = true,
+  fillHeight = true,
 }: {
   title: string;
   content: string;
@@ -1530,6 +1531,7 @@ function EditorCard({
   placeholder: string;
   bordered?: boolean;
   chrome?: boolean;
+  fillHeight?: boolean;
 }) {
   const containerClass = chrome
     ? clsx("flex h-full min-h-0 flex-col bg-[color:var(--bg-0)]", bordered && "border-t border-[var(--border)]")
@@ -1546,7 +1548,11 @@ function EditorCard({
             content={content}
             onChange={onChange}
             placeholder={placeholder}
-            className="h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-editor]:min-h-0 [&_.cm-scroller]:h-full [&_.cm-scroller]:min-h-0 [&_.cm-scroller]:overflow-auto [&_.cm-content]:min-h-full"
+            className={
+              fillHeight
+                ? "h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-editor]:min-h-0 [&_.cm-scroller]:h-full [&_.cm-scroller]:min-h-0 [&_.cm-scroller]:overflow-auto [&_.cm-content]:min-h-full"
+                : "min-h-[240px] [&_.cm-editor]:min-h-[240px] [&_.cm-scroller]:overflow-visible"
+            }
             themeVariant="clean"
           />
         </div>
