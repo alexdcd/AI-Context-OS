@@ -307,7 +307,11 @@ fn extract_http_urls(value: &str) -> Vec<String> {
     };
     unique_strings(
         re.find_iter(value)
-            .map(|m| m.as_str().trim_end_matches(&['.', ',', ';', ':'][..]).to_string())
+            .map(|m| {
+                m.as_str()
+                    .trim_end_matches(&['.', ',', ';', ':'][..])
+                    .to_string()
+            })
             .collect::<Vec<_>>(),
     )
 }
@@ -340,8 +344,10 @@ fn build_memory_corpus(root: &Path, state: &AppState) -> Vec<MemoryCorpusEntry> 
                         trim_chars(&memory.l2_content, 600),
                         meta.tags.join(" "),
                     ]);
-                    let source_urls =
-                        extract_http_urls(&format!("{}\n\n{}", memory.l1_content, memory.l2_content));
+                    let source_urls = extract_http_urls(&format!(
+                        "{}\n\n{}",
+                        memory.l1_content, memory.l2_content
+                    ));
                     (document, preview, source_urls)
                 }
                 Err(_) => {
@@ -396,13 +402,19 @@ fn find_inbox_duplicate_candidates(
                 (
                     "inbox_source_url".to_string(),
                     0.97,
-                    format!("Shares the same source URL as inbox item '{}'.", other.title),
+                    format!(
+                        "Shares the same source URL as inbox item '{}'.",
+                        other.title
+                    ),
                 )
             } else {
                 (
                     "inbox_content_hash".to_string(),
                     0.95,
-                    format!("Shares the same content hash as inbox item '{}'.", other.title),
+                    format!(
+                        "Shares the same content hash as inbox item '{}'.",
+                        other.title
+                    ),
                 )
             };
 
@@ -501,7 +513,10 @@ fn infer_destination_candidates(
 
     if let Ok(default_path) = default_memory_destination(root) {
         let default_path = default_path.to_string_lossy().to_string();
-        if !destinations.iter().any(|candidate| candidate.path == default_path) {
+        if !destinations
+            .iter()
+            .any(|candidate| candidate.path == default_path)
+        {
             let default_dir = PathBuf::from(&default_path);
             destinations.push(InboxDestinationCandidate {
                 path: default_path,
@@ -545,7 +560,10 @@ fn build_enrichment_context_prompt(
         for duplicate in duplicates.iter().take(4) {
             lines.push(format!(
                 "- [{}] {} | confidence {:.2} | {}",
-                duplicate.target_id, duplicate.target_title, duplicate.confidence, duplicate.rationale
+                duplicate.target_id,
+                duplicate.target_title,
+                duplicate.confidence,
+                duplicate.rationale
             ));
         }
     }
@@ -590,7 +608,9 @@ fn build_enrichment_context_prompt(
     Some(lines.join("\n"))
 }
 
-fn exact_duplicate_candidate(duplicates: &[InboxDuplicateCandidate]) -> Option<&InboxDuplicateCandidate> {
+fn exact_duplicate_candidate(
+    duplicates: &[InboxDuplicateCandidate],
+) -> Option<&InboxDuplicateCandidate> {
     duplicates.iter().find(|candidate| {
         matches!(
             candidate.kind.as_str(),
@@ -625,10 +645,7 @@ fn apply_exact_duplicate_guard(mut proposal: IngestProposal) -> IngestProposal {
         proposal.target_memory_id = None;
         proposal.target_memory_path = None;
         proposal.destination = None;
-        proposal.rationale = format!(
-            "Exact duplicate detected: {}",
-            duplicate.rationale
-        );
+        proposal.rationale = format!("Exact duplicate detected: {}", duplicate.rationale);
     }
     proposal
 }
@@ -682,7 +699,10 @@ fn apply_heuristic_enrichment(
     proposal
 }
 
-fn apply_inferred_enrichment(mut proposal: IngestProposal, enrichment: &InboxEnrichment) -> IngestProposal {
+fn apply_inferred_enrichment(
+    mut proposal: IngestProposal,
+    enrichment: &InboxEnrichment,
+) -> IngestProposal {
     let candidate_ids: HashSet<String> = enrichment
         .related_memory_candidates
         .iter()
@@ -1830,7 +1850,10 @@ fn build_inbox_enrichment(
         .map(|entry| entry.document.as_str())
         .collect();
     let bm25_corpus = Bm25Corpus::from_documents(&documents);
-    let memory_metas: Vec<MemoryMeta> = memory_corpus.iter().map(|entry| entry.meta.clone()).collect();
+    let memory_metas: Vec<MemoryMeta> = memory_corpus
+        .iter()
+        .map(|entry| entry.meta.clone())
+        .collect();
     let wikilink_targets = detect_item_wikilink_targets(item, &memory_metas);
     let source_url = item.source_url.clone().unwrap_or_default();
     let tag_query = combine_query_parts(&[item.tags.join(" "), query.clone()]);
@@ -1851,10 +1874,7 @@ fn build_inbox_enrichment(
             }
         })
         .collect();
-    let max_bm25 = raw_bm25_scores
-        .iter()
-        .copied()
-        .fold(0.0_f64, f64::max);
+    let max_bm25 = raw_bm25_scores.iter().copied().fold(0.0_f64, f64::max);
 
     let mut related_candidates = Vec::new();
     let mut duplicate_candidates = enrichment.duplicate_candidates.clone();
@@ -1874,7 +1894,10 @@ fn build_inbox_enrichment(
             0.0
         };
         let source_url_score = if !source_url.is_empty()
-            && entry.source_urls.iter().any(|candidate| candidate == &source_url)
+            && entry
+                .source_urls
+                .iter()
+                .any(|candidate| candidate == &source_url)
         {
             1.0
         } else {
@@ -1909,7 +1932,10 @@ fn build_inbox_enrichment(
 
         let mut reasons = Vec::new();
         if normalized_bm25 >= 0.35 {
-            reasons.push(format!("Strong lexical match (BM25 {:.2}).", normalized_bm25));
+            reasons.push(format!(
+                "Strong lexical match (BM25 {:.2}).",
+                normalized_bm25
+            ));
         }
         if tag_overlap >= 0.25 {
             reasons.push(format!("Tag overlap {:.2}.", tag_overlap));
@@ -1964,12 +1990,16 @@ fn build_inbox_enrichment(
         .map(|candidate| candidate.memory_id.clone())
         .collect();
 
-    if let Some(target) = enrichment.related_memory_candidates.iter().find(|candidate| {
-        !candidate.protected
-            && (candidate.score.source_url >= 0.99
-                || candidate.score.wikilink >= 0.99
-                || candidate.final_score >= 0.72)
-    }) {
+    if let Some(target) = enrichment
+        .related_memory_candidates
+        .iter()
+        .find(|candidate| {
+            !candidate.protected
+                && (candidate.score.source_url >= 0.99
+                    || candidate.score.wikilink >= 0.99
+                    || candidate.final_score >= 0.72)
+        })
+    {
         enrichment.suggested_target_memory_id = Some(target.memory_id.clone());
         enrichment.suggested_target_memory_path = Some(target.file_path.clone());
     }
@@ -2176,37 +2206,40 @@ async fn infer_proposal(
     })?;
     let now = Utc::now();
 
-    Ok(apply_inferred_enrichment(IngestProposal {
-        id: format!("proposal-{}", Uuid::new_v4().simple()),
-        item_id: item.id.clone(),
-        item_path: item.path.clone(),
-        action: parsed.action,
-        state: ProposalState::Pending,
-        confidence: parsed.confidence.clamp(0.0, 1.0),
-        rationale: parsed.rationale,
-        created: now,
-        modified: now,
-        destination: parsed.destination,
-        target_memory_id: parsed.target_memory_id,
-        target_memory_path: None,
-        ontology: parsed.ontology,
-        l0: parsed.l0.or_else(|| Some(item.title.clone())),
-        l1_content: parsed.l1_content.or_else(|| Some(item.summary.clone())),
-        l2_content: parsed.l2_content.or_else(|| Some(item.l2_content.clone())),
-        tags: if parsed.tags.is_empty() {
-            item.tags.clone()
-        } else {
-            parsed.tags
+    Ok(apply_inferred_enrichment(
+        IngestProposal {
+            id: format!("proposal-{}", Uuid::new_v4().simple()),
+            item_id: item.id.clone(),
+            item_path: item.path.clone(),
+            action: parsed.action,
+            state: ProposalState::Pending,
+            confidence: parsed.confidence.clamp(0.0, 1.0),
+            rationale: parsed.rationale,
+            created: now,
+            modified: now,
+            destination: parsed.destination,
+            target_memory_id: parsed.target_memory_id,
+            target_memory_path: None,
+            ontology: parsed.ontology,
+            l0: parsed.l0.or_else(|| Some(item.title.clone())),
+            l1_content: parsed.l1_content.or_else(|| Some(item.summary.clone())),
+            l2_content: parsed.l2_content.or_else(|| Some(item.l2_content.clone())),
+            tags: if parsed.tags.is_empty() {
+                item.tags.clone()
+            } else {
+                parsed.tags
+            },
+            derived_from: vec![item.id.clone()],
+            context_memory_ids: Vec::new(),
+            related_memory_candidates: Vec::new(),
+            duplicate_candidates: Vec::new(),
+            destination_candidates: Vec::new(),
+            inference_provider: Some(config.kind.clone()),
+            inference_preset: Some(config.preset.clone()),
+            origin: "inferred".to_string(),
         },
-        derived_from: vec![item.id.clone()],
-        context_memory_ids: Vec::new(),
-        related_memory_candidates: Vec::new(),
-        duplicate_candidates: Vec::new(),
-        destination_candidates: Vec::new(),
-        inference_provider: Some(config.kind.clone()),
-        inference_preset: Some(config.preset.clone()),
-        origin: "inferred".to_string(),
-    }, enrichment))
+        enrichment,
+    ))
 }
 
 fn update_item_status(
@@ -2741,7 +2774,9 @@ fn default_memory_destination(root: &Path) -> Result<PathBuf, String> {
         .map_err(|e| format!("Failed to read workspace root: {}", e))?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| path.is_dir())
-        .filter(|path| *path != paths.inbox_dir() && *path != paths.sources_dir() && *path != paths.ai_dir())
+        .filter(|path| {
+            *path != paths.inbox_dir() && *path != paths.sources_dir() && *path != paths.ai_dir()
+        })
         .collect::<Vec<_>>();
     candidates.sort();
     if let Some(path) = candidates.into_iter().next() {
@@ -2969,11 +3004,7 @@ fn merge_update_payload(item: &InboxItem, proposal: &IngestProposal) -> String {
     if body.trim().is_empty() {
         String::new()
     } else {
-        format!(
-            "### Inbox update from {}\n\n{}",
-            item.title,
-            body
-        )
+        format!("### Inbox update from {}\n\n{}", item.title, body)
     }
 }
 
@@ -3008,10 +3039,8 @@ fn apply_update_memory(
         .filter(|memory_id| memory_id != &memory.meta.id)
         .collect::<Vec<_>>();
     memory.meta.related = union_string_vectors(&memory.meta.related, &related_ids);
-    memory.meta.derived_from = union_string_vectors(
-        &memory.meta.derived_from,
-        &vec![item.id.clone()],
-    );
+    memory.meta.derived_from =
+        union_string_vectors(&memory.meta.derived_from, &vec![item.id.clone()]);
     memory.meta.confidence = memory.meta.confidence.max(proposal.confidence);
     memory.meta.modified = Utc::now();
     memory.meta.version = memory.meta.version.saturating_add(1);
@@ -3109,7 +3138,9 @@ pub fn apply_ingest_proposal(
 
     if matches!(
         proposal.action,
-        ProposalAction::PromoteMemory | ProposalAction::RouteToSources | ProposalAction::UpdateMemory
+        ProposalAction::PromoteMemory
+            | ProposalAction::RouteToSources
+            | ProposalAction::UpdateMemory
     ) {
         if matches!(
             proposal.action,
