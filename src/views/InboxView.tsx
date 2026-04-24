@@ -986,7 +986,7 @@ export function InboxView() {
                   ]}
                 />
               </div>
-              <div className="min-h-0 flex-1">
+              <div className="min-h-0 flex-1 overflow-hidden">
                 {itemEditorTab === "details" && (
                   <div className="h-full overflow-y-auto bg-[color:var(--bg-1)] p-4">
                     <ItemDetailsFields
@@ -999,8 +999,8 @@ export function InboxView() {
                   </div>
                 )}
                 {itemEditorTab === "l1" && (
-                  <div className="h-full p-4">
-                    <div className="h-full rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
+                  <div className="h-full min-h-0 overflow-hidden p-4">
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
                       <EditorCard
                         title="L1 summary"
                         content={draftL1}
@@ -1012,8 +1012,8 @@ export function InboxView() {
                   </div>
                 )}
                 {itemEditorTab === "l2" && (
-                  <div className="h-full p-4">
-                    <div className="h-full rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
+                  <div className="h-full min-h-0 overflow-hidden p-4">
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)]">
                       <EditorCard
                         title="L2 details"
                         content={draftL2}
@@ -1400,13 +1400,13 @@ function EditorCard({
       <div className="shrink-0 border-b border-[var(--border)] px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
         {title}
       </div>
-      <div className="min-h-0 flex-1 px-4 py-3">
-        <div className="h-full rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)] px-4 py-3">
+      <div className="min-h-0 flex-1 overflow-hidden px-4 py-3">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[color:var(--bg-1)] px-4 py-3">
           <HybridMarkdownEditor
             content={content}
             onChange={onChange}
             placeholder={placeholder}
-            className="h-full"
+            className="h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-scroller]:min-h-full [&_.cm-scroller]:overflow-auto"
             themeVariant="clean"
           />
         </div>
