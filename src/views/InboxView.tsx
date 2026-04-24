@@ -172,7 +172,14 @@ function buildProposalMap(proposals: IngestProposal[]) {
 
 function queueBucket(item: InboxItem, proposal: IngestProposal | null): QueueFilter {
   if (proposal?.state === "pending") return "review";
-  if (proposal?.state === "applied" || proposal?.state === "rejected") return "resolved";
+  if (
+    proposal?.state === "applied" ||
+    proposal?.state === "rejected" ||
+    proposal?.state === "approved" ||
+    proposal?.state === "error"
+  ) {
+    return "resolved";
+  }
   if (item.status === "processed" || item.status === "promoted" || item.status === "discarded") {
     return "resolved";
   }
@@ -221,6 +228,8 @@ export function InboxView() {
   const [isDropActive, setIsDropActive] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
   const dragDepthRef = useRef(0);
+  const mountedRef = useRef(true);
+  const loadSeqRef = useRef(0);
 
   const [draftTitle, setDraftTitle] = useState("");
   const [draftL1, setDraftL1] = useState("");
@@ -235,16 +244,24 @@ export function InboxView() {
   const [linkNotes, setLinkNotes] = useState("");
 
   const refreshDerivedState = useCallback(async () => {
-    await Promise.all([loadMemories(), loadFileTree(), loadGraph()]);
+    await Promise.allSettled([loadMemories(), loadFileTree(), loadGraph()]);
   }, [loadFileTree, loadGraph, loadMemories]);
 
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const loadInboxState = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
+    setLoading(true);
     try {
-      setLoading(true);
       const [nextItems, nextProposals] = await Promise.all([
         listInboxItems(),
         listIngestProposals(),
       ]);
+      if (!mountedRef.current || seq !== loadSeqRef.current) return;
       setItems(nextItems);
       setProposals(nextProposals);
       setSelectedItemId((current) => {
@@ -252,9 +269,13 @@ export function InboxView() {
         return nextItems[0]?.id ?? null;
       });
     } catch (error) {
-      setError(String(error));
+      if (mountedRef.current && seq === loadSeqRef.current) {
+        setError(String(error));
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current && seq === loadSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, [setError]);
 
@@ -263,24 +284,25 @@ export function InboxView() {
   }, [loadInboxState]);
 
   useEffect(() => {
-    let disposeInbox: (() => void) | undefined;
-    let disposeProposals: (() => void) | undefined;
+    let cancelled = false;
+    const unsubs: Array<() => void> = [];
 
-    void listen("inbox-changed", () => {
-      void loadInboxState();
-    }).then((unlisten) => {
-      disposeInbox = unlisten;
-    });
-
-    void listen("proposals-changed", () => {
-      void loadInboxState();
-    }).then((unlisten) => {
-      disposeProposals = unlisten;
-    });
+    void (async () => {
+      const [u1, u2] = await Promise.all([
+        listen("inbox-changed", () => void loadInboxState()),
+        listen("proposals-changed", () => void loadInboxState()),
+      ]);
+      if (cancelled) {
+        u1();
+        u2();
+        return;
+      }
+      unsubs.push(u1, u2);
+    })();
 
     return () => {
-      disposeInbox?.();
-      disposeProposals?.();
+      cancelled = true;
+      unsubs.forEach((u) => u());
     };
   }, [loadInboxState]);
 
@@ -317,7 +339,8 @@ export function InboxView() {
     setDraftL1(selectedItem.l1_content);
     setDraftL2(selectedItem.l2_content);
     setDraftTags(selectedItem.tags.join(", "));
-  }, [selectedItem?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem?.id, selectedItem?.content_hash]);
 
   useEffect(() => {
     if (!selectedProposal) {
@@ -327,7 +350,8 @@ export function InboxView() {
     setApplyDestination(
       selectedProposal.destination ?? selectedProposal.destination_candidates[0]?.path ?? "",
     );
-  }, [selectedProposal?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProposal?.id, selectedProposal?.modified]);
 
   const focusItemPanel = useCallback(() => {
     if (layoutMode === "stack") {
@@ -353,6 +377,8 @@ export function InboxView() {
     [focusItemPanel],
   );
 
+  const isBusy = busyAction !== null;
+  const canReviewProposal = selectedProposal?.state === "pending";
   const currentBucket = selectedItem ? queueBucket(selectedItem, selectedProposal) : "pending";
   const draftIsDirty =
     !!selectedItem &&
@@ -656,7 +682,7 @@ export function InboxView() {
           <button
             type="button"
             onClick={() => void handleOpenMarkdownImport()}
-            disabled={busyAction === "import-files"}
+            disabled={isBusy}
             className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50 max-sm:flex-1"
           >
             <span className="inline-flex items-center gap-1.5">
@@ -691,19 +717,21 @@ export function InboxView() {
               value={noteTitle}
               onChange={(event) => setNoteTitle(event.target.value)}
               placeholder="Title"
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+              aria-label="Note title"
+              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
             />
             <textarea
               value={noteContent}
               onChange={(event) => setNoteContent(event.target.value)}
               placeholder="Paste the raw note or snippet here"
+              aria-label="Note content"
               rows={4}
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
             />
             <button
               type="button"
               onClick={() => void handleCreateNote()}
-              disabled={busyAction === "create-note"}
+              disabled={isBusy}
               className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
             >
               {busyAction === "create-note" ? "Creating..." : "Create inbox note"}
@@ -717,25 +745,28 @@ export function InboxView() {
               value={linkUrl}
               onChange={(event) => setLinkUrl(event.target.value)}
               placeholder="https://..."
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+              aria-label="Link URL"
+              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
             />
             <input
               value={linkTitle}
               onChange={(event) => setLinkTitle(event.target.value)}
               placeholder="Optional title"
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+              aria-label="Link title"
+              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
             />
             <textarea
               value={linkNotes}
               onChange={(event) => setLinkNotes(event.target.value)}
               placeholder="Optional notes"
+              aria-label="Link notes"
               rows={3}
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
             />
             <button
               type="button"
               onClick={() => void handleCreateLink()}
-              disabled={busyAction === "create-link"}
+              disabled={isBusy}
               className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
             >
               {busyAction === "create-link" ? "Capturing..." : "Create inbox link"}
@@ -774,7 +805,7 @@ export function InboxView() {
             <button
               type="button"
               onClick={() => void handleOpenMarkdownImport()}
-              disabled={busyAction === "import-files"}
+              disabled={isBusy}
               className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50"
             >
               Choose files
@@ -789,6 +820,7 @@ export function InboxView() {
             <button
               key={bucket}
               type="button"
+              aria-pressed={filter === bucket}
               onClick={() => setFilter(bucket)}
               className={clsx(
                 "rounded-md px-2.5 py-1.5 text-[11px] font-medium",
@@ -823,6 +855,7 @@ export function InboxView() {
                 <button
                   key={item.id}
                   type="button"
+                  aria-current={isSelected ? "true" : undefined}
                   onClick={() => handleSelectItem(item.id)}
                   className={clsx(
                     "w-full overflow-hidden rounded-xl border p-3 text-left transition-colors",
@@ -890,7 +923,7 @@ export function InboxView() {
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--text-2)]">
                   <span>{selectedItem.kind}</span>
                   <span>•</span>
-                  <span>{selectedItem.path.split("/").pop()}</span>
+                  <span>{selectedItem.path.split(/[\\/]/).pop()}</span>
                   <span>•</span>
                   <span>{bucketLabel(currentBucket)}</span>
                 </div>
@@ -899,7 +932,7 @@ export function InboxView() {
                 <button
                   type="button"
                   onClick={() => void saveSelectedItem()}
-                  disabled={!draftIsDirty || busyAction === "save-item"}
+                  disabled={!draftIsDirty || isBusy}
                   className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
@@ -914,7 +947,7 @@ export function InboxView() {
                 <button
                   type="button"
                   onClick={() => void handleNormalizeSelected()}
-                  disabled={busyAction === "normalize-item"}
+                  disabled={isBusy}
                   className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
@@ -931,7 +964,7 @@ export function InboxView() {
                   onClick={() =>
                     void handleAnalyzeItem(selectedProposal?.state === "pending" ? "replace" : "generate")
                   }
-                  disabled={busyAction === "generate-proposal" || busyAction === "replace-proposal"}
+                  disabled={isBusy}
                   className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
@@ -1082,13 +1115,14 @@ export function InboxView() {
               {selectedProposal.action === "promote_memory" &&
                 selectedProposal.destination_candidates.length > 0 && (
                   <div className="mt-4">
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
+                    <label htmlFor="inbox-destination" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
                       Destination
                     </label>
                     <select
+                      id="inbox-destination"
                       value={applyDestination}
                       onChange={(event) => setApplyDestination(event.target.value)}
-                      className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+                      className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
                     >
                       {selectedProposal.destination_candidates.map((candidate) => (
                         <option key={candidate.path} value={candidate.path}>
@@ -1109,38 +1143,40 @@ export function InboxView() {
                 </div>
               )}
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleApplyProposal()}
-                  disabled={busyAction === "apply-proposal"}
-                  className="rounded-md bg-[color:var(--success)]/15 px-3 py-1.5 text-xs font-medium text-[color:var(--success)] disabled:opacity-60 max-sm:flex-1"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    {busyAction === "apply-proposal" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Check className="h-3.5 w-3.5" />
-                    )}
-                    Apply recommendation
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleRejectProposal()}
-                  disabled={busyAction === "reject-proposal"}
-                  className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] disabled:opacity-60 max-sm:flex-1"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    {busyAction === "reject-proposal" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    Reject recommendation
-                  </span>
-                </button>
-              </div>
+              {canReviewProposal && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleApplyProposal()}
+                    disabled={isBusy}
+                    className="rounded-md bg-[color:var(--success)]/15 px-3 py-1.5 text-xs font-medium text-[color:var(--success)] disabled:opacity-60 max-sm:flex-1"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {busyAction === "apply-proposal" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                      Apply recommendation
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRejectProposal()}
+                    disabled={isBusy}
+                    className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] disabled:opacity-60 max-sm:flex-1"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {busyAction === "reject-proposal" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                      Reject recommendation
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {selectedProposal.duplicate_candidates.length > 0 && (
@@ -1211,7 +1247,7 @@ export function InboxView() {
             <button
               type="button"
               onClick={() => void handleAnalyzeVisible()}
-              disabled={busyAction === "generate-visible"}
+              disabled={isBusy}
               className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 max-sm:flex-1"
             >
               <span className="inline-flex items-center gap-1.5">
@@ -1304,6 +1340,7 @@ function SegmentedControl({
         <button
           key={option.value}
           type="button"
+          aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={clsx(
             "rounded-md px-3 py-1.5 text-xs font-medium",
@@ -1335,24 +1372,26 @@ function ItemDetailsFields({
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
+        <label htmlFor="inbox-draft-title" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
           Title
         </label>
         <input
+          id="inbox-draft-title"
           value={draftTitle}
           onChange={(event) => setDraftTitle(event.target.value)}
-          className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+          className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
         />
       </div>
       <div>
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
+        <label htmlFor="inbox-draft-tags" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-2)]">
           Tags
         </label>
         <input
+          id="inbox-draft-tags"
           value={draftTags}
           onChange={(event) => setDraftTags(event.target.value)}
           placeholder="comma, separated, tags"
-          className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none"
+          className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
         />
       </div>
       {selectedItem.source_url && (
