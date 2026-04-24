@@ -1,4 +1,4 @@
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -11,18 +11,23 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
+use crate::core::folder_contract::load_folder_contract;
 use crate::core::jsonl::read_jsonl;
 use crate::core::levels::join_levels;
-use crate::core::memory::write_memory;
+use crate::core::memory::{read_memory, write_memory};
 use crate::core::paths::SystemPaths;
+use crate::core::search::{bm25_score, l0_keyword_score, tag_match_score, Bm25Corpus};
 use crate::core::types::{
     ApplyIngestProposalInput, ChatCompletionRequest, ChatCompletionResponse, ChatContextDebug,
     ChatContextDebugMemory, ChatMessage, CreateInboxLinkInput, CreateInboxTextInput, DailyEntry,
-    DiscoveredProvider, InboxAttachment, InboxItem, InboxItemKind, InboxItemStatus,
-    InferenceCapability, InferenceProviderConfig, InferenceProviderKind, InferenceProviderPreset,
-    InferenceProviderStatus, IngestProposal, Memory, MemoryMeta, MemoryOntology, ProposalAction,
-    ProposalState, ProviderModel, RecentOperationalContext, UpdateInboxItemInput,
+    DiscoveredProvider, InboxAttachment, InboxDestinationCandidate, InboxDuplicateCandidate,
+    InboxItem, InboxItemKind, InboxItemStatus, InboxRecommendationScore,
+    InboxRelatedMemoryCandidate, InferenceCapability, InferenceProviderConfig,
+    InferenceProviderKind, InferenceProviderPreset, InferenceProviderStatus, IngestProposal,
+    Memory, MemoryMeta, MemoryOntology, ProposalAction, ProposalState, ProviderModel,
+    RecentOperationalContext, UpdateInboxItemInput,
 };
+use crate::core::wikilinks::{parse_wikilinks, resolve_wikilink, WikilinkResolution};
 use crate::state::AppState;
 
 const MAX_FETCH_BYTES: usize = 256 * 1024;
@@ -94,6 +99,10 @@ struct ProposalModelResponse {
     confidence: f64,
     rationale: String,
     #[serde(default)]
+    destination: Option<String>,
+    #[serde(default)]
+    target_memory_id: Option<String>,
+    #[serde(default)]
     ontology: Option<MemoryOntology>,
     #[serde(default)]
     l0: Option<String>,
@@ -103,6 +112,26 @@ struct ProposalModelResponse {
     l2_content: Option<String>,
     #[serde(default)]
     tags: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct MemoryCorpusEntry {
+    meta: MemoryMeta,
+    path: String,
+    document: String,
+    source_urls: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct InboxEnrichment {
+    related_memory_candidates: Vec<InboxRelatedMemoryCandidate>,
+    duplicate_candidates: Vec<InboxDuplicateCandidate>,
+    destination_candidates: Vec<InboxDestinationCandidate>,
+    context_memory_ids: Vec<String>,
+    context_prompt: Option<String>,
+    inferred_destination: Option<String>,
+    suggested_target_memory_id: Option<String>,
+    suggested_target_memory_path: Option<String>,
 }
 
 fn hash_str(value: &str) -> String {
