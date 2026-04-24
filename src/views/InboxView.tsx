@@ -4,6 +4,8 @@ import { clsx } from "clsx";
 import {
   Bot,
   Check,
+  ChevronDown,
+  ChevronRight,
   FilePlus2,
   FolderSearch,
   Inbox as InboxIcon,
@@ -208,6 +210,12 @@ function statusTone(item: InboxItem, proposal: IngestProposal | null) {
   return "text-[color:var(--accent)] bg-[color:var(--accent-muted)]";
 }
 
+function confidenceTone(confidence: number) {
+  if (confidence >= 0.8) return "text-[color:var(--success)]";
+  if (confidence >= 0.5) return "text-[color:var(--warning)]";
+  return "text-[color:var(--danger)]";
+}
+
 export function InboxView() {
   const setError = useAppStore((state) => state.setError);
   const loadMemories = useAppStore((state) => state.loadMemories);
@@ -222,11 +230,13 @@ export function InboxView() {
   const [filter, setFilter] = useState<QueueFilter>("review");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode>(null);
+  const [showCapture, setShowCapture] = useState(false);
   const [stackPanel, setStackPanel] = useState<StackPanel>("queue");
   const [detailPanel, setDetailPanel] = useState<DetailPanel>("item");
   const [itemEditorTab, setItemEditorTab] = useState<ItemEditorTab>("details");
   const [isDropActive, setIsDropActive] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const dragDepthRef = useRef(0);
   const mountedRef = useRef(true);
   const loadSeqRef = useRef(0);
@@ -246,6 +256,18 @@ export function InboxView() {
   const refreshDerivedState = useCallback(async () => {
     await Promise.allSettled([loadMemories(), loadFileTree(), loadGraph()]);
   }, [loadFileTree, loadGraph, loadMemories]);
+
+  useEffect(() => {
+    if (!importFeedback) return;
+    const timer = setTimeout(() => setImportFeedback(null), 4000);
+    return () => clearTimeout(timer);
+  }, [importFeedback]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
 
   useEffect(() => {
     return () => {
@@ -513,6 +535,7 @@ export function InboxView() {
         destination_dir: selectedProposal.action === "promote_memory" ? applyDestination || null : null,
       });
       await refreshAfterMutation();
+      setSuccessMessage("Recommendation applied successfully");
       focusRecommendationPanel();
     } catch (error) {
       setError(String(error));
@@ -527,6 +550,7 @@ export function InboxView() {
     try {
       await rejectIngestProposal(selectedProposal.id);
       await loadInboxState();
+      setSuccessMessage("Recommendation rejected");
     } catch (error) {
       setError(String(error));
     } finally {
