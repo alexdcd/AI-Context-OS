@@ -210,6 +210,12 @@ function statusTone(item: InboxItem, proposal: IngestProposal | null) {
   return "text-[color:var(--accent)] bg-[color:var(--accent-muted)]";
 }
 
+function confidenceTone(confidence: number) {
+  if (confidence >= 0.8) return "text-[color:var(--success)]";
+  if (confidence >= 0.5) return "text-[color:var(--warning)]";
+  return "text-[color:var(--danger)]";
+}
+
 export function InboxView() {
   const setError = useAppStore((state) => state.setError);
   const loadMemories = useAppStore((state) => state.loadMemories);
@@ -1325,7 +1331,7 @@ export function InboxView() {
             <button
               type="button"
               onClick={() => void loadInboxState()}
-              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] max-sm:flex-1"
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] max-sm:flex-1"
             >
               <span className="inline-flex items-center gap-1.5">
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -1336,7 +1342,7 @@ export function InboxView() {
               type="button"
               onClick={() => void handleAnalyzeVisible()}
               disabled={isBusy}
-              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 max-sm:flex-1"
+              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60 max-sm:flex-1"
             >
               <span className="inline-flex items-center gap-1.5">
                 {busyAction === "generate-visible" ? (
