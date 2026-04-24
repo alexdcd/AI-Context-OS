@@ -151,34 +151,6 @@ Working with limitations (important):
 - Connector capabilities vary by tool; “universal” means universal core model + adapters, not identical feature depth everywhere.
 - Some UX labels/copy still need consistency polish.
 
-## Roadmap
-
-This roadmap reflects the current codebase plus the alignment doc (`REVISION-TECNICA-ALINEACION-2026-03-29.md`).
-
-### 1. Adapter-first hardening
-
-- Keep neutral core generation as primary architecture.
-- Preserve compatibility artifacts (`claude.md`) without letting them become canonical.
-- Continue reducing implicit tool-specific assumptions in core flows.
-
-### 2. Connector honesty and tier clarity
-
-- Keep clear tiers (`Local Native`, `Bridge`, future `Remote`).
-- Match UI copy to real capabilities per connector.
-- Expand bridge handoff ergonomics without over-claiming.
-
-### 3. Deterministic scoring evolution
-
-- Continue conservative improvements in lexical expansion and intent weighting.
-- Improve graph proximity in bounded, interpretable steps.
-- Avoid opaque retrieval dependencies that break portability.
-
-### 4. Governance + observability loop
-
-- Turn optimization suggestions into safer guided actions.
-- Improve health score explainability and user trust.
-- Use telemetry to reduce context overloading and stale memory accumulation.
-
 ## Invariants (do not break)
 
 - `src/lib/types.ts` must mirror `src-tauri/src/core/types.rs`

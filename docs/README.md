@@ -21,13 +21,7 @@ Contains the core documentation, architecture specs, and whitepapers:
 ### Core Technical References In `docs/`
 - [Algorithms And Scoring](./algorithms-and-scoring.md)
 
-### 2. `roadmap/`
-Contains development plans, technical reviews, and upcoming features:
-- [Current State, Implemented Changes, And Roadmap](./roadmap/current-state-and-roadmap.md)
-- [Pending Features](./roadmap/FEATURES-PENDIENTES.md)
-- [Technical Alignment Review](./roadmap/REVISION-TECNICA-ALINEACION-2026-03-29.md)
-
-### 3. Top-level guides
+### 2. Top-level guides
 Focused guides for specific product capabilities:
 - [Custom Themes](./themes.md)
 
@@ -41,9 +35,8 @@ These docs intentionally go deeper than the root README:
 - ontology layer
 - current workspace structure
 - adapter-first integrations
-- inbox and future ingestion design
+- inbox design
 - what is already implemented in code
-- what is still planned
 - constraints and invariants that should not be broken casually
 
 ## Maintenance rule
