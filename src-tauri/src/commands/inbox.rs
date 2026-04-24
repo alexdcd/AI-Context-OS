@@ -1,6 +1,5 @@
-use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
@@ -37,6 +36,8 @@ const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 const DEFAULT_OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434/v1";
 const DEFAULT_LM_STUDIO_BASE_URL: &str = "http://127.0.0.1:1234/v1";
 const DEFAULT_ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
+const FNV1A64_OFFSET: u64 = 0xcbf29ce484222325;
+const FNV1A64_PRIME: u64 = 0x100000001b3;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct InboxFrontmatter {
@@ -136,15 +137,16 @@ struct InboxEnrichment {
 }
 
 fn hash_str(value: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    value.hash(&mut hasher);
-    format!("sip64:{:x}", hasher.finish())
+    hash_bytes(value.as_bytes())
 }
 
 fn hash_bytes(bytes: &[u8]) -> String {
-    let mut hasher = DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    format!("sip64:{:x}", hasher.finish())
+    let mut hash = FNV1A64_OFFSET;
+    for byte in bytes {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(FNV1A64_PRIME);
+    }
+    format!("fnv1a64:{:016x}", hash)
 }
 
 fn slugify(value: &str) -> String {
@@ -280,6 +282,44 @@ fn union_string_vectors(primary: &[String], secondary: &[String]) -> Vec<String>
             .chain(secondary.iter().cloned())
             .collect::<Vec<_>>(),
     )
+}
+
+fn canonical_item_body(title: &str, l1: &str, l2: &str) -> String {
+    combine_query_parts(&[title.to_string(), join_levels(l1, l2)])
+}
+
+fn is_legacy_content_hash(value: Option<&str>) -> bool {
+    value
+        .map(|hash| hash.trim().is_empty() || hash.starts_with("sip64:"))
+        .unwrap_or(true)
+}
+
+fn compute_item_content_hash(
+    kind: &InboxItemKind,
+    title: &str,
+    l1: &str,
+    l2: &str,
+    source_url: Option<&str>,
+    attachments: &[InboxAttachment],
+    stored_hash: Option<&str>,
+) -> String {
+    match kind {
+        InboxItemKind::Link => source_url.map(hash_str).unwrap_or_else(|| {
+            hash_str(&canonical_item_body(title, l1, l2))
+        }),
+        InboxItemKind::File => {
+            if let Some(attachment) = attachments.first() {
+                if let Ok(bytes) = fs::read(&attachment.path) {
+                    return hash_bytes(&bytes);
+                }
+            }
+            stored_hash
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| hash_str(&canonical_item_body(title, l1, l2)))
+        }
+        InboxItemKind::Text => hash_str(&canonical_item_body(title, l1, l2)),
+    }
 }
 
 fn combine_query_parts(parts: &[String]) -> String {
@@ -431,6 +471,19 @@ fn find_inbox_duplicate_candidates(
 }
 
 fn is_allowed_destination_dir(root: &Path, dir: &Path) -> bool {
+    fn is_disallowed(dir: &Path, root: &Path) -> bool {
+        let paths = SystemPaths::new(root);
+        dir == paths.inbox_dir()
+            || dir == paths.sources_dir()
+            || dir == paths.ai_dir()
+            || dir.starts_with(paths.journal_dir())
+            || dir.starts_with(paths.scratch_dir())
+    }
+
+    if dir.starts_with(root) {
+        return !is_disallowed(dir, root);
+    }
+
     let normalized_root = match fs::canonicalize(root) {
         Ok(value) => value,
         Err(_) => return false,
@@ -439,14 +492,8 @@ fn is_allowed_destination_dir(root: &Path, dir: &Path) -> bool {
         Ok(value) => value,
         Err(_) => return false,
     };
-    let paths = SystemPaths::new(&normalized_root);
 
-    normalized_dir.starts_with(&normalized_root)
-        && normalized_dir != paths.inbox_dir()
-        && normalized_dir != paths.sources_dir()
-        && normalized_dir != paths.ai_dir()
-        && !normalized_dir.starts_with(paths.journal_dir())
-        && !normalized_dir.starts_with(paths.scratch_dir())
+    normalized_dir.starts_with(&normalized_root) && !is_disallowed(&normalized_dir, &normalized_root)
 }
 
 fn folder_category_for_dir(root: &Path, dir: &Path) -> Option<String> {
