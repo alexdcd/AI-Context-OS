@@ -210,12 +210,6 @@ function statusTone(item: InboxItem, proposal: IngestProposal | null) {
   return "text-[color:var(--accent)] bg-[color:var(--accent-muted)]";
 }
 
-function confidenceTone(confidence: number) {
-  if (confidence >= 0.8) return "text-[color:var(--success)]";
-  if (confidence >= 0.5) return "text-[color:var(--warning)]";
-  return "text-[color:var(--danger)]";
-}
-
 export function InboxView() {
   const setError = useAppStore((state) => state.setError);
   const loadMemories = useAppStore((state) => state.loadMemories);
@@ -270,6 +264,7 @@ export function InboxView() {
   }, [successMessage]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -701,156 +696,169 @@ export function InboxView() {
 
   const queuePanel = (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--bg-1)]">
-      <div className="shrink-0 border-b border-[var(--border)] px-4 py-3">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setCaptureMode((current) => (current === "note" ? null : "note"))}
-            className={clsx(
-              "rounded-md px-3 py-1.5 text-xs font-medium max-sm:flex-1 max-sm:justify-center",
-              captureMode === "note"
-                ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
-                : "border border-[var(--border)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
-            )}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <FilePlus2 className="h-3.5 w-3.5" />
-              Quick note
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleOpenMarkdownImport()}
-            disabled={isBusy}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50 max-sm:flex-1"
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {busyAction === "import-files" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Upload className="h-3.5 w-3.5" />
-              )}
-              Import Markdown
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCaptureMode((current) => (current === "link" ? null : "link"))}
-            className={clsx(
-              "rounded-md px-3 py-1.5 text-xs font-medium max-sm:flex-1 max-sm:justify-center",
-              captureMode === "link"
-                ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
-                : "border border-[var(--border)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
-            )}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Link2 className="h-3.5 w-3.5" />
-              Capture link
-            </span>
-          </button>
-        </div>
-
-        {captureMode === "note" && (
-          <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[color:var(--bg-0)] p-3">
-            <input
-              value={noteTitle}
-              onChange={(event) => setNoteTitle(event.target.value)}
-              placeholder="Title"
-              aria-label="Note title"
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
-            />
-            <textarea
-              value={noteContent}
-              onChange={(event) => setNoteContent(event.target.value)}
-              placeholder="Paste the raw note or snippet here"
-              aria-label="Note content"
-              rows={4}
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
-            />
-            <button
-              type="button"
-              onClick={() => void handleCreateNote()}
-              disabled={isBusy}
-              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-            >
-              {busyAction === "create-note" ? "Creating..." : "Create inbox note"}
-            </button>
-          </div>
-        )}
-
-        {captureMode === "link" && (
-          <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[color:var(--bg-0)] p-3">
-            <input
-              value={linkUrl}
-              onChange={(event) => setLinkUrl(event.target.value)}
-              placeholder="https://..."
-              aria-label="Link URL"
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
-            />
-            <input
-              value={linkTitle}
-              onChange={(event) => setLinkTitle(event.target.value)}
-              placeholder="Optional title"
-              aria-label="Link title"
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
-            />
-            <textarea
-              value={linkNotes}
-              onChange={(event) => setLinkNotes(event.target.value)}
-              placeholder="Optional notes"
-              aria-label="Link notes"
-              rows={3}
-              className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
-            />
-            <button
-              type="button"
-              onClick={() => void handleCreateLink()}
-              disabled={isBusy}
-              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-            >
-              {busyAction === "create-link" ? "Capturing..." : "Create inbox link"}
-            </button>
-          </div>
-        )}
-
-        <div
-          onDragEnter={handleDropZoneDragEnter}
-          onDragOver={handleDropZoneDragOver}
-          onDragLeave={handleDropZoneDragLeave}
-          onDrop={handleDropZoneDrop}
-          className={clsx(
-            "mt-3 rounded-xl border border-dashed p-3 transition-colors",
-            isDropActive
-              ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]/40"
-              : "border-[var(--border)] bg-[color:var(--bg-0)]",
-          )}
+      <div className="shrink-0 border-b border-[var(--border)]">
+        <button
+          type="button"
+          onClick={() => setShowCapture((v) => !v)}
+          className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)]"
         >
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg bg-[color:var(--bg-2)] p-2 text-[color:var(--accent)]">
-              <Upload className="h-4 w-4" />
+          {showCapture ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Capture
+          <span className="ml-auto text-[10px] text-[color:var(--text-2)]">Note, link, or file import</span>
+        </button>
+
+        {showCapture && (
+          <div className="border-t border-[var(--border)] px-4 py-3 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCaptureMode((current) => (current === "note" ? null : "note"))}
+                className={clsx(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors max-sm:flex-1 max-sm:justify-center",
+                  captureMode === "note"
+                    ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
+                    : "border border-[var(--border)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
+                )}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <FilePlus2 className="h-3.5 w-3.5" />
+                  Quick note
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleOpenMarkdownImport()}
+                disabled={isBusy}
+                className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] disabled:opacity-50 max-sm:flex-1"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  {busyAction === "import-files" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                  Import Markdown
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCaptureMode((current) => (current === "link" ? null : "link"))}
+                className={clsx(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors max-sm:flex-1 max-sm:justify-center",
+                  captureMode === "link"
+                    ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
+                    : "border border-[var(--border)] text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)]",
+                )}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Link2 className="h-3.5 w-3.5" />
+                  Capture link
+                </span>
+              </button>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-[color:var(--text-0)]">
-                {isDropActive ? "Release to import Markdown" : "Drag Markdown files into Inbox"}
+
+            {captureMode === "note" && (
+              <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[color:var(--bg-0)] p-3">
+                <input
+                  value={noteTitle}
+                  onChange={(event) => setNoteTitle(event.target.value)}
+                  placeholder="Title"
+                  aria-label="Note title"
+                  className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                />
+                <textarea
+                  value={noteContent}
+                  onChange={(event) => setNoteContent(event.target.value)}
+                  placeholder="Paste the raw note or snippet here"
+                  aria-label="Note content"
+                  rows={4}
+                  className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCreateNote()}
+                  disabled={isBusy}
+                  className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity disabled:opacity-60 hover:opacity-90"
+                >
+                  {busyAction === "create-note" ? "Creating..." : "Create inbox note"}
+                </button>
               </div>
-              <div className="mt-1 text-xs leading-5 text-[color:var(--text-2)]">
-                Start with `.md` files. PDF and other text formats can plug into this flow once we add
-                conversion to Markdown.
+            )}
+
+            {captureMode === "link" && (
+              <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[color:var(--bg-0)] p-3">
+                <input
+                  value={linkUrl}
+                  onChange={(event) => setLinkUrl(event.target.value)}
+                  placeholder="https://..."
+                  aria-label="Link URL"
+                  className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                />
+                <input
+                  value={linkTitle}
+                  onChange={(event) => setLinkTitle(event.target.value)}
+                  placeholder="Optional title"
+                  aria-label="Link title"
+                  className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                />
+                <textarea
+                  value={linkNotes}
+                  onChange={(event) => setLinkNotes(event.target.value)}
+                  placeholder="Optional notes"
+                  aria-label="Link notes"
+                  rows={3}
+                  className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[color:var(--text-0)] outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCreateLink()}
+                  disabled={isBusy}
+                  className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity disabled:opacity-60 hover:opacity-90"
+                >
+                  {busyAction === "create-link" ? "Capturing..." : "Create inbox link"}
+                </button>
               </div>
-              {importFeedback && (
-                <div className="mt-2 text-xs text-[color:var(--accent)]">{importFeedback}</div>
+            )}
+
+            <div
+              onDragEnter={handleDropZoneDragEnter}
+              onDragOver={handleDropZoneDragOver}
+              onDragLeave={handleDropZoneDragLeave}
+              onDrop={handleDropZoneDrop}
+              className={clsx(
+                "rounded-xl border border-dashed p-3 transition-colors",
+                isDropActive
+                  ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]/40"
+                  : "border-[var(--border)] bg-[color:var(--bg-0)]",
               )}
-            </div>
-            <button
-              type="button"
-              onClick={() => void handleOpenMarkdownImport()}
-              disabled={isBusy}
-              className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] hover:bg-[color:var(--bg-2)] disabled:opacity-50"
             >
-              Choose files
-            </button>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-lg bg-[color:var(--bg-2)] p-2 text-[color:var(--accent)]">
+                  <Upload className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-[color:var(--text-0)]">
+                    {isDropActive ? "Release to import Markdown" : "Drag Markdown files here"}
+                  </div>
+                  <div className="mt-0.5 text-[11px] leading-4 text-[color:var(--text-2)]">
+                    Accepts .md files
+                  </div>
+                  {importFeedback && (
+                    <div className="mt-1.5 text-xs text-[color:var(--accent)]">{importFeedback}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenMarkdownImport()}
+                  disabled={isBusy}
+                  className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] disabled:opacity-50"
+                >
+                  Choose files
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
@@ -862,7 +870,7 @@ export function InboxView() {
               aria-pressed={filter === bucket}
               onClick={() => setFilter(bucket)}
               className={clsx(
-                "rounded-md px-2.5 py-1.5 text-[11px] font-medium",
+                "rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                 filter === bucket
                   ? "bg-[color:var(--accent-muted)] text-[color:var(--accent)]"
                   : "text-[color:var(--text-2)] hover:bg-[color:var(--bg-2)] hover:text-[color:var(--text-1)]",
@@ -880,12 +888,23 @@ export function InboxView() {
             <Loader2 className="h-4 w-4 animate-spin" />
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-5 text-center text-sm text-[color:var(--text-2)]">
-            <FolderSearch className="h-5 w-5 text-[color:var(--text-2)]" />
-            No items in this bucket.
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="rounded-xl bg-[color:var(--bg-2)] p-3">
+              <FolderSearch className="h-6 w-6 text-[color:var(--text-2)]" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-[color:var(--text-1)]">No items in this bucket</div>
+              <p className="mt-1 text-xs leading-5 text-[color:var(--text-2)]">
+                {filter === "review"
+                  ? "All caught up! No items waiting for review."
+                  : filter === "pending"
+                    ? "No items pending analysis. Import a file or create a note to get started."
+                    : "Nothing here yet."}
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {filteredItems.map((item) => {
               const proposal = proposalMap.get(item.id) ?? null;
               const bucket = queueBucket(item, proposal);
@@ -903,35 +922,31 @@ export function InboxView() {
                       : "border-[var(--border)] bg-[color:var(--bg-0)] hover:bg-[color:var(--bg-2)]",
                   )}
                 >
-                  <div className="flex min-w-0 flex-col gap-2">
-                    <div className="flex min-w-0 flex-wrap items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="line-clamp-2 text-sm font-semibold leading-6 text-[color:var(--text-0)] [overflow-wrap:anywhere]">
-                          {item.title}
-                        </div>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-sm font-semibold leading-5 text-[color:var(--text-0)] [overflow-wrap:anywhere]">
+                        {item.title}
                       </div>
-                      <span
-                        className={clsx(
-                          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                          statusTone(item, proposal),
-                        )}
-                      >
-                        {bucketLabel(bucket)}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="line-clamp-3 text-xs leading-5 text-[color:var(--text-2)] [overflow-wrap:anywhere]">
+                      <div className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--text-2)] [overflow-wrap:anywhere]">
                         {item.summary || item.l1_content || item.l2_content || "No preview yet"}
                       </div>
                     </div>
+                    <span
+                      className={clsx(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        statusTone(item, proposal),
+                      )}
+                    >
+                      {bucketLabel(bucket)}
+                    </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[color:var(--text-2)]">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[color:var(--text-2)]">
                     <span>{item.kind}</span>
-                    <span>•</span>
+                    <span className="opacity-40">·</span>
                     <span>{item.status}</span>
                     {proposal && (
                       <>
-                        <span>•</span>
+                        <span className="opacity-40">·</span>
                         <span>{actionLabel(proposal.action)}</span>
                       </>
                     )}
@@ -948,8 +963,16 @@ export function InboxView() {
   const itemPanel = (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--bg-0)]">
       {!selectedItem ? (
-        <div className="flex h-full items-center justify-center text-sm text-[color:var(--text-2)]">
-          Select an inbox item to start reviewing it.
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="rounded-xl bg-[color:var(--bg-2)] p-3">
+            <InboxIcon className="h-6 w-6 text-[color:var(--text-2)]" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-[color:var(--text-1)]">No item selected</div>
+            <p className="mt-1 text-xs leading-5 text-[color:var(--text-2)]">
+              Pick an item from the queue to review its content and metadata.
+            </p>
+          </div>
         </div>
       ) : (
         <>
@@ -972,7 +995,7 @@ export function InboxView() {
                   type="button"
                   onClick={() => void saveSelectedItem()}
                   disabled={!draftIsDirty || isBusy}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50 max-sm:flex-1"
+                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] disabled:opacity-50 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "save-item" ? (
@@ -987,7 +1010,7 @@ export function InboxView() {
                   type="button"
                   onClick={() => void handleNormalizeSelected()}
                   disabled={isBusy}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] disabled:opacity-50 max-sm:flex-1"
+                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-1)] transition-colors hover:bg-[color:var(--bg-2)] disabled:opacity-50 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "normalize-item" ? (
@@ -1004,7 +1027,7 @@ export function InboxView() {
                     void handleAnalyzeItem(selectedProposal?.state === "pending" ? "replace" : "generate")
                   }
                   disabled={isBusy}
-                  className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 max-sm:flex-1"
+                  className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60 max-sm:flex-1"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {busyAction === "generate-proposal" || busyAction === "replace-proposal" ? (
@@ -1118,13 +1141,35 @@ export function InboxView() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {successMessage && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-[color:var(--success)]/10 px-3 py-2 text-xs font-medium text-[color:var(--success)]">
+            <Check className="h-3.5 w-3.5 shrink-0" />
+            {successMessage}
+          </div>
+        )}
         {!selectedItem ? (
-          <div className="text-sm text-[color:var(--text-2)]">
-            Select an item to inspect its recommendation.
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <div className="rounded-xl bg-[color:var(--bg-2)] p-3">
+              <Sparkles className="h-6 w-6 text-[color:var(--text-2)]" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-[color:var(--text-1)]">No item selected</div>
+              <p className="mt-1 text-xs leading-5 text-[color:var(--text-2)]">
+                Select an item from the queue to see its AI recommendation.
+              </p>
+            </div>
           </div>
         ) : !selectedProposal ? (
-          <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[color:var(--text-2)]">
-            No proposal yet. Normalize or generate a recommendation for this item.
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <div className="rounded-xl border border-dashed border-[var(--border)] p-3">
+              <Bot className="h-6 w-6 text-[color:var(--text-2)]" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-[color:var(--text-1)]">No recommendation yet</div>
+              <p className="mt-1 text-xs leading-5 text-[color:var(--text-2)]">
+                Click <strong>Generate recommendation</strong> on the item panel to analyze this content.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1134,8 +1179,12 @@ export function InboxView() {
                   <div className="text-sm font-semibold text-[color:var(--text-0)]">
                     {actionLabel(selectedProposal.action)}
                   </div>
-                  <div className="mt-1 text-xs text-[color:var(--text-2)]">
-                    Confidence {Math.round(selectedProposal.confidence * 100)}% • {selectedProposal.origin}
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-[color:var(--text-2)]">
+                    <span className={clsx("font-semibold", confidenceTone(selectedProposal.confidence))}>
+                      {Math.round(selectedProposal.confidence * 100)}%
+                    </span>
+                    <span className="opacity-40">·</span>
+                    <span>{selectedProposal.origin}</span>
                   </div>
                 </div>
                 <span
@@ -1188,7 +1237,7 @@ export function InboxView() {
                     type="button"
                     onClick={() => void handleApplyProposal()}
                     disabled={isBusy}
-                    className="rounded-md bg-[color:var(--success)]/15 px-3 py-1.5 text-xs font-medium text-[color:var(--success)] disabled:opacity-60 max-sm:flex-1"
+                    className="rounded-md bg-[color:var(--success)]/15 px-3 py-1.5 text-xs font-medium text-[color:var(--success)] transition-colors hover:bg-[color:var(--success)]/25 disabled:opacity-60 max-sm:flex-1"
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {busyAction === "apply-proposal" ? (
