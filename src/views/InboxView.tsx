@@ -230,7 +230,7 @@ export function InboxView() {
   const [filter, setFilter] = useState<QueueFilter>("review");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode>(null);
-  const [showCapture, setShowCapture] = useState(false);
+  const [showCapture, setShowCapture] = useState(true);
   const [stackPanel, setStackPanel] = useState<StackPanel>("queue");
   const [detailPanel, setDetailPanel] = useState<DetailPanel>("item");
   const [itemEditorTab, setItemEditorTab] = useState<ItemEditorTab>("details");
@@ -1147,12 +1147,6 @@ export function InboxView() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {successMessage && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg bg-[color:var(--success)]/10 px-3 py-2 text-xs font-medium text-[color:var(--success)]">
-            <Check className="h-3.5 w-3.5 shrink-0" />
-            {successMessage}
-          </div>
-        )}
         {!selectedItem ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <div className="rounded-xl bg-[color:var(--bg-2)] p-3">
@@ -1357,6 +1351,15 @@ export function InboxView() {
         </div>
       </div>
 
+      {successMessage && (
+        <div className="shrink-0 border-b border-[color:var(--success)]/20 bg-[color:var(--success)]/8 px-4 py-2.5 lg:px-5">
+          <div className="flex items-center gap-2 text-xs font-medium text-[color:var(--success)]">
+            <Check className="h-3.5 w-3.5 shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+        </div>
+      )}
+
       {layoutMode === "stack" && (
         <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
           <SegmentedControl
@@ -1543,7 +1546,7 @@ function EditorCard({
             content={content}
             onChange={onChange}
             placeholder={placeholder}
-            className="h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-scroller]:min-h-full [&_.cm-scroller]:overflow-auto"
+            className="h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-editor]:min-h-0 [&_.cm-scroller]:h-full [&_.cm-scroller]:min-h-0 [&_.cm-scroller]:overflow-auto [&_.cm-content]:min-h-full"
             themeVariant="clean"
           />
         </div>
