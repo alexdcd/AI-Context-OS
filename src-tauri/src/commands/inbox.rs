@@ -119,6 +119,7 @@ struct MemoryCorpusEntry {
     meta: MemoryMeta,
     path: String,
     document: String,
+    preview: String,
     source_urls: Vec<String>,
 }
 
@@ -243,6 +244,494 @@ fn extract_title_from_html(value: &str) -> Option<String> {
 fn preview_text(value: &str) -> String {
     let compact = value.split_whitespace().collect::<Vec<_>>().join(" ");
     compact.chars().take(280).collect()
+}
+
+fn trim_chars(value: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    value.chars().take(max_chars).collect()
+}
+
+fn unique_strings<I>(values: I) -> Vec<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for value in values {
+        let normalized = value.trim();
+        if normalized.is_empty() {
+            continue;
+        }
+        let owned = normalized.to_string();
+        if seen.insert(owned.clone()) {
+            out.push(owned);
+        }
+    }
+    out
+}
+
+fn union_string_vectors(primary: &[String], secondary: &[String]) -> Vec<String> {
+    unique_strings(
+        primary
+            .iter()
+            .cloned()
+            .chain(secondary.iter().cloned())
+            .collect::<Vec<_>>(),
+    )
+}
+
+fn combine_query_parts(parts: &[String]) -> String {
+    parts
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+fn item_query_text(item: &InboxItem) -> String {
+    combine_query_parts(&[
+        item.title.clone(),
+        item.summary.clone(),
+        item.l1_content.clone(),
+        trim_chars(&item.l2_content, 1200),
+        item.tags.join(" "),
+    ])
+}
+
+fn extract_http_urls(value: &str) -> Vec<String> {
+    let Some(re) = Regex::new(r#"https?://[^\s<>"\])]+"#).ok() else {
+        return Vec::new();
+    };
+    unique_strings(
+        re.find_iter(value)
+            .map(|m| m.as_str().trim_end_matches(&['.', ',', ';', ':'][..]).to_string())
+            .collect::<Vec<_>>(),
+    )
+}
+
+fn memory_index_snapshot(state: &AppState) -> Vec<(MemoryMeta, String)> {
+    let needs_refresh = { state.memory_index.read().unwrap().is_empty() };
+    if needs_refresh {
+        state.refresh_memory_index();
+    }
+
+    state
+        .memory_index
+        .read()
+        .unwrap()
+        .values()
+        .map(|(meta, path)| (meta.clone(), path.clone()))
+        .collect()
+}
+
+fn build_memory_corpus(root: &Path, state: &AppState) -> Vec<MemoryCorpusEntry> {
+    memory_index_snapshot(state)
+        .into_iter()
+        .map(|(meta, path)| {
+            let (document, preview, source_urls) = match read_memory(root, Path::new(&path)) {
+                Ok(memory) => {
+                    let preview = preview_text(&memory.l1_content);
+                    let document = combine_query_parts(&[
+                        meta.l0.clone(),
+                        memory.l1_content.clone(),
+                        trim_chars(&memory.l2_content, 600),
+                        meta.tags.join(" "),
+                    ]);
+                    let source_urls =
+                        extract_http_urls(&format!("{}\n\n{}", memory.l1_content, memory.l2_content));
+                    (document, preview, source_urls)
+                }
+                Err(_) => {
+                    let preview = preview_text(&meta.l0);
+                    let document = combine_query_parts(&[meta.l0.clone(), meta.tags.join(" ")]);
+                    (document, preview, Vec::new())
+                }
+            };
+
+            MemoryCorpusEntry {
+                meta,
+                path,
+                document,
+                preview,
+                source_urls,
+            }
+        })
+        .collect()
+}
+
+fn detect_item_wikilink_targets(item: &InboxItem, memories: &[MemoryMeta]) -> HashSet<String> {
+    let mut targets = HashSet::new();
+    let content = combine_query_parts(&[item.l1_content.clone(), item.l2_content.clone()]);
+    for link in parse_wikilinks(&content) {
+        match resolve_wikilink(&link.inner, memories) {
+            WikilinkResolution::ExactId { id }
+            | WikilinkResolution::ExactL0 { id }
+            | WikilinkResolution::FuzzyL0 { id } => {
+                targets.insert(id);
+            }
+            WikilinkResolution::Ambiguous { .. } | WikilinkResolution::Unresolved => {}
+        }
+    }
+    targets
+}
+
+fn find_inbox_duplicate_candidates(
+    item: &InboxItem,
+    all_items: &[InboxItem],
+) -> Vec<InboxDuplicateCandidate> {
+    all_items
+        .iter()
+        .filter(|other| other.id != item.id)
+        .filter_map(|other| {
+            let same_hash = other.content_hash == item.content_hash;
+            let same_url = item.source_url.is_some() && other.source_url == item.source_url;
+            if !same_hash && !same_url {
+                return None;
+            }
+
+            let (kind, confidence, rationale) = if same_url {
+                (
+                    "inbox_source_url".to_string(),
+                    0.97,
+                    format!("Shares the same source URL as inbox item '{}'.", other.title),
+                )
+            } else {
+                (
+                    "inbox_content_hash".to_string(),
+                    0.95,
+                    format!("Shares the same content hash as inbox item '{}'.", other.title),
+                )
+            };
+
+            Some(InboxDuplicateCandidate {
+                kind,
+                target_id: other.id.clone(),
+                target_title: other.title.clone(),
+                file_path: Some(other.path.clone()),
+                confidence,
+                rationale,
+            })
+        })
+        .collect()
+}
+
+fn is_allowed_destination_dir(root: &Path, dir: &Path) -> bool {
+    let normalized_root = match fs::canonicalize(root) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    let normalized_dir = match fs::canonicalize(dir) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    let paths = SystemPaths::new(&normalized_root);
+
+    normalized_dir.starts_with(&normalized_root)
+        && normalized_dir != paths.inbox_dir()
+        && normalized_dir != paths.sources_dir()
+        && normalized_dir != paths.ai_dir()
+        && !normalized_dir.starts_with(paths.journal_dir())
+        && !normalized_dir.starts_with(paths.scratch_dir())
+}
+
+fn folder_category_for_dir(root: &Path, dir: &Path) -> Option<String> {
+    dir.strip_prefix(root)
+        .ok()?
+        .components()
+        .next()
+        .map(|component| component.as_os_str().to_string_lossy().to_string())
+}
+
+fn infer_destination_candidates(
+    root: &Path,
+    related: &[InboxRelatedMemoryCandidate],
+) -> Vec<InboxDestinationCandidate> {
+    let mut grouped: HashMap<String, Vec<&InboxRelatedMemoryCandidate>> = HashMap::new();
+    for candidate in related {
+        let Some(parent) = Path::new(&candidate.file_path).parent() else {
+            continue;
+        };
+        if !is_allowed_destination_dir(root, parent) {
+            continue;
+        }
+        grouped
+            .entry(parent.to_string_lossy().to_string())
+            .or_default()
+            .push(candidate);
+    }
+
+    let mut destinations: Vec<InboxDestinationCandidate> = grouped
+        .into_iter()
+        .map(|(path, candidates)| {
+            let candidate_path = PathBuf::from(&path);
+            let score = candidates
+                .iter()
+                .take(3)
+                .map(|candidate| candidate.final_score)
+                .sum::<f64>()
+                .min(1.0);
+            let strongest = candidates
+                .iter()
+                .max_by(|left, right| left.final_score.total_cmp(&right.final_score))
+                .map(|candidate| candidate.l0.clone())
+                .unwrap_or_else(|| "related memory".to_string());
+            let mut reasons = vec![format!(
+                "{} related memor{} already live here.",
+                candidates.len(),
+                if candidates.len() == 1 { "y" } else { "ies" }
+            )];
+            reasons.push(format!("Strongest match in this folder: '{}'.", strongest));
+            let contract_role = load_folder_contract(&candidate_path).map(|contract| contract.role);
+            if let Some(role) = &contract_role {
+                reasons.push(format!("Folder contract role: {}.", role));
+            }
+
+            InboxDestinationCandidate {
+                path,
+                folder_category: folder_category_for_dir(root, &candidate_path),
+                score,
+                contract_role,
+                reasons,
+            }
+        })
+        .collect();
+
+    if let Ok(default_path) = default_memory_destination(root) {
+        let default_path = default_path.to_string_lossy().to_string();
+        if !destinations.iter().any(|candidate| candidate.path == default_path) {
+            let default_dir = PathBuf::from(&default_path);
+            destinations.push(InboxDestinationCandidate {
+                path: default_path,
+                folder_category: folder_category_for_dir(root, &default_dir),
+                score: 0.15,
+                contract_role: load_folder_contract(&default_dir).map(|contract| contract.role),
+                reasons: vec![
+                    "Fallback destination when no stronger folder signal exists.".to_string(),
+                ],
+            });
+        }
+    }
+
+    destinations.sort_by(|left, right| right.score.total_cmp(&left.score));
+    destinations
+}
+
+fn build_enrichment_context_prompt(
+    item: &InboxItem,
+    related: &[InboxRelatedMemoryCandidate],
+    duplicates: &[InboxDuplicateCandidate],
+    destinations: &[InboxDestinationCandidate],
+    memory_corpus: &[MemoryCorpusEntry],
+) -> Option<String> {
+    if related.is_empty() && duplicates.is_empty() && destinations.is_empty() {
+        return None;
+    }
+
+    let preview_map: HashMap<String, String> = memory_corpus
+        .iter()
+        .map(|entry| (entry.meta.id.clone(), entry.preview.clone()))
+        .collect();
+
+    let mut lines = vec![format!(
+        "Workspace enrichment for inbox item '{}'. Use only this vetted context when deciding update_memory or destination.",
+        item.title
+    )];
+
+    if !duplicates.is_empty() {
+        lines.push("Possible duplicates:".to_string());
+        for duplicate in duplicates.iter().take(4) {
+            lines.push(format!(
+                "- [{}] {} | confidence {:.2} | {}",
+                duplicate.target_id, duplicate.target_title, duplicate.confidence, duplicate.rationale
+            ));
+        }
+    }
+
+    if !destinations.is_empty() {
+        lines.push("Candidate destinations for promote_memory:".to_string());
+        for destination in destinations.iter().take(4) {
+            lines.push(format!(
+                "- {} | score {:.2} | {}",
+                destination.path,
+                destination.score,
+                destination.reasons.join(" ")
+            ));
+        }
+    }
+
+    if !related.is_empty() {
+        lines.push("Most related existing memories. If you choose update_memory, target_memory_id must be one of these ids:".to_string());
+        for candidate in related.iter().take(5) {
+            let ontology = format!("{:?}", candidate.ontology).to_lowercase();
+            let preview = preview_map
+                .get(&candidate.memory_id)
+                .cloned()
+                .unwrap_or_else(String::new);
+            lines.push(format!(
+                "- [{}] {} | ontology={} | protected={} | folder={} | score {:.2} | preview={} | reasons={}",
+                candidate.memory_id,
+                candidate.l0,
+                ontology,
+                candidate.protected,
+                candidate
+                    .folder_category
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string()),
+                candidate.final_score,
+                preview,
+                candidate.reasons.join(" ")
+            ));
+        }
+    }
+
+    Some(lines.join("\n"))
+}
+
+fn exact_duplicate_candidate(duplicates: &[InboxDuplicateCandidate]) -> Option<&InboxDuplicateCandidate> {
+    duplicates.iter().find(|candidate| {
+        matches!(
+            candidate.kind.as_str(),
+            "inbox_source_url" | "inbox_content_hash" | "memory_source_url"
+        )
+    })
+}
+
+fn attach_enrichment(mut proposal: IngestProposal, enrichment: &InboxEnrichment) -> IngestProposal {
+    proposal.context_memory_ids = enrichment.context_memory_ids.clone();
+    proposal.related_memory_candidates = enrichment.related_memory_candidates.clone();
+    proposal.duplicate_candidates = enrichment.duplicate_candidates.clone();
+    proposal.destination_candidates = enrichment.destination_candidates.clone();
+
+    if proposal.target_memory_id.is_none() {
+        proposal.target_memory_id = enrichment.suggested_target_memory_id.clone();
+    }
+    if proposal.target_memory_path.is_none() {
+        proposal.target_memory_path = enrichment.suggested_target_memory_path.clone();
+    }
+    if proposal.destination.is_none() && matches!(proposal.action, ProposalAction::PromoteMemory) {
+        proposal.destination = enrichment.inferred_destination.clone();
+    }
+
+    proposal
+}
+
+fn apply_exact_duplicate_guard(mut proposal: IngestProposal) -> IngestProposal {
+    if let Some(duplicate) = exact_duplicate_candidate(&proposal.duplicate_candidates) {
+        proposal.action = ProposalAction::Discard;
+        proposal.confidence = proposal.confidence.max(duplicate.confidence);
+        proposal.target_memory_id = None;
+        proposal.target_memory_path = None;
+        proposal.destination = None;
+        proposal.rationale = format!(
+            "Exact duplicate detected: {}",
+            duplicate.rationale
+        );
+    }
+    proposal
+}
+
+fn apply_heuristic_enrichment(
+    mut proposal: IngestProposal,
+    item: &InboxItem,
+    enrichment: &InboxEnrichment,
+) -> IngestProposal {
+    proposal = attach_enrichment(proposal, enrichment);
+    proposal = apply_exact_duplicate_guard(proposal);
+
+    if matches!(proposal.action, ProposalAction::Discard) {
+        return proposal;
+    }
+
+    if matches!(item.kind, InboxItemKind::Text)
+        && matches!(
+            proposal.action,
+            ProposalAction::PromoteMemory | ProposalAction::NeedsReview
+        )
+        && proposal.target_memory_id.is_some()
+    {
+        proposal.action = ProposalAction::UpdateMemory;
+        proposal.ontology = proposal
+            .related_memory_candidates
+            .iter()
+            .find(|candidate| Some(&candidate.memory_id) == proposal.target_memory_id.as_ref())
+            .map(|candidate| candidate.ontology.clone())
+            .or(proposal.ontology);
+        proposal.confidence = proposal.confidence.max(0.78);
+        if let Some(target_id) = &proposal.target_memory_id {
+            let target_title = proposal
+                .related_memory_candidates
+                .iter()
+                .find(|candidate| &candidate.memory_id == target_id)
+                .map(|candidate| candidate.l0.clone())
+                .unwrap_or_else(|| target_id.clone());
+            proposal.rationale = format!(
+                "Strong match with existing memory '{}'; updating it is safer than creating a near-duplicate.",
+                target_title
+            );
+        }
+    } else if matches!(proposal.action, ProposalAction::PromoteMemory) {
+        proposal.destination = proposal
+            .destination
+            .clone()
+            .or_else(|| enrichment.inferred_destination.clone());
+    }
+
+    proposal
+}
+
+fn apply_inferred_enrichment(mut proposal: IngestProposal, enrichment: &InboxEnrichment) -> IngestProposal {
+    let candidate_ids: HashSet<String> = enrichment
+        .related_memory_candidates
+        .iter()
+        .map(|candidate| candidate.memory_id.clone())
+        .collect();
+    let candidate_paths: HashSet<String> = enrichment
+        .destination_candidates
+        .iter()
+        .map(|candidate| candidate.path.clone())
+        .collect();
+
+    proposal = attach_enrichment(proposal, enrichment);
+
+    if matches!(proposal.action, ProposalAction::UpdateMemory)
+        && proposal
+            .target_memory_id
+            .as_ref()
+            .map(|id| !candidate_ids.contains(id))
+            .unwrap_or(true)
+    {
+        if let Some(fallback_id) = &enrichment.suggested_target_memory_id {
+            proposal.target_memory_id = Some(fallback_id.clone());
+            proposal.target_memory_path = enrichment.suggested_target_memory_path.clone();
+            proposal.rationale = format!(
+                "{} Fallbacked to the strongest vetted related memory.",
+                proposal.rationale
+            );
+        } else {
+            proposal.action = ProposalAction::NeedsReview;
+            proposal.target_memory_id = None;
+            proposal.target_memory_path = None;
+            proposal.rationale = format!(
+                "{} No valid target_memory_id was provided from the vetted related-memory set.",
+                proposal.rationale
+            );
+        }
+    }
+
+    if matches!(proposal.action, ProposalAction::PromoteMemory)
+        && proposal
+            .destination
+            .as_ref()
+            .map(|destination| !candidate_paths.contains(destination))
+            .unwrap_or(true)
+    {
+        proposal.destination = enrichment.inferred_destination.clone();
+    }
+
+    apply_exact_duplicate_guard(proposal)
 }
 
 fn inbox_frontmatter_to_item(
