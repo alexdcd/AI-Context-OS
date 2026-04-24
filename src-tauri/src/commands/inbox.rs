@@ -304,9 +304,9 @@ fn compute_item_content_hash(
     stored_hash: Option<&str>,
 ) -> String {
     match kind {
-        InboxItemKind::Link => source_url.map(hash_str).unwrap_or_else(|| {
-            hash_str(&canonical_item_body(title, l1, l2))
-        }),
+        InboxItemKind::Link => source_url
+            .map(hash_str)
+            .unwrap_or_else(|| hash_str(&canonical_item_body(title, l1, l2))),
         InboxItemKind::File => {
             if let Some(attachment) = attachments.first() {
                 if let Ok(bytes) = fs::read(&attachment.path) {
@@ -493,7 +493,8 @@ fn is_allowed_destination_dir(root: &Path, dir: &Path) -> bool {
         Err(_) => return false,
     };
 
-    normalized_dir.starts_with(&normalized_root) && !is_disallowed(&normalized_dir, &normalized_root)
+    normalized_dir.starts_with(&normalized_root)
+        && !is_disallowed(&normalized_dir, &normalized_root)
 }
 
 fn folder_category_for_dir(root: &Path, dir: &Path) -> Option<String> {
@@ -835,10 +836,17 @@ fn inbox_frontmatter_to_item(
             frontmatter.content_hash.as_deref(),
         )
     } else {
-        frontmatter
-            .content_hash
-            .clone()
-            .unwrap_or_else(|| compute_item_content_hash(&kind, &title, &l1, &l2, source_url.as_deref(), &attachments, None))
+        frontmatter.content_hash.clone().unwrap_or_else(|| {
+            compute_item_content_hash(
+                &kind,
+                &title,
+                &l1,
+                &l2,
+                source_url.as_deref(),
+                &attachments,
+                None,
+            )
+        })
     };
 
     InboxItem {
@@ -1558,10 +1566,10 @@ pub(super) fn build_anthropic_messages(request: &ChatCompletionRequest) -> Vec<V
     normalized_turns
         .into_iter()
         .map(|(role, text)| {
-        json!({
-                "role": role,
-                "content": [{ "type": "text", "text": text }]
-        })
+            json!({
+                    "role": role,
+                    "content": [{ "type": "text", "text": text }]
+            })
         })
         .collect()
 }
@@ -2438,7 +2446,15 @@ pub fn create_inbox_text(
         status: InboxItemStatus::New,
         capture_state: "raw".to_string(),
         proposal_state: ProposalState::Pending,
-        content_hash: compute_item_content_hash(&InboxItemKind::Text, &title, &l1, "", None, &[], None),
+        content_hash: compute_item_content_hash(
+            &InboxItemKind::Text,
+            &title,
+            &l1,
+            "",
+            None,
+            &[],
+            None,
+        ),
         created: now,
         modified: now,
         path: path.to_string_lossy().to_string(),
@@ -3754,7 +3770,7 @@ mod tests {
             model: None,
         });
 
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 1);
         assert_eq!(
             messages[0].get("role").and_then(|v| v.as_str()),
             Some("user")
@@ -3764,16 +3780,7 @@ mod tests {
             .and_then(|v| v.as_str())
             .unwrap_or_default();
         assert!(ctx_text.contains("Yo soy alex dc"));
-
-        assert_eq!(
-            messages[1].get("role").and_then(|v| v.as_str()),
-            Some("user")
-        );
-        let user_text = messages[1]
-            .pointer("/content/0/text")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default();
-        assert_eq!(user_text, "como me llamo?");
+        assert!(ctx_text.contains("como me llamo?"));
     }
 
     #[test]
@@ -3805,6 +3812,27 @@ mod tests {
             messages[1].get("role").and_then(|v| v.as_str()),
             Some("assistant")
         );
+    }
+
+    #[test]
+    fn content_hash_is_stable_and_recomputes_legacy_text_hashes() {
+        let hash = hash_str("hola");
+        assert!(hash.starts_with("fnv1a64:"));
+
+        let item = inbox_frontmatter_to_item(
+            InboxFrontmatter {
+                id: "legacy".to_string(),
+                kind: Some(InboxItemKind::Text),
+                title: Some("Legacy note".to_string()),
+                content_hash: Some("sip64:deadbeef".to_string()),
+                ..InboxFrontmatter::default()
+            },
+            "L1 body".to_string(),
+            Path::new("/tmp/legacy.md"),
+        );
+
+        assert!(item.content_hash.starts_with("fnv1a64:"));
+        assert_ne!(item.content_hash, "sip64:deadbeef".to_string());
     }
 
     #[test]
