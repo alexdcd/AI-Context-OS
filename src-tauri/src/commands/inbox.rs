@@ -2737,15 +2737,14 @@ pub fn reject_ingest_proposal(
 
 fn default_memory_destination(root: &Path) -> Result<PathBuf, String> {
     let paths = SystemPaths::new(root);
-    for entry in fs::read_dir(root).map_err(|e| format!("Failed to read workspace root: {}", e))? {
-        let entry = entry.map_err(|e| format!("Failed to read workspace entry: {}", e))?;
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        if path == paths.inbox_dir() || path == paths.sources_dir() || path == paths.ai_dir() {
-            continue;
-        }
+    let mut candidates = fs::read_dir(root)
+        .map_err(|e| format!("Failed to read workspace root: {}", e))?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.is_dir())
+        .filter(|path| *path != paths.inbox_dir() && *path != paths.sources_dir() && *path != paths.ai_dir())
+        .collect::<Vec<_>>();
+    candidates.sort();
+    if let Some(path) = candidates.into_iter().next() {
         return Ok(path);
     }
     Ok(root.to_path_buf())
@@ -2801,6 +2800,12 @@ fn build_memory_from_proposal(
     let l0 = proposal.l0.clone().unwrap_or_else(|| item.title.clone());
     let ontology = proposal.ontology.clone().unwrap_or(MemoryOntology::Concept);
     let path = destination.join(format!("{}.md", memory_id));
+    let related = proposal
+        .related_memory_candidates
+        .iter()
+        .map(|candidate| candidate.memory_id.clone())
+        .take(5)
+        .collect::<Vec<_>>();
     Ok(Memory {
         meta: MemoryMeta {
             id: memory_id,
@@ -2816,7 +2821,7 @@ fn build_memory_from_proposal(
             } else {
                 proposal.tags.clone()
             },
-            related: Vec::new(),
+            related,
             created: Utc::now(),
             modified: Utc::now(),
             version: 1,
@@ -2864,6 +2869,12 @@ fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path)
         }
         l2.push_str(&format!("Imported file: {}", original_file));
     }
+    let related = proposal
+        .related_memory_candidates
+        .iter()
+        .map(|candidate| candidate.memory_id.clone())
+        .take(5)
+        .collect::<Vec<_>>();
     Memory {
         meta: MemoryMeta {
             id: source_id,
@@ -2879,7 +2890,7 @@ fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path)
             } else {
                 proposal.tags.clone()
             },
-            related: Vec::new(),
+            related,
             created: Utc::now(),
             modified: Utc::now(),
             version: 1,
@@ -2903,6 +2914,113 @@ fn build_source_memory(item: &InboxItem, proposal: &IngestProposal, root: &Path)
     }
 }
 
+fn resolve_target_memory_path(
+    root: &Path,
+    state: &AppState,
+    proposal: &IngestProposal,
+) -> Result<PathBuf, String> {
+    if let Some(path) = &proposal.target_memory_path {
+        return Ok(PathBuf::from(path));
+    }
+
+    let target_id = proposal
+        .target_memory_id
+        .as_ref()
+        .ok_or_else(|| "Update proposal is missing target_memory_id".to_string())?;
+
+    let snapshot = memory_index_snapshot(state);
+    snapshot
+        .into_iter()
+        .find(|(meta, _)| &meta.id == target_id)
+        .map(|(_, path)| PathBuf::from(path))
+        .ok_or_else(|| format!("Target memory not found: {}", target_id))
+}
+
+fn merge_update_payload(item: &InboxItem, proposal: &IngestProposal) -> String {
+    let mut sections = Vec::new();
+    let summary = proposal
+        .l1_content
+        .clone()
+        .unwrap_or_else(|| item.summary.clone())
+        .trim()
+        .to_string();
+    if !summary.is_empty() {
+        sections.push(summary);
+    }
+
+    let details = proposal
+        .l2_content
+        .clone()
+        .unwrap_or_else(|| item.l2_content.clone())
+        .trim()
+        .to_string();
+    if !details.is_empty() {
+        sections.push(details);
+    }
+
+    if let Some(url) = &item.source_url {
+        sections.push(format!("Original URL: {}", url));
+    }
+    if let Some(original_file) = &item.original_file {
+        sections.push(format!("Imported file: {}", original_file));
+    }
+
+    let body = sections.join("\n\n");
+    if body.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "### Inbox update from {}\n\n{}",
+            item.title,
+            body
+        )
+    }
+}
+
+fn apply_update_memory(
+    root: &Path,
+    state: &AppState,
+    item: &InboxItem,
+    proposal: &IngestProposal,
+) -> Result<PathBuf, String> {
+    let target_path = resolve_target_memory_path(root, state, proposal)?;
+    let mut memory = read_memory(root, &target_path)?;
+    if memory.meta.protected {
+        return Err(format!(
+            "Memory '{}' is protected. Unprotect it before applying an inbox update.",
+            memory.meta.id
+        ));
+    }
+
+    let appended = merge_update_payload(item, proposal);
+    if !appended.is_empty() && !memory.l2_content.contains(appended.trim()) {
+        if !memory.l2_content.trim().is_empty() {
+            memory.l2_content.push_str("\n\n");
+        }
+        memory.l2_content.push_str(&appended);
+    }
+
+    memory.meta.tags = union_string_vectors(&memory.meta.tags, &proposal.tags);
+    let related_ids = proposal
+        .related_memory_candidates
+        .iter()
+        .map(|candidate| candidate.memory_id.clone())
+        .filter(|memory_id| memory_id != &memory.meta.id)
+        .collect::<Vec<_>>();
+    memory.meta.related = union_string_vectors(&memory.meta.related, &related_ids);
+    memory.meta.derived_from = union_string_vectors(
+        &memory.meta.derived_from,
+        &vec![item.id.clone()],
+    );
+    memory.meta.confidence = memory.meta.confidence.max(proposal.confidence);
+    memory.meta.modified = Utc::now();
+    memory.meta.version = memory.meta.version.saturating_add(1);
+
+    write_memory(&target_path, &memory)?;
+    state.mark_recent_write(&target_path);
+    Ok(target_path)
+}
+
 #[tauri::command]
 pub fn apply_ingest_proposal(
     input: ApplyIngestProposalInput,
@@ -2919,9 +3037,14 @@ pub fn apply_ingest_proposal(
         .find(|item| item.id == proposal.item_id)
         .ok_or_else(|| format!("Inbox item not found: {}", proposal.item_id))?;
 
+    let requested_destination = input
+        .destination_dir
+        .clone()
+        .or_else(|| proposal.destination.clone());
+
     match proposal.action {
         ProposalAction::PromoteMemory => {
-            let destination = ensure_valid_destination(&root, input.destination_dir.clone())?;
+            let destination = ensure_valid_destination(&root, requested_destination)?;
             let memory = build_memory_from_proposal(
                 &item,
                 &proposal,
@@ -2929,10 +3052,12 @@ pub fn apply_ingest_proposal(
                 input.memory_id_override,
             )?;
             write_memory(Path::new(&memory.file_path), &memory)?;
+            state.mark_recent_write(Path::new(&memory.file_path));
         }
         ProposalAction::RouteToSources => {
             let memory = build_source_memory(&item, &proposal, &root);
             write_memory(Path::new(&memory.file_path), &memory)?;
+            state.mark_recent_write(Path::new(&memory.file_path));
             for attachment in &item.attachments {
                 let source_path = PathBuf::from(&attachment.path);
                 if source_path.exists() {
@@ -2959,7 +3084,16 @@ pub fn apply_ingest_proposal(
                 ProposalState::Applied,
             )?;
         }
-        ProposalAction::NeedsReview | ProposalAction::UpdateMemory => {
+        ProposalAction::UpdateMemory => {
+            let _ = apply_update_memory(&root, state.inner(), &item, &proposal)?;
+            let _ = update_item_status(
+                &root,
+                &item.id,
+                InboxItemStatus::Processed,
+                ProposalState::Applied,
+            )?;
+        }
+        ProposalAction::NeedsReview => {
             let _ = update_item_status(
                 &root,
                 &item.id,
@@ -2975,14 +3109,19 @@ pub fn apply_ingest_proposal(
 
     if matches!(
         proposal.action,
-        ProposalAction::PromoteMemory | ProposalAction::RouteToSources
+        ProposalAction::PromoteMemory | ProposalAction::RouteToSources | ProposalAction::UpdateMemory
     ) {
-        let _ = update_item_status(
-            &root,
-            &item.id,
-            InboxItemStatus::Promoted,
-            ProposalState::Applied,
-        )?;
+        if matches!(
+            proposal.action,
+            ProposalAction::PromoteMemory | ProposalAction::RouteToSources
+        ) {
+            let _ = update_item_status(
+                &root,
+                &item.id,
+                InboxItemStatus::Promoted,
+                ProposalState::Applied,
+            )?;
+        }
         state.refresh_memory_index();
         let _ = crate::commands::router::regenerate_router_internal(&app, &state);
     }
