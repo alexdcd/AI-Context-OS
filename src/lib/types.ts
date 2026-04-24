@@ -316,6 +316,43 @@ export interface InboxItem {
   attachments: InboxAttachment[];
 }
 
+export interface InboxRecommendationScore {
+  bm25: number;
+  tag_overlap: number;
+  l0_keyword: number;
+  wikilink: number;
+  source_url: number;
+}
+
+export interface InboxRelatedMemoryCandidate {
+  memory_id: string;
+  l0: string;
+  ontology: MemoryOntology;
+  file_path: string;
+  folder_category: string | null;
+  protected: boolean;
+  score: InboxRecommendationScore;
+  final_score: number;
+  reasons: string[];
+}
+
+export interface InboxDuplicateCandidate {
+  kind: string;
+  target_id: string;
+  target_title: string;
+  file_path: string | null;
+  confidence: number;
+  rationale: string;
+}
+
+export interface InboxDestinationCandidate {
+  path: string;
+  folder_category: string | null;
+  score: number;
+  contract_role: string | null;
+  reasons: string[];
+}
+
 export interface IngestProposal {
   id: string;
   item_id: string;
@@ -327,12 +364,18 @@ export interface IngestProposal {
   created: string;
   modified: string;
   destination: string | null;
+  target_memory_id: string | null;
+  target_memory_path: string | null;
   ontology: MemoryOntology | null;
   l0: string | null;
   l1_content: string | null;
   l2_content: string | null;
   tags: string[];
   derived_from: string[];
+  context_memory_ids: string[];
+  related_memory_candidates: InboxRelatedMemoryCandidate[];
+  duplicate_candidates: InboxDuplicateCandidate[];
+  destination_candidates: InboxDestinationCandidate[];
   inference_provider: InferenceProviderKind | null;
   inference_preset: InferenceProviderPreset | null;
   origin: string;

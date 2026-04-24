@@ -467,6 +467,62 @@ pub struct InboxItem {
     pub attachments: Vec<InboxAttachment>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct InboxRecommendationScore {
+    #[serde(default)]
+    pub bm25: f64,
+    #[serde(default)]
+    pub tag_overlap: f64,
+    #[serde(default)]
+    pub l0_keyword: f64,
+    #[serde(default)]
+    pub wikilink: f64,
+    #[serde(default)]
+    pub source_url: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboxRelatedMemoryCandidate {
+    pub memory_id: String,
+    pub l0: String,
+    pub ontology: MemoryOntology,
+    pub file_path: String,
+    #[serde(default)]
+    pub folder_category: Option<String>,
+    #[serde(default)]
+    pub protected: bool,
+    #[serde(default)]
+    pub score: InboxRecommendationScore,
+    #[serde(default)]
+    pub final_score: f64,
+    #[serde(default)]
+    pub reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboxDuplicateCandidate {
+    pub kind: String,
+    pub target_id: String,
+    pub target_title: String,
+    #[serde(default)]
+    pub file_path: Option<String>,
+    pub confidence: f64,
+    pub rationale: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboxDestinationCandidate {
+    pub path: String,
+    #[serde(default)]
+    pub folder_category: Option<String>,
+    #[serde(default)]
+    pub score: f64,
+    #[serde(default)]
+    pub contract_role: Option<String>,
+    #[serde(default)]
+    pub reasons: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IngestProposal {
     pub id: String,
@@ -481,6 +537,10 @@ pub struct IngestProposal {
     #[serde(default)]
     pub destination: Option<String>,
     #[serde(default)]
+    pub target_memory_id: Option<String>,
+    #[serde(default)]
+    pub target_memory_path: Option<String>,
+    #[serde(default)]
     pub ontology: Option<MemoryOntology>,
     #[serde(default)]
     pub l0: Option<String>,
@@ -492,6 +552,14 @@ pub struct IngestProposal {
     pub tags: Vec<String>,
     #[serde(default)]
     pub derived_from: Vec<String>,
+    #[serde(default)]
+    pub context_memory_ids: Vec<String>,
+    #[serde(default)]
+    pub related_memory_candidates: Vec<InboxRelatedMemoryCandidate>,
+    #[serde(default)]
+    pub duplicate_candidates: Vec<InboxDuplicateCandidate>,
+    #[serde(default)]
+    pub destination_candidates: Vec<InboxDestinationCandidate>,
     #[serde(default)]
     pub inference_provider: Option<InferenceProviderKind>,
     #[serde(default)]
