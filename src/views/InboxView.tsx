@@ -1252,7 +1252,7 @@ export function InboxView() {
                     type="button"
                     onClick={() => void handleRejectProposal()}
                     disabled={isBusy}
-                    className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] disabled:opacity-60 max-sm:flex-1"
+                    className="rounded-md bg-[color:var(--danger)]/10 px-3 py-1.5 text-xs font-medium text-[color:var(--danger)] transition-colors hover:bg-[color:var(--danger)]/20 disabled:opacity-60 max-sm:flex-1"
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {busyAction === "reject-proposal" ? (
