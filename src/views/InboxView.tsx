@@ -825,31 +825,35 @@ export function InboxView() {
                   type="button"
                   onClick={() => handleSelectItem(item.id)}
                   className={clsx(
-                    "w-full rounded-xl border p-3 text-left transition-colors",
+                    "w-full overflow-hidden rounded-xl border p-3 text-left transition-colors",
                     isSelected
                       ? "border-[color:var(--accent)] bg-[color:var(--accent-muted)]/50"
                       : "border-[var(--border)] bg-[color:var(--bg-0)] hover:bg-[color:var(--bg-2)]",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-[color:var(--text-0)]">
-                        {item.title}
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <div className="flex min-w-0 flex-wrap items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="line-clamp-2 text-sm font-semibold leading-6 text-[color:var(--text-0)] [overflow-wrap:anywhere]">
+                          {item.title}
+                        </div>
                       </div>
-                      <div className="mt-1 line-clamp-2 text-xs text-[color:var(--text-2)]">
+                      <span
+                        className={clsx(
+                          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                          statusTone(item, proposal),
+                        )}
+                      >
+                        {bucketLabel(bucket)}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="line-clamp-3 text-xs leading-5 text-[color:var(--text-2)] [overflow-wrap:anywhere]">
                         {item.summary || item.l1_content || item.l2_content || "No preview yet"}
                       </div>
                     </div>
-                    <span
-                      className={clsx(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                        statusTone(item, proposal),
-                      )}
-                    >
-                      {bucketLabel(bucket)}
-                    </span>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[color:var(--text-2)]">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[color:var(--text-2)]">
                     <span>{item.kind}</span>
                     <span>•</span>
                     <span>{item.status}</span>
