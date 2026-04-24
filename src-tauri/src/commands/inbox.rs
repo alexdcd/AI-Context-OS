@@ -2106,13 +2106,17 @@ fn duplicate_proposal(item: &InboxItem, duplicate_of: &InboxItem) -> IngestPropo
     }
 }
 
-async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal, String> {
+async fn infer_proposal(
+    root: &Path,
+    item: &InboxItem,
+    enrichment: &InboxEnrichment,
+) -> Result<IngestProposal, String> {
     let config = load_provider_config(root)?.ok_or_else(|| "No provider configured".to_string())?;
     if !config.enabled {
         return Err("Provider is disabled".to_string());
     }
 
-    let system_prompt = "You are generating governed ingestion proposals for AI Context OS. Reply with JSON only. Allowed action values: promote_memory, route_to_sources, update_memory, discard, needs_review. Allowed ontology values: source, entity, concept, synthesis. Keep proposals conservative.";
+    let system_prompt = "You are generating governed ingestion proposals for AI Context OS. Reply with JSON only. Allowed action values: promote_memory, route_to_sources, update_memory, discard, needs_review. Allowed ontology values: source, entity, concept, synthesis. Be conservative. If you choose update_memory, target_memory_id must be one of the provided related_memory_ids. If you choose promote_memory, destination should be one of the provided destination_candidates when available.";
     let user_payload = json!({
         "item": {
             "id": item.id,
@@ -2126,10 +2130,18 @@ async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal,
             "needs_extraction": item.needs_extraction,
             "needs_inference": item.needs_inference
         },
+        "related_memory_ids": enrichment.context_memory_ids,
+        "destination_candidates": enrichment
+            .destination_candidates
+            .iter()
+            .map(|candidate| candidate.path.clone())
+            .collect::<Vec<_>>(),
         "response_schema": {
             "action": "promote_memory|route_to_sources|update_memory|discard|needs_review",
             "confidence": 0.0,
             "rationale": "short rationale",
+            "destination": "string|null",
+            "target_memory_id": "string|null",
             "ontology": "source|entity|concept|synthesis|null",
             "l0": "string|null",
             "l1_content": "string|null",
@@ -2143,8 +2155,8 @@ async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal,
         &ChatCompletionRequest {
             system_prompt: Some(system_prompt.to_string()),
             include_vault_context: false,
-            context_prompt: None,
-            context_memory_ids: Vec::new(),
+            context_prompt: enrichment.context_prompt.clone(),
+            context_memory_ids: enrichment.context_memory_ids.clone(),
             model: Some(config.model.clone()),
             messages: vec![ChatMessage {
                 role: "user".to_string(),
@@ -2164,7 +2176,7 @@ async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal,
     })?;
     let now = Utc::now();
 
-    Ok(IngestProposal {
+    Ok(apply_inferred_enrichment(IngestProposal {
         id: format!("proposal-{}", Uuid::new_v4().simple()),
         item_id: item.id.clone(),
         item_path: item.path.clone(),
@@ -2174,7 +2186,9 @@ async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal,
         rationale: parsed.rationale,
         created: now,
         modified: now,
-        destination: None,
+        destination: parsed.destination,
+        target_memory_id: parsed.target_memory_id,
+        target_memory_path: None,
         ontology: parsed.ontology,
         l0: parsed.l0.or_else(|| Some(item.title.clone())),
         l1_content: parsed.l1_content.or_else(|| Some(item.summary.clone())),
@@ -2185,10 +2199,14 @@ async fn infer_proposal(root: &Path, item: &InboxItem) -> Result<IngestProposal,
             parsed.tags
         },
         derived_from: vec![item.id.clone()],
+        context_memory_ids: Vec::new(),
+        related_memory_candidates: Vec::new(),
+        duplicate_candidates: Vec::new(),
+        destination_candidates: Vec::new(),
         inference_provider: Some(config.kind.clone()),
         inference_preset: Some(config.preset.clone()),
         origin: "inferred".to_string(),
-    })
+    }, enrichment))
 }
 
 fn update_item_status(
@@ -2610,6 +2628,8 @@ pub async fn generate_ingest_proposals(
     state: State<'_, AppState>,
 ) -> Result<Vec<IngestProposal>, String> {
     let root = state.get_root();
+    state.refresh_memory_index();
+    let memory_corpus = build_memory_corpus(&root, state.inner());
     let items = load_inbox_items(&root)?;
     let all_items = if item_ids.is_empty() {
         items.clone()
@@ -2640,6 +2660,8 @@ pub async fn generate_ingest_proposals(
                 "total": total,
             }),
         );
+        let inbox_duplicates = find_inbox_duplicate_candidates(&item, &items);
+        let enrichment = build_inbox_enrichment(&root, &item, &memory_corpus, inbox_duplicates);
         let mut proposal = items
             .iter()
             .find(|other| {
@@ -2649,7 +2671,8 @@ pub async fn generate_ingest_proposals(
             })
             .map(|duplicate_of| duplicate_proposal(&item, duplicate_of))
             .unwrap_or_else(|| heuristic_proposal(&item));
-        match infer_proposal(&root, &item).await {
+        proposal = apply_heuristic_enrichment(proposal, &item, &enrichment);
+        match infer_proposal(&root, &item, &enrichment).await {
             Ok(inferred) => {
                 if !matches!(proposal.action, ProposalAction::Discard) {
                     proposal = inferred;
