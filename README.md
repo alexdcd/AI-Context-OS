@@ -19,7 +19,7 @@
 
 ## Temporary Public Snapshot
 
-This repository is temporarily limited to an earlier public snapshot while the current version is being stabilized.
+This repository is temporarily limited to an earlier public snapshot.
 
 Active development is continuing in private and a newer public version will be published again once it is ready.
 
