@@ -255,3 +255,23 @@ pub fn blocks_to_markdown(blocks: &[JournalBlock]) -> String {
 
     lines.join("\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_date() {
+        assert!(validate_date("2023-10-15"));
+        assert!(validate_date("2024-02-29")); // Leap year
+        assert!(validate_date("1999-01-01"));
+
+        assert!(!validate_date("2023-13-01")); // Invalid month
+        assert!(!validate_date("2023-00-01")); // Invalid month
+        assert!(!validate_date("2023-10-32")); // Invalid day
+        assert!(!validate_date("2023/10/15")); // Invalid format
+        assert!(!validate_date("15-10-2023")); // Invalid format
+        assert!(!validate_date("2023-10")); // Incomplete
+        assert!(!validate_date("not-a-date")); // Random string
+    }
+}
