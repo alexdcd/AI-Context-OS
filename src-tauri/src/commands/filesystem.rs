@@ -140,7 +140,21 @@ fn path_contains_protected_content(root: &Path, target: &Path) -> Option<String>
 
 /// Read a file's raw content.
 #[tauri::command]
-pub fn read_file(path: String) -> Result<String, String> {
+pub fn read_file(path: String, state: State<AppState>) -> Result<String, String> {
+    let root = state.get_root();
+    let target = Path::new(&path);
+
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve workspace root: {}", e))?;
+    let canonical_target = target
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve path {}: {}", path, e))?;
+
+    if !canonical_target.starts_with(&canonical_root) {
+        return Err("Access denied: path is outside workspace root".to_string());
+    }
+
     fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
 }
 
