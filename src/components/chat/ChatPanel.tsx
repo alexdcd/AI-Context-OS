@@ -46,7 +46,7 @@ const SYSTEM_PROMPT =
   "Be concise, factual, and preserve the user's language.";
 
 function nanoid(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  return crypto.randomUUID();
 }
 
 function scoreColor(score?: number): string {

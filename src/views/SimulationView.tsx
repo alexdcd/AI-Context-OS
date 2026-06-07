@@ -62,7 +62,7 @@ export function SimulationView() {
       setActiveHistoryId(null);
 
       const run: SimulationRun = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: crypto.randomUUID(),
         query: query.trim(),
         budget,
         timestamp: Date.now(),
