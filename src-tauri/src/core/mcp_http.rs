@@ -4,7 +4,8 @@ use axum::Router;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use rmcp::transport::streamable_http_server::tower::StreamableHttpService;
 use rmcp::transport::streamable_http_server::StreamableHttpServerConfig;
-use tower_http::cors::{Any, CorsLayer};
+use http::{HeaderValue, Method};
+use tower_http::cors::CorsLayer;
 
 use crate::core::mcp::{AiContextMcpServer, McpSharedState};
 
@@ -27,9 +28,12 @@ pub fn build_mcp_router(shared_state: Arc<McpSharedState>) -> Router {
     let mcp_service = StreamableHttpService::new(factory, session_manager, config);
 
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin([
+            "tauri://localhost".parse::<HeaderValue>().unwrap(),
+            "http://localhost:1420".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1:1420".parse::<HeaderValue>().unwrap(),
+        ])
+        .allow_methods([Method::GET, Method::POST]);
 
     Router::new().nest_service("/mcp", mcp_service).layer(cors)
 }
