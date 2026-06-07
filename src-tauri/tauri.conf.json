@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri: ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src http: https:; img-src * data: blob:; font-src 'self' data:"
     }
   },
   "bundle": {
