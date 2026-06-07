@@ -503,6 +503,17 @@ const structuralDecorations = ViewPlugin.fromClass(
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+function safeOpenUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      open(url).catch(console.error);
+    }
+  } catch {
+    // Invalid URL — do nothing.
+  }
+}
+
 function buildLinkIconSvg(): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("width", "12");
@@ -548,7 +559,7 @@ class LinkIconWidget extends WidgetType {
     span.appendChild(buildLinkIconSvg());
 
     span.addEventListener("click", (e) => {
-      open(this.url).catch(console.error);
+      safeOpenUrl(this.url);
       e.preventDefault();
       e.stopPropagation();
     });
@@ -624,7 +635,7 @@ class ImagePreviewWidget extends WidgetType {
     root.append(preview, text);
 
     root.addEventListener("click", (e) => {
-      open(this.url).catch(console.error);
+      safeOpenUrl(this.url);
       e.preventDefault();
       e.stopPropagation();
     });
